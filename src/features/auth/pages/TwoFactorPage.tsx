@@ -97,15 +97,35 @@ export function TwoFactorPage() {
         tenantHeader as string | undefined,
       );
 
-      if (result.tokens?.access_token) {
-        localStorageService.set(storageKeys.accessToken, result.tokens.access_token);
+      if (!result.success) {
+        throw new Error(result.message || "Verification failed. Please try again.");
       }
-      if (result.tokens?.refresh_token) {
-        localStorageService.set(storageKeys.refreshToken, result.tokens.refresh_token);
+
+      const accessToken = result.tokens?.access_token || result.access_token;
+      const refreshToken = result.tokens?.refresh_token || result.refresh_token;
+
+      if (accessToken) {
+        localStorageService.set(storageKeys.accessToken, accessToken);
       }
-      if (result.user) {
-        localStorageService.set(storageKeys.user, JSON.stringify(result.user));
+      if (refreshToken) {
+        localStorageService.set(storageKeys.refreshToken, refreshToken);
       }
+
+      // Reconstruct user object from flat response if needed
+      const user = result.user || {
+        id: result.admin_id || 0,
+        email: result.email || "",
+        first_name: result.first_name || "",
+        last_name: result.last_name || "",
+        username: result.email || "",
+        status: "ACTIVE",
+        is_superuser: true,
+        is_email_verified: true,
+        is_phone_verified: true,
+        is_two_factor_enabled: false,
+      };
+
+      localStorageService.set(storageKeys.user, JSON.stringify(user));
 
       let target: string = routes.dashboard;
       try {

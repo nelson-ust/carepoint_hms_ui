@@ -1,0 +1,20 @@
+Email: superadmin@carepointhms.com
+Password: SuperAdmin123!
+
+
+Tenant Admin Email: nelson.attah@live.com
+Tenant Admin Password: S3cure!Password2026
+tenant_code: stnicholas
+
+
+
+https://evercare.carepointhms.com/dashboard
+Tenant Admin Email: nel.attah@gmail.com
+Tenant Admin Username: evercare_admin
+Tenant Admin Password: Ever!Secure2026
+
+
+https://cedarcrest.carepointhms.com
+Tenant Admin Email:  nattah@ccfng.org
+Tenant Admin_username: cedarcrest_admin
+Tenant AdminPassword": Cedar!Secure2026

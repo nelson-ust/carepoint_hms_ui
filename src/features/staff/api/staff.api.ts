@@ -1,5 +1,31 @@
 import { apiClient } from "@/lib/api/api-client";
 import type { PaginatedResponse } from "@/features/visits/api/visits.api";
+import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
+
+/**
+ * Resolves the currently logged-in user to their corresponding Staff record.
+ * This is used to avoid hard-coding IDs like '1' in clinical/admin actions.
+ */
+export async function getCurrentStaff(staffList?: Staff[]): Promise<Staff | null> {
+  try {
+    const raw = localStorageService.get(storageKeys.user);
+    if (!raw) return null;
+    const user = JSON.parse(raw);
+    const userId = user?.id;
+    if (typeof userId !== "number") return null;
+
+    // If a list is provided (already loaded in page), search it.
+    if (staffList && staffList.length > 0) {
+      return staffList.find((s) => s.user_id === userId) ?? null;
+    }
+
+    // Otherwise, fetch from the API.
+    const allStaff = await getStaff(0, 1000);
+    return allStaff.find((s) => s.user_id === userId) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export type Staff = {
   id: number;

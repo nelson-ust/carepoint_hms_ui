@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getVisitDetails, getServiceDeliveryPoints, rerouteVisit, ServiceDeliveryPoint, Visit } from "../api/visits.api";
+import { getCurrentStaff } from "@/features/staff/api/staff.api";
 import { routes } from "@/config/routes";
 
 export function VisitReRoutePage() {
@@ -63,9 +64,15 @@ export function VisitReRoutePage() {
     setIsSubmitting(true);
     setError(null);
     try {
+      const currentStaff = await getCurrentStaff();
+      if (!currentStaff) {
+        setError("Unable to identify current clinician. Please re-login.");
+        return;
+      }
+
       await rerouteVisit(Number(visitId), {
         service_delivery_point_id: selectedSdp,
-        routed_by_id: 1, // Current user ID (mock)
+        routed_by_id: currentStaff.id,
         reason: reason,
         create_queue_ticket: true,
         queue_status: "WAITING",

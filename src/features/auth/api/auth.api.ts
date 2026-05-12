@@ -56,8 +56,16 @@ export type LoginPayload = {
 export type LoginResponse = {
   success: boolean;
   message: string;
-  user: User;
-  tokens: AuthTokens;
+  user?: User;
+  tokens?: AuthTokens;
+  // SaaS flat response support
+  access_token?: string;
+  refresh_token?: string;
+  token_type?: string;
+  admin_id?: number;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
 };
 
 export type RefreshTokenPayload = { refresh_token: string };

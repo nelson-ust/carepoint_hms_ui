@@ -35,3 +35,8 @@ export async function createConsultation(visitId: number, data: any) {
   });
   return response.data;
 }
+
+export const clinicalTemplatesApi = {
+  list: () => apiClient.get("/clinical-templates").then(res => res.data),
+  create: (data: any) => apiClient.post("/clinical-templates", data).then(res => res.data),
+};

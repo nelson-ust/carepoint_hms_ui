@@ -17,6 +17,7 @@ export const routes = {
   patients: "/patients",
   patientRegister: "/patients/register",
   patientSearch: "/patients/search",
+  membershipCards: "/patients/membership-cards",
   
   visits: "/visits",
   visitInitiate: "/visits/initiate",
@@ -34,6 +35,7 @@ export const routes = {
   triage: "/clinical/triage",
   consultation: "/clinical/consultation",
   vitals: "/clinical/vitals",
+  clinicalTemplates: "/clinical/templates",
 
   laboratory: "/laboratory",
   labOrders: "/laboratory/orders",
@@ -48,12 +50,15 @@ export const routes = {
   wards: "/wards",
   beds: "/beds",
   billing: "/billing",
+  billingDetail: "/billing/:invoiceId",
   payments: "/payments",
   insurance: "/insurance",
   inventory: "/inventory",
   inventoryStores: "/inventory/stores",
   inventoryItems: "/inventory/items",
+  inventoryItemDetail: "/inventory/items/:itemId",
   inventoryMovements: "/inventory/movements",
+  procurement: "/inventory/procurement",
   drugs: "/drugs",
   appointments: "/appointments",
   doctorCalendar: "/doctor-calendar",
@@ -62,10 +67,30 @@ export const routes = {
   staff: "/staff",
   hr: "/hr",
   payroll: "/payroll",
+  timesheets: "/staff/timesheets",
+  staffFinance: "/staff/finance",
+  leaveRequests: "/hr/leave",
+  compliance: "/compliance",
+  backups: "/settings/backups",
   tax: "/tax",
   
   approvals: "/approvals",
   reports: "/reports",
   settings: "/settings",
+
+  ambulances: "/ambulances",
+  ambulanceDetail: "/ambulances/:ambulanceId",
+
+  invitations: "/invitations",
+
+  saasInvoices: "/saas/billing",
+  supportAccess: "/saas/support",
+
+  emailSettings: "/settings/email",
+  tenantJobs: "/settings/jobs",
+
+  loyalty: "/patients/:patientId/loyalty",
+  patientPaymentGateways: "/billing/gateways",
+  connectivity: "/saas/connectivity",
 } as const;
 

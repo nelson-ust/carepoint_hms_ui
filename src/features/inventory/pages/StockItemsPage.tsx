@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { routes } from "@/config/routes";
 import {
   AlertCircle,
   Boxes,
@@ -96,6 +97,7 @@ function isLowStock(item: StockItem): boolean {
 }
 
 export function StockItemsPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialStore = searchParams.get("store") ?? "";
 
@@ -466,7 +468,11 @@ export function StockItemsPage() {
                   const expired = isExpired(it.expiry_date);
                   const low = isLowStock(it);
                   return (
-                    <tr key={it.id} className="hover:bg-primary-50/30 transition-all">
+                    <tr 
+                      key={it.id} 
+                      onClick={() => navigate(routes.inventoryItems + `/${it.id}`)}
+                      className="hover:bg-primary-50/30 transition-all cursor-pointer group"
+                    >
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-3">
                           <div className="h-11 w-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md shrink-0">
@@ -564,14 +570,14 @@ export function StockItemsPage() {
                             <History className="h-4 w-4" />
                           </Link>
                           <button
-                            onClick={() => openEdit(it)}
+                            onClick={(e) => { e.stopPropagation(); openEdit(it); }}
                             className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-primary-700 transition-all shadow-md"
                           >
                             <Edit3 className="h-3.5 w-3.5" />
                             Edit
                           </button>
                           <button
-                            onClick={() => setConfirmDelete(it)}
+                            onClick={(e) => { e.stopPropagation(); setConfirmDelete(it); }}
                             className="p-2 hover:bg-rose-50 text-rose-500 rounded-xl transition-all"
                             title="Delete"
                           >

@@ -88,14 +88,40 @@ export function LoginForm() {
         return;
       }
 
+      if (!result.success) {
+        throw new Error(result.message || "Login failed.");
+      }
+
+      // Extract tokens from either nested or flat structure
+      const accessToken = result.tokens?.access_token || result.access_token;
+      const refreshToken = result.tokens?.refresh_token || result.refresh_token;
+
+      if (!accessToken) {
+        throw new Error("Authentication succeeded but no access token was received.");
+      }
+
       // ----- Normal login path -----
-      if (result.tokens.access_token) {
-        localStorageService.set(storageKeys.accessToken, result.tokens.access_token);
+      localStorageService.set(storageKeys.accessToken, accessToken);
+      
+      if (refreshToken) {
+        localStorageService.set(storageKeys.refreshToken, refreshToken);
       }
-      if (result.tokens.refresh_token) {
-        localStorageService.set(storageKeys.refreshToken, result.tokens.refresh_token);
-      }
-      localStorageService.set(storageKeys.user, JSON.stringify(result.user));
+
+      // Handle user object reconstruction for flat responses (like SaaS Admin)
+      const user = result.user || {
+        id: result.admin_id || 0,
+        email: result.email || "",
+        first_name: result.first_name || "",
+        last_name: result.last_name || "",
+        username: result.email || "",
+        status: "ACTIVE",
+        is_superuser: true,
+        is_email_verified: true,
+        is_phone_verified: true,
+        is_two_factor_enabled: false,
+      };
+
+      localStorageService.set(storageKeys.user, JSON.stringify(user));
 
       // If the api-client redirected the user here from a 401, take them back
       // to where they were after a successful login. Otherwise go to dashboard.

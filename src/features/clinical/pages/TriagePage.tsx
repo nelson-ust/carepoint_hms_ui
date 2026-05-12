@@ -16,6 +16,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { recordVitalSigns, getVisitVitalSigns, VitalSign } from "../api/vital-signs.api";
+import { getCurrentStaff } from "@/features/staff/api/staff.api";
 import { getVisitDetails, rerouteVisit, Visit } from "@/features/visits/api/visits.api";
 import { useParams, useNavigate } from "react-router-dom";
 import { routes } from "@/config/routes";
@@ -80,9 +81,15 @@ export function TriagePage() {
     setIsSubmitting(true);
     setError(null);
     try {
+      const currentStaff = await getCurrentStaff();
+      if (!currentStaff) {
+        setError("Unable to identify current clinician. Please re-login.");
+        return;
+      }
+
       await recordVitalSigns({
         visit_id: Number(visitId),
-        recorded_by_staff_id: 1, // Mock current staff ID
+        recorded_by_staff_id: currentStaff.id,
         ...vitals
       });
       

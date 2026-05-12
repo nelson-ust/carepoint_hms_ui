@@ -11,11 +11,11 @@ export type Backup = {
 
 export const backupsApi = {
   list: () =>
-    apiClient.get<Backup[]>("/backups").then((res) => res.data),
+    apiClient.get<Backup[]>("/backups/").then((res) => res.data),
   
   trigger: () =>
-    apiClient.post<{ success: boolean; backup: Backup }>("/backups").then((res) => res.data),
+    apiClient.post<{ success: boolean; backup: Backup }>("/backups/").then((res) => res.data),
   
   download: (id: number) =>
-    apiClient.get(`/backups/${id}/download`).then((res) => res.data),
+    apiClient.get(`/backups/${id}/download/`).then((res) => res.data),
 };

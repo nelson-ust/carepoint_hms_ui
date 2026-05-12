@@ -1,11 +1,21 @@
 import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock, Mail, Building2, ChevronRight, AlertCircle, ShieldCheck } from "lucide-react";
+import { Lock, Mail, Building2, ChevronRight, AlertCircle, ShieldCheck, Heart, Sparkles, Eye, EyeOff } from "lucide-react";
 import { routes } from "@/config/routes";
 import { login } from "@/features/auth/api/auth.api";
 import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
 import { resolveTenantCode } from "@/lib/tenant/tenant-resolver";
+
+const backgroundImages = [
+  "/nigeria_hospital_reception_1_1778593918777.png",
+  "/nigeria_hospital_doctors_2_1778593934424.png",
+  "/nigeria_hospital_tech_3_1778593950760.png",
+  "/nigeria_hospital_pediatrics_4_1778593966044.png",
+  "/nigeria_hospital_exterior_5_1778593988122.png",
+  "/nigeria_hospital_surgery_6_1778594007242.png",
+  "/nigeria_hospital_consultation_7_1778594026243.png",
+];
 
 export function LoginForm() {
   const navigate = useNavigate();
@@ -16,10 +26,21 @@ export function LoginForm() {
   const [tenantCode, setTenantCode] = useState(urlTenant || "");
   const [isSaaSAdmin, setIsSaaSAdmin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // Sync tenantCode if URL changes or on mount
+  // Slideshow State
+  const [bgIndex, setBgIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setBgIndex((prev) => (prev + 1) % backgroundImages.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     if (urlTenant) {
       setTenantCode(urlTenant);
@@ -27,14 +48,11 @@ export function LoginForm() {
     }
   }, [urlTenant]);
 
-  // Show a friendly notice if the api-client bounced the user here after a 401
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const reason = params.get("reason");
     if (reason === "session_expired") {
-      setInfo("Your session has expired. Please sign in again to continue.");
-    } else if (reason === "unauthorized") {
-      setInfo("Please sign in to access this page.");
+      setInfo("Your session has expired. Please sign in again.");
     }
   }, []);
 
@@ -44,162 +62,142 @@ export function LoginForm() {
     setError(null);
 
     try {
-      // Header strategy:
-      //  - SaaS admin: pass "" so the api-client suppresses the auto-injected
-      //    X-Tenant-Code header (SaaS endpoints don't expect it).
-      //  - Tenant login from subdomain: pass undefined to let the interceptor
-      //    pick the tenant code from the URL / localStorage.
-      //  - Manual tenant entry: pass the typed code explicitly.
-      const effectiveTenantCode = isSaaSAdmin
-        ? ""
-        : urlTenant
-          ? urlTenant
-          : tenantCode || undefined;
+      const effectiveTenantCode = isSaaSAdmin ? "" : urlTenant || tenantCode || undefined;
 
-      // Persist or clear the tenant code for subsequent requests
       if (effectiveTenantCode && effectiveTenantCode !== "") {
         localStorageService.set(storageKeys.tenantCode, effectiveTenantCode);
       } else if (isSaaSAdmin) {
         localStorageService.remove(storageKeys.tenantCode);
       }
 
-      const result = await login(
-        { identifier, password, remember_me: false },
-        effectiveTenantCode,
-      );
+      const result = await login({ identifier, password, remember_me: rememberMe }, effectiveTenantCode);
 
-      // ----- Two-factor branch -----
-      // If the backend says 2FA is required, we DON'T store the tokens yet —
-      // they'll be returned after a successful /auth/two-factor/verify call.
-      // Route the user to the dedicated 2FA challenge page with the context
-      // they need to complete the flow.
       if (result.tokens?.two_factor_required && !result.tokens.two_factor_verified) {
         navigate(routes.twoFactor, {
           state: {
-            userId: result.user.id,
+            userId: result.user?.id || result.admin_id,
             identifier,
             tenantCode: effectiveTenantCode === "" ? null : effectiveTenantCode,
             isSaaSAdmin,
-            // Some backends embed a pre-issued access token even when 2FA is
-            // pending — pass it along so the verify call can authenticate.
             preToken: result.tokens.access_token,
           },
         });
         return;
       }
 
-      if (!result.success) {
-        throw new Error(result.message || "Login failed.");
-      }
+      if (!result.success) throw new Error(result.message || "Login failed.");
 
-      // Extract tokens from either nested or flat structure
       const accessToken = result.tokens?.access_token || result.access_token;
       const refreshToken = result.tokens?.refresh_token || result.refresh_token;
 
-      if (!accessToken) {
-        throw new Error("Authentication succeeded but no access token was received.");
-      }
+      if (!accessToken) throw new Error("No access token received.");
 
-      // ----- Normal login path -----
       localStorageService.set(storageKeys.accessToken, accessToken);
-      
-      if (refreshToken) {
-        localStorageService.set(storageKeys.refreshToken, refreshToken);
-      }
+      if (refreshToken) localStorageService.set(storageKeys.refreshToken, refreshToken);
 
-      // Handle user object reconstruction for flat responses (like SaaS Admin)
-      const user = result.user || {
-        id: result.admin_id || 0,
-        email: result.email || "",
-        first_name: result.first_name || "",
-        last_name: result.last_name || "",
-        username: result.email || "",
-        status: "ACTIVE",
-        is_superuser: true,
-        is_email_verified: true,
-        is_phone_verified: true,
-        is_two_factor_enabled: false,
+      const rawUser = (result.user || result) as any;
+      const user = {
+        id: rawUser.id || rawUser.admin_id || 0,
+        email: rawUser.email || "",
+        first_name: rawUser.first_name || "",
+        last_name: rawUser.last_name || "",
+        name: rawUser.name || `${rawUser.first_name || ""} ${rawUser.last_name || ""}`.trim() || "User",
+        username: rawUser.username || rawUser.email || "",
+        status: rawUser.status || "ACTIVE",
+        role: rawUser.role || (isSaaSAdmin ? "SAAS_ADMIN" : "STAFF"),
+        is_superuser: !!rawUser.is_superuser,
+        is_email_verified: !!rawUser.is_email_verified,
+        is_phone_verified: !!rawUser.is_phone_verified,
+        is_two_factor_enabled: !!rawUser.is_two_factor_enabled,
+        is_saas_admin: isSaaSAdmin,
       };
 
       localStorageService.set(storageKeys.user, JSON.stringify(user));
 
-      // If the api-client redirected the user here from a 401, take them back
-      // to where they were after a successful login. Otherwise go to dashboard.
-      let target: string = routes.dashboard;
+      let target: string = isSaaSAdmin ? routes.tenants : routes.dashboard;
       try {
         const stored = window.sessionStorage.getItem("carepoint.return_to");
         if (stored && stored !== "/login" && !stored.startsWith("/login")) {
           target = stored;
           window.sessionStorage.removeItem("carepoint.return_to");
         }
-      } catch {
-        /* ignore */
-      }
+      } catch { /* ignore */ }
       navigate(target);
     } catch (err: any) {
-      console.error("Login failed:", err);
-      const data = err?.response?.data;
-      const message =
-        (typeof data?.message === "string" && data.message) ||
-        (typeof data?.detail === "string" && data.detail) ||
-        (Array.isArray(data?.detail) &&
-          data.detail
-            .map((d: any) => `${d.loc?.join(".") ?? "field"}: ${d.msg ?? "invalid"}`)
-            .join(" · ")) ||
-        "Invalid credentials or tenant code. Please try again.";
-      setError(message);
+      setError(err?.response?.data?.message || "Invalid credentials. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500 shadow-xl shadow-emerald-500/20">
+    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-slate-950">
+      {/* Background Slideshow */}
+      {backgroundImages.map((src, idx) => (
+        <div
+          key={src}
+          className={`absolute inset-0 z-0 transition-opacity duration-[3000ms] ease-in-out ${idx === bgIndex ? "opacity-40 scale-105" : "opacity-0 scale-100"
+            } transform-gpu`}
+          style={{
+            backgroundImage: `url(${src})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+      ))}
+
+      {/* Glass Overlay */}
+      <div className="absolute inset-0 z-[1] bg-gradient-to-br from-slate-950/80 via-slate-900/40 to-emerald-950/80" />
+
+      {/* Main Content */}
+      <div className="relative z-10 w-full max-w-xl p-4 lg:p-8 flex flex-col items-center">
+        {/* Branding */}
+        <div className="text-center mb-10 group">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2.5rem] bg-emerald-500 shadow-[0_20px_50px_rgba(16,185,129,0.3)] ring-8 ring-emerald-500/10 mb-6 transition-transform group-hover:rotate-12 duration-500">
             <ShieldCheck className="h-10 w-10 text-white" />
           </div>
-          <h1 className="mt-6 text-3xl font-bold tracking-tight">
-            {urlTenant ? `${urlTenant} Workspace` : "Welcome back"}
+          <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tighter font-display">
+            Carepoint<span className="text-emerald-400">.</span>
           </h1>
-          <p className="mt-2 text-slate-500 text-sm">
-            {isSaaSAdmin
-              ? "Secure platform administration portal"
-              : urlTenant
-                ? `Authorized access for ${urlTenant}  staff`
-                : "Enter your credentials to access your workspace"}
+          <p className="mt-3 text-emerald-400/80 font-bold text-[10px] uppercase tracking-[0.4em]">
+            Enterprise Health Management
           </p>
         </div>
 
-        <div className="glass-card rounded-3xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {info && !error && (
-              <div className="flex items-center gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-700 border border-amber-100 animate-in fade-in slide-in-from-top-2">
-                <AlertCircle className="h-5 w-5 shrink-0" />
-                <p>{info}</p>
-              </div>
-            )}
+        {/* Login Card */}
+        <div className="w-full glass-card rounded-[3rem] p-8 lg:p-12 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] bg-white/10 backdrop-blur-3xl border border-white/20">
+          <div className="mb-10 text-center">
+            <h2 className="text-2xl font-black text-white tracking-tight">
+              {urlTenant ? `${urlTenant} Portal` : "Welcome Back"}
+            </h2>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              {/* <span className="h-1 w-8 bg-emerald-500 rounded-full" /> */}
+              <p className="text-slate-400 text-xs font-medium">
+                {isSaaSAdmin ? "SaaS Administration Access" : "Secure Authentication"}
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="flex items-center gap-3 rounded-xl bg-rose-50 p-4 text-sm text-rose-600 border border-rose-100 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-3 rounded-2xl bg-rose-500/10 p-4 text-sm text-rose-400 border border-rose-500/20 animate-shake">
                 <AlertCircle className="h-5 w-5 shrink-0" />
-                <p>{error}</p>
+                <p className="font-medium">{error}</p>
               </div>
             )}
 
-            {/* Only show Tenant Code field if not resolved from URL and not SaaS Admin */}
             {!urlTenant && !isSaaSAdmin && (
-              <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                <label className="text-sm font-semibold text-slate-700 ml-1">Tenant Code</label>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Active Tenant Code</label>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-5 text-slate-500 group-focus-within:text-emerald-400 transition-colors">
                     <Building2 className="h-5 w-5" />
                   </div>
                   <input
                     value={tenantCode}
                     onChange={(e) => setTenantCode(e.target.value.toUpperCase())}
-                    className="input-field pl-11"
-                    placeholder="e.g. STNICHOLAS"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-5 py-4 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40 transition-all outline-none"
+                    placeholder="e.g. EVERCARE"
                     required
                   />
                 </div>
@@ -207,17 +205,17 @@ export function LoginForm() {
             )}
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700 ml-1">Email or Username</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Identity</label>
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-5 text-slate-500 group-focus-within:text-emerald-400 transition-colors">
                   <Mail className="h-5 w-5" />
                 </div>
                 <input
                   type="text"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="input-field pl-11"
-                  placeholder="admin@live.com"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-5 py-4 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40 transition-all outline-none font-medium"
+                  placeholder="Email or Username"
                   required
                 />
               </div>
@@ -225,72 +223,109 @@ export function LoginForm() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between ml-1">
-                <label className="text-sm font-semibold text-slate-700">Password</label>
-                <a href="#" className="text-xs font-semibold text-emerald-600 hover:text-emerald-700">
-                  Forgot?
-                </a>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Passkey</label>
+                <a href="#" className="text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-emerald-300 transition-colors">Forgot Password?</a>
               </div>
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-5 text-slate-500 group-focus-within:text-emerald-400 transition-colors">
                   <Lock className="h-5 w-5" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="input-field pl-11"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-14 py-4 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40 transition-all outline-none"
                   placeholder="••••••••"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-5 text-slate-500 hover:text-emerald-400 transition-colors focus:outline-none"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 animate-in zoom-in duration-300" />
+                  ) : (
+                    <Eye className="h-5 w-5 animate-in zoom-in duration-300" />
+                  )}
+                </button>
               </div>
+            </div>
+
+            <div className="flex items-center justify-between px-1">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <div className="relative flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="peer appearance-none h-5 w-5 rounded-lg border border-white/10 bg-white/5 checked:bg-emerald-500 checked:border-emerald-500 transition-all cursor-pointer"
+                  />
+                  <div className="absolute opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none">
+                    <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                      <path d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-slate-300 transition-colors">Remember Session</span>
+              </label>
             </div>
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="btn-primary w-full group py-3 mt-2"
+              className="w-full btn-primary group py-4 mt-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest text-xs shadow-[0_10px_30px_rgba(16,185,129,0.3)] flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
             >
               {isSubmitting ? (
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
               ) : (
                 <>
-                  <span>Sign in to dashboard</span>
-                  <ChevronRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  <span>Sign In</span>
+                  <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Only show SaaS Admin toggle if no tenant is resolved from URL */}
           {!urlTenant && (
-            <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center gap-4">
+            <div className="mt-10 pt-8 border-t border-white/5 text-center">
               <button
                 onClick={() => {
                   setIsSaaSAdmin(!isSaaSAdmin);
                   setError(null);
                 }}
-                className="text-sm font-medium text-slate-600 hover:text-brand-navy transition-colors flex items-center gap-2"
+                className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-emerald-400 transition-colors"
               >
-                <div className={`h-2 w-2 rounded-full ${isSaaSAdmin ? 'bg-amber-500 animate-pulse' : 'bg-slate-300'}`} />
-                {isSaaSAdmin ? "Switch to Tenant Login" : "Are you a SaaS Administrator?"}
+                <Sparkles className={`h-3 w-3 ${isSaaSAdmin ? 'text-amber-500 animate-pulse' : ''}`} />
+                {isSaaSAdmin ? "Switch to Hospital Portal" : "Platform Administrator?"}
               </button>
-            </div>
-          )}
-
-          {urlTenant && (
-            <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-              <p className="text-xs text-slate-400">
-                Not your workspace? <a href={`http://${window.location.host.split('.').slice(1).join('.')}`} className="text-emerald-600 font-bold hover:underline">Go back to main portal</a>
-              </p>
             </div>
           )}
         </div>
 
-        <p className="text-center text-xs text-slate-400 uppercase tracking-widest font-semibold">
-          Powered by Carepoint HMS v1.0
-        </p>
+        {/* Footer */}
+        <div className="mt-12 text-center space-y-4">
+          <div className="flex items-center justify-center gap-6">
+            <div className="flex flex-col items-center">
+              <p className="text-white font-black text-xl">250+</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Hospitals</p>
+            </div>
+            <div className="w-px h-8 bg-white/10" />
+            <div className="flex flex-col items-center">
+              <p className="text-white font-black text-xl">1.2M</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Patients</p>
+            </div>
+            <div className="w-px h-8 bg-white/10" />
+            <div className="flex flex-col items-center">
+              <p className="text-white font-black text-xl">15k</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Doctors</p>
+            </div>
+          </div>
+          <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-600">
+            Carepoint HMS • Secure Health Cloud v1.0
+          </p>
+        </div>
       </div>
     </div>
   );
 }
-

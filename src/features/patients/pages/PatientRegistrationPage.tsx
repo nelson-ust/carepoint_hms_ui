@@ -25,8 +25,11 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { routes } from "@/config/routes";
-import { createPatient } from "../api/patients.api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Select from "react-select";
+import { Controller } from "react-hook-form";
+import { createPatient, getLoyaltyPrograms } from "../api/patients.api";
+import type { LoyaltyProgram } from "../api/patients.api";
 
 const patientSchema = z.object({
   first_name: z.string().min(2, "First name is required"),
@@ -92,14 +95,27 @@ export function PatientRegistrationPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<"basic" | "clinical" | "insurance" | "loyalty">("basic");
+  const [loyaltyPrograms, setLoyaltyPrograms] = useState<LoyaltyProgram[]>([]);
 
-  const { register, handleSubmit, control, watch, formState: { errors } } = useForm<FormData>({
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      try {
+        const programs = await getLoyaltyPrograms();
+        setLoyaltyPrograms(programs);
+      } catch (err) {
+        console.error("Failed to fetch loyalty programs:", err);
+      }
+    };
+    fetchPrograms();
+  }, []);
+
+  const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<FormData>({
     // The schema's INPUT type differs from its OUTPUT type because of
     // `.default()` and `.optional().or(z.literal(""))` — coerce to the OUTPUT
     // type so the useForm generic stays consistent.
     resolver: zodResolver(patientSchema) as unknown as Resolver<FormData>,
     defaultValues: {
-      patient_type: "INDIVIDUAL",
+      patient_type: "OUTPATIENT",
       payer_type: "CASH",
       country: "Nigeria",
       previous_identifiers: [],
@@ -110,6 +126,18 @@ export function PatientRegistrationPage() {
     control,
     name: "previous_identifiers"
   });
+
+  // Auto-generate membership number when loyalty program is selected
+  const watchLoyaltyProgram = watch("loyalty_enrollment.loyalty_program_id");
+  const currentMembershipNo = watch("loyalty_enrollment.membership_no");
+
+  useEffect(() => {
+    if (watchLoyaltyProgram && !currentMembershipNo) {
+      const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      const random = Math.floor(1000 + Math.random() * 9000);
+      setValue("loyalty_enrollment.membership_no", `LOY-${date}-${random}`);
+    }
+  }, [watchLoyaltyProgram, setValue, currentMembershipNo]);
 
   const payerType = watch("payer_type");
 
@@ -148,11 +176,14 @@ export function PatientRegistrationPage() {
 
       const payload = cleanData(data) as any;
 
+      // Final sanitization for backend alignment
+      if (payload.preferred_payer_id === 0) delete payload.preferred_payer_id;
+      
       // Ensure specific optional sub-objects are removed when their PK is missing
-      if (!payload.insurance_enrollment?.insurance_provider_id) {
+      if (payload.insurance_enrollment && !payload.insurance_enrollment.insurance_provider_id) {
         delete payload.insurance_enrollment;
       }
-      if (!payload.loyalty_enrollment?.loyalty_program_id) {
+      if (payload.loyalty_enrollment && !payload.loyalty_enrollment.loyalty_program_id) {
         delete payload.loyalty_enrollment;
       }
 
@@ -193,6 +224,50 @@ export function PatientRegistrationPage() {
       <span>{label}</span>
     </button>
   );
+
+  const selectStyles = {
+    control: (base: any, state: any) => ({
+      ...base,
+      minHeight: '3.5rem',
+      borderRadius: '1rem',
+      borderColor: state.isFocused ? '#0ea5e9' : '#e2e8f0',
+      boxShadow: state.isFocused ? '0 0 0 1px #0ea5e9' : 'none',
+      backgroundColor: 'white',
+      '&:hover': {
+        borderColor: '#0ea5e9'
+      },
+      paddingLeft: '0.5rem',
+      fontSize: '0.875rem',
+      fontWeight: '600'
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isSelected ? '#0ea5e9' : state.isFocused ? '#f0f9ff' : 'white',
+      color: state.isSelected ? 'white' : '#1e293b',
+      padding: '0.75rem 1.25rem',
+      fontSize: '0.875rem',
+      fontWeight: '600',
+      '&:active': {
+        backgroundColor: '#0ea5e9'
+      }
+    }),
+    menu: (base: any) => ({
+      ...base,
+      zIndex: 9999,
+      borderRadius: '1rem',
+      overflow: 'hidden',
+      border: '1px solid #e2e8f0',
+      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
+    }),
+    menuPortal: (base: any) => ({
+      ...base,
+      zIndex: 9999
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: '#94a3b8'
+    })
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20">
@@ -261,21 +336,48 @@ export function PatientRegistrationPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Gender</label>
-                    <select {...register("gender")} className="input-field">
-                      <option value="">Select</option>
-                      <option value="MALE">Male</option>
-                      <option value="FEMALE">Female</option>
-                      <option value="OTHER">Other</option>
-                    </select>
+                    <Controller
+                      name="gender"
+                      control={control}
+                      render={({ field }) => (
+                        <Select
+                          {...field}
+                          options={[
+                            { value: "MALE", label: "Male" },
+                            { value: "FEMALE", label: "Female" },
+                            { value: "OTHER", label: "Other" }
+                          ]}
+                          styles={selectStyles}
+                          menuPortalTarget={document.body}
+                          value={[{ value: "MALE", label: "Male" }, { value: "FEMALE", label: "Female" }, { value: "OTHER", label: "Other" }].find(opt => opt.value === field.value)}
+                          onChange={(val: any) => field.onChange(val?.value)}
+                          placeholder="Select..."
+                        />
+                      )}
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Marital Status</label>
-                    <select {...register("marital_status")} className="input-field">
-                      <option value="">Select</option>
-                      <option value="SINGLE">Single</option>
-                      <option value="MARRIED">Married</option>
-                      <option value="DIVORCED">Divorced</option>
-                    </select>
+                    <Controller
+                      name="marital_status"
+                      control={control}
+                      render={({ field }) => (
+                        <Select
+                          {...field}
+                          options={[
+                            { value: "SINGLE", label: "Single" },
+                            { value: "MARRIED", label: "Married" },
+                            { value: "DIVORCED", label: "Divorced" },
+                            { value: "WIDOWED", label: "Widowed" }
+                          ]}
+                          styles={selectStyles}
+                          menuPortalTarget={document.body}
+                          value={[{ value: "SINGLE", label: "Single" }, { value: "MARRIED", label: "Married" }, { value: "DIVORCED", label: "Divorced" }, { value: "WIDOWED", label: "Widowed" }].find(opt => opt.value === field.value)}
+                          onChange={(val: any) => field.onChange(val?.value)}
+                          placeholder="Select..."
+                        />
+                      )}
+                    />
                   </div>
                 </div>
               </div>
@@ -336,21 +438,69 @@ export function PatientRegistrationPage() {
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Blood Group</label>
-                    <select {...register("blood_group")} className="input-field">
-                      <option value="">Unknown</option>
-                      <option value="A+">A+</option>
-                      <option value="O+">O+</option>
-                      <option value="B+">B+</option>
-                    </select>
+                    <Controller
+                      name="blood_group"
+                      control={control}
+                      render={({ field }) => (
+                        <Select
+                          {...field}
+                          options={[
+                            { value: "A+", label: "A+" },
+                            { value: "A-", label: "A-" },
+                            { value: "B+", label: "B+" },
+                            { value: "B-", label: "B-" },
+                            { value: "AB+", label: "AB+" },
+                            { value: "AB-", label: "AB-" },
+                            { value: "O+", label: "O+" },
+                            { value: "O-", label: "O-" }
+                          ]}
+                          styles={selectStyles}
+                          menuPortalTarget={document.body}
+                          value={[
+                            { value: "A+", label: "A+" },
+                            { value: "A-", label: "A-" },
+                            { value: "B+", label: "B+" },
+                            { value: "B-", label: "B-" },
+                            { value: "AB+", label: "AB+" },
+                            { value: "AB-", label: "AB-" },
+                            { value: "O+", label: "O+" },
+                            { value: "O-", label: "O-" }
+                          ].find(opt => opt.value === field.value)}
+                          onChange={(val: any) => field.onChange(val?.value)}
+                          placeholder="Select..."
+                        />
+                      )}
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Genotype</label>
-                    <select {...register("genotype")} className="input-field">
-                      <option value="">Unknown</option>
-                      <option value="AA">AA</option>
-                      <option value="AS">AS</option>
-                      <option value="SS">SS</option>
-                    </select>
+                    <Controller
+                      name="genotype"
+                      control={control}
+                      render={({ field }) => (
+                        <Select
+                          {...field}
+                          options={[
+                            { value: "AA", label: "AA" },
+                            { value: "AS", label: "AS" },
+                            { value: "SS", label: "SS" },
+                            { value: "SC", label: "SC" },
+                            { value: "AC", label: "AC" }
+                          ]}
+                          styles={selectStyles}
+                          menuPortalTarget={document.body}
+                          value={[
+                            { value: "AA", label: "AA" },
+                            { value: "AS", label: "AS" },
+                            { value: "SS", label: "SS" },
+                            { value: "SC", label: "SC" },
+                            { value: "AC", label: "AC" }
+                          ].find(opt => opt.value === field.value)}
+                          onChange={(val: any) => field.onChange(val?.value)}
+                          placeholder="Select..."
+                        />
+                      )}
+                    />
                   </div>
                 </div>
 
@@ -469,11 +619,26 @@ export function PatientRegistrationPage() {
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Program ID</label>
-                    <input type="number" {...register("loyalty_enrollment.loyalty_program_id")} className="input-field" placeholder="1" />
+                    <Controller
+                      name="loyalty_enrollment.loyalty_program_id"
+                      control={control}
+                      render={({ field }) => (
+                        <Select
+                          {...field}
+                          options={loyaltyPrograms.map(p => ({ value: p.id, label: p.name }))}
+                          styles={selectStyles}
+                          menuPortalTarget={document.body}
+                          value={loyaltyPrograms.map(p => ({ value: p.id, label: p.name })).find(opt => opt.value === field.value)}
+                          onChange={(val: any) => field.onChange(val?.value)}
+                          placeholder="Select Program..."
+                        />
+                      )}
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Membership No.</label>
-                    <input {...register("loyalty_enrollment.membership_no")} className="input-field" placeholder="LOY-555" />
+                    <input {...register("loyalty_enrollment.membership_no")} className="input-field bg-secondary-50/50 font-mono" placeholder="LOY-555" readOnly />
+                    <p className="text-[10px] font-bold text-primary-500 mt-1 uppercase">Auto-Generated Sequence</p>
                   </div>
                 </div>
 
@@ -508,7 +673,7 @@ export function PatientRegistrationPage() {
               {isSubmitting ? "Syncing..." : (
                 <>
                   <Save className="h-5 w-5" />
-                  <span>Finalize Admission</span>
+                  <span>Finalize Onboarding</span>
                 </>
               )}
             </button>

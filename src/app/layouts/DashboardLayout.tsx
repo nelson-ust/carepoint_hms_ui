@@ -1,12 +1,15 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "@/components/navigation/Sidebar";
 import { Topbar } from "@/components/navigation/Topbar";
+import { useUI } from "@/app/providers/UIProvider";
 
 export function DashboardLayout() {
+  const { isSidebarCollapsed } = useUI();
+
   return (
-    <div className="min-h-screen bg-brand-gray selection:bg-primary-100 selection:text-primary-900">
+    <div className="min-h-screen bg-brand-gray selection:bg-primary-100 selection:text-primary-900 dark:bg-secondary-950 transition-colors duration-500">
       <Sidebar />
-      <div className="lg:pl-72 flex flex-col min-h-screen">
+      <div className={`flex flex-col min-h-screen transition-all duration-300 ${isSidebarCollapsed ? "lg:pl-24" : "lg:pl-72"}`}>
         <Topbar />
         <main className="flex-1 p-6 md:p-10 animate-fade-in overflow-x-hidden">
           <div className="mx-auto max-w-7xl">

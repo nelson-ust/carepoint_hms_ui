@@ -1,31 +1,74 @@
 import { resolveTenantCode } from "@/lib/tenant/tenant-resolver";
-import { Search, Bell, Menu, HelpCircle, LayoutGrid, Sun, Moon } from "lucide-react";
+import { Search, Bell, Menu, HelpCircle, LayoutGrid, Sun, Moon, PanelLeftClose, PanelLeft } from "lucide-react";
 import { useTheme } from "@/lib/theme/ThemeProvider";
+import { useUI } from "@/app/providers/UIProvider";
+import { useLocation } from "react-router-dom";
 
 export function Topbar() {
   const tenant = resolveTenantCode();
   const { theme, toggleTheme } = useTheme();
+  const { isSidebarCollapsed, toggleSidebar } = useUI();
+  const location = useLocation();
   const isDark = theme === "dark";
 
+  const getPageTitle = () => {
+    const path = location.pathname;
+    if (path === "/" || path === "/dashboard") return "Operations Overview";
+
+    // Map specific complex paths
+    const routeMap: Record<string, string> = {
+      "/patients": "Patient Registry",
+      "/patients/register": "Patient Admission",
+      "/visits": "Clinical Visits",
+      "/visits/initiate": "Visit Initiation",
+      "/billing": "Revenue Management",
+      "/inventory": "Stock Inventory",
+      "/staff": "Human Resources",
+      "/settings": "System Configuration",
+      "/laboratory": "Diagnostic Lab",
+      "/pharmacy": "Pharmacy Dispensing",
+    };
+
+    if (routeMap[path]) return routeMap[path];
+
+    // Fallback cleaning
+    const segment = path.split("/").filter(Boolean).pop() || "";
+    return segment
+      .split("-")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
   return (
-    <header className="sticky top-0 z-20 border-b border-secondary-200 bg-white/80 backdrop-blur-xl dark:bg-secondary-900/70 dark:border-white/10">
-      <div className="flex h-18 items-center justify-between px-6">
+    <header className="sticky top-0 z-20 border-b border-black bg-white/80 backdrop-blur-xl dark:bg-secondary-900/70 dark:border-white">
+      <div className="flex h-18 items-center justify-between p-6">
         {/* Left: Mobile Menu & Search */}
-        <div className="flex items-center gap-6 flex-1">
-          <button className="lg:hidden p-2 hover:bg-secondary-100 rounded-xl transition-colors dark:hover:bg-white/5">
-            <Menu className="h-6 w-6 text-secondary-600 dark:text-secondary-300" />
+        <div className="flex items-center gap-4 flex-1">
+          <button
+            onClick={toggleSidebar}
+            className="p-2.5 text-secondary-500 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all dark:text-secondary-300 dark:hover:bg-white/5"
+            title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            {isSidebarCollapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
           </button>
 
-          <div className="hidden md:flex relative max-w-md w-full group">
+          <div className="hidden xl:flex relative max-w-xs w-full group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 group-focus-within:text-primary-500 transition-colors" />
             <input
               type="text"
-              placeholder="Search patients, files, or records..."
-              className="w-full bg-secondary-50 border-transparent focus:bg-white focus:border-primary-500/20 focus:ring-4 focus:ring-primary-500/5 rounded-2xl py-2.5 pl-11 pr-4 text-sm transition-all dark:bg-secondary-800 dark:focus:bg-secondary-900 dark:text-secondary-100 dark:placeholder:text-secondary-500"
+              placeholder="Registry Quick Search..."
+              className="w-full bg-secondary-50 border-transparent focus:bg-white focus:border-primary-500/20 focus:ring-4 focus:ring-primary-500/5 rounded-2xl py-2 pr-4 pl-11 text-xs transition-all dark:bg-secondary-800 dark:focus:bg-secondary-900 dark:text-secondary-100 dark:placeholder:text-secondary-500"
             />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded-md border border-secondary-200 bg-white text-[10px] font-bold text-secondary-400 dark:bg-secondary-900 dark:border-white/10 dark:text-secondary-500">
-              ⌘K
-            </div>
+          </div>
+        </div>
+
+        {/* Center: Dynamic Title */}
+        <div className="hidden lg:flex flex-1 justify-center">
+          <div className="flex flex-col items-center">
+            <h2 className="text-sm font-black text-secondary-900 dark:text-white uppercase tracking-[0.2em] animate-in fade-in slide-in-from-top-4 duration-500">
+              {getPageTitle()}
+            </h2>
+            <div className="h-0.5 w-8 bg-primary-500 mt-1 rounded-full shadow-sm shadow-primary-500/50" />
           </div>
         </div>
 
@@ -52,14 +95,12 @@ export function Topbar() {
               className="relative p-2.5 text-secondary-500 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all dark:text-secondary-300 dark:hover:bg-white/5 dark:hover:text-primary-300"
             >
               <Sun
-                className={`h-5 w-5 transition-all duration-300 ${
-                  isDark ? "scale-0 rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100"
-                }`}
+                className={`h-5 w-5 transition-all duration-300 ${isDark ? "scale-0 rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100"
+                  }`}
               />
               <Moon
-                className={`h-5 w-5 absolute inset-0 m-auto transition-all duration-300 ${
-                  isDark ? "scale-100 rotate-0 opacity-100" : "scale-0 -rotate-90 opacity-0"
-                }`}
+                className={`h-5 w-5 absolute inset-0 m-auto transition-all duration-300 ${isDark ? "scale-100 rotate-0 opacity-100" : "scale-0 -rotate-90 opacity-0"
+                  }`}
               />
             </button>
             <button className="p-2.5 text-secondary-500 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all relative dark:text-secondary-300 dark:hover:bg-white/5 dark:hover:text-primary-300">

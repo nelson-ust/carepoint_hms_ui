@@ -1,6 +1,8 @@
+// carepoint_hms_ui/src/features/visits/pages/VisitListPage.tsx
+
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Activity,
   AlertCircle,
@@ -22,6 +24,8 @@ import {
 import { routes } from "@/config/routes";
 import { deleteVisit, getVisits } from "../api/visits.api";
 import type { ListMeta, Visit, VisitListFilters } from "../api/visits.api";
+import { getPatientById } from "@/features/patients/api/patients.api";
+import type { Patient } from "@/features/patients/api/patients.api";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Statuses" },
@@ -79,6 +83,11 @@ export function VisitListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  
+  const [searchParams] = useSearchParams();
+  const patientIdFilter = searchParams.get("patient_id");
+  const [filteredPatient, setFilteredPatient] = useState<Patient | null>(null);
+  const [patientCache, setPatientCache] = useState<Record<number, Patient>>({});
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -92,10 +101,21 @@ export function VisitListPage() {
     return () => clearTimeout(handle);
   }, [search]);
 
-  // Reset to first page when filters change
+  // Reset to first page when filters change (Search now filters locally)
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, statusFilter, priorityFilter]);
+  }, [statusFilter, priorityFilter, patientIdFilter]);
+
+  // Load Patient info if filtering
+  useEffect(() => {
+    if (patientIdFilter) {
+      getPatientById(Number(patientIdFilter))
+        .then(setFilteredPatient)
+        .catch(() => setFilteredPatient(null));
+    } else {
+      setFilteredPatient(null);
+    }
+  }, [patientIdFilter]);
 
   const filters: VisitListFilters = useMemo(
     () => ({
@@ -103,18 +123,50 @@ export function VisitListPage() {
       limit: PAGE_SIZE,
       status: statusFilter || undefined,
       priority: priorityFilter || undefined,
-      search: debouncedSearch || undefined,
+      patient_id: patientIdFilter ? Number(patientIdFilter) : undefined,
     }),
-    [page, statusFilter, priorityFilter, debouncedSearch],
+    [page, statusFilter, priorityFilter, patientIdFilter],
   );
+
+  const finalVisits = useMemo(() => {
+    if (!debouncedSearch) return visits;
+    const query = debouncedSearch.toLowerCase();
+    return visits.filter((v) => {
+      const patient = v.patient || patientCache[v.patient_id];
+      const patientName = patient ? `${patient.first_name} ${patient.last_name}`.toLowerCase() : "";
+      const hospNum = patient?.hospital_number?.toLowerCase() || "";
+      const visitCode = (v.visit_code || `VISIT-${v.id}`).toLowerCase();
+      return patientName.includes(query) || hospNum.includes(query) || visitCode.includes(query);
+    });
+  }, [visits, debouncedSearch, patientCache]);
 
   const loadVisits = async (filterArgs: VisitListFilters) => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await getVisits(filterArgs);
-      setVisits(response.items || []);
+      const items = response.items || [];
+      setVisits(items);
       setMeta(response.meta || null);
+
+      // Fetch missing patient names
+      const missingPatientIds = [...new Set(
+        items
+          .filter(v => !v.patient && !patientCache[v.patient_id])
+          .map(v => v.patient_id)
+      )];
+
+      if (missingPatientIds.length > 0) {
+        Promise.all(missingPatientIds.map(id => getPatientById(id)))
+          .then(newPatients => {
+            setPatientCache(prev => {
+              const next = { ...prev };
+              newPatients.forEach(p => { if (p) next[p.id] = p; });
+              return next;
+            });
+          })
+          .catch(err => console.error("Failed to fetch missing patients", err));
+      }
     } catch (err) {
       console.error("Failed to load visits", err);
       setError("Unable to connect to the visits registry. Please check your connection.");
@@ -153,8 +205,8 @@ export function VisitListPage() {
     <div className="space-y-10 animate-fade-in pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <PageHeader
-          title="Active Visit Registry"
-          description="Track every patient lifecycle in motion across your clinical service points."
+          title={filteredPatient ? `${filteredPatient.first_name} ${filteredPatient.last_name}'s Visit History` : "Active Visit Registry"}
+          description={filteredPatient ? `Reviewing all clinical encounters and lifecycle data for ${filteredPatient.first_name}.` : "Track every patient lifecycle in motion across your clinical service points."}
         />
         <div className="flex items-center gap-3">
           <Link
@@ -262,8 +314,8 @@ export function VisitListPage() {
                       </div>
                     </td>
                   </tr>
-                ) : visits.length > 0 ? (
-                  visits.map((visit) => {
+                ) : finalVisits.length > 0 ? (
+                  finalVisits.map((visit) => {
                     const priorityKey = (visit.priority || "ROUTINE").toUpperCase();
                     const priorityMeta = priorityStyles[priorityKey] ?? priorityStyles.ROUTINE;
                     const statusKey = (visit.status || "").toUpperCase();
@@ -289,18 +341,18 @@ export function VisitListPage() {
                           </div>
                         </td>
                         <td className="px-8 py-6">
-                          {visit.patient ? (
+                          { (visit.patient || patientCache[visit.patient_id]) ? (
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-xs font-bold shadow-md shadow-primary-500/20">
-                                {(visit.patient.first_name?.[0] ?? "?")}
-                                {(visit.patient.last_name?.[0] ?? "?")}
+                                {((visit.patient?.first_name || patientCache[visit.patient_id]?.first_name)?.[0] ?? "?")}
+                                {((visit.patient?.last_name || patientCache[visit.patient_id]?.last_name)?.[0] ?? "?")}
                               </div>
                               <div>
                                 <p className="text-sm font-bold text-secondary-900">
-                                  {visit.patient.first_name} {visit.patient.last_name}
+                                  {visit.patient?.first_name || patientCache[visit.patient_id]?.first_name} {visit.patient?.last_name || patientCache[visit.patient_id]?.last_name}
                                 </p>
                                 <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase tracking-tighter mt-0.5">
-                                  {visit.patient.hospital_number}
+                                  {visit.patient?.hospital_number || patientCache[visit.patient_id]?.hospital_number}
                                 </p>
                               </div>
                             </div>
@@ -415,7 +467,7 @@ export function VisitListPage() {
                 <span className="text-secondary-900">
                   {showingFrom} – {showingTo}
                 </span>{" "}
-                of {total} Records
+                of {total} Records {debouncedSearch && `(Filtered locally: ${finalVisits.length})`}
               </p>
               <div className="flex gap-2">
                 <button

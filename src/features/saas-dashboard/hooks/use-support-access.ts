@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supportAccessApi } from "../api/support-access.api";
+import { supportAccessApi, SupportRequestPayload } from "../api/support-access.api";
 
 export const supportKeys = {
   all: ["support-access"] as const,
@@ -24,7 +24,7 @@ export function useAllSupportGrants() {
 export function useRequestSupportAccess() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { reason: string; duration_hours: number }) => 
+    mutationFn: (payload: SupportRequestPayload) => 
       supportAccessApi.request(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: supportKeys.myGrants() });

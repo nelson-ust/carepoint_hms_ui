@@ -18,3 +18,11 @@ https://cedarcrest.carepointhms.com
 Tenant Admin Email:  nattah@ccfng.org
 Tenant Admin_username: cedarcrest_admin
 Tenant AdminPassword": Cedar!Secure2026
+
+
+https://geneology-backend.onrender.com/
+
+https://geneology-frontend.vercel.app/login
+
+admin@genealogy.com
+AdminPassword123

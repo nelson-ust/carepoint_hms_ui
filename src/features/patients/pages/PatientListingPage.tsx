@@ -134,19 +134,22 @@ export function PatientListingPage() {
                   patients.map((patient) => (
                     <tr key={patient.id} className="hover:bg-primary-50/30 transition-all group">
                       <td className="px-8 py-6">
-                        <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-base font-bold shadow-lg shadow-primary-500/20">
-                            {patient.first_name?.[0] || '?'}{patient.last_name?.[0] || '?'}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-secondary-900 group-hover:text-primary-600 transition-colors">
-                              {patient.first_name} {patient.last_name}
-                            </p>
-                            <p className="text-[11px] font-bold text-secondary-400 uppercase tracking-tighter mt-0.5">
-                              {patient.gender} • {patient.date_of_birth ? `${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} Years` : 'Age Unknown'}
-                            </p>
-                          </div>
-                        </div>
+                          <Link 
+                            to={routes.patientDetail.replace(':patientId', String(patient.id))}
+                            className="flex items-center gap-4 hover:opacity-80 transition-opacity"
+                          >
+                            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-base font-bold shadow-lg shadow-primary-500/20">
+                              {patient.first_name?.[0] || '?'}{patient.last_name?.[0] || '?'}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-secondary-900 group-hover:text-primary-600 transition-colors">
+                                {patient.first_name} {patient.last_name}
+                              </p>
+                              <p className="text-[11px] font-bold text-secondary-400 uppercase tracking-tighter mt-0.5">
+                                {patient.gender} • {patient.date_of_birth ? `${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} Years` : 'Age Unknown'}
+                              </p>
+                            </div>
+                          </Link>
                       </td>
                       <td className="px-8 py-6">
                         <div className="inline-flex items-center gap-2 bg-secondary-900/5 border border-secondary-900/10 px-3 py-1.5 rounded-xl">
@@ -174,6 +177,13 @@ export function PatientListingPage() {
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex items-center justify-end gap-2">
+                          <Link
+                            to={routes.patientDetail.replace(':patientId', String(patient.id))}
+                            className="p-2.5 hover:bg-primary-50 text-primary-600 rounded-xl transition-all shadow-sm border border-primary-100"
+                            title="Patient Dashboard"
+                          >
+                            <User className="h-5 w-5" />
+                          </Link>
                           <button
                             onClick={() => navigate(routes.visitInitiate, { state: { patient } })}
                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-primary-700 transition-all shadow-lg shadow-primary-500/10"

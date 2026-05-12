@@ -23,10 +23,18 @@ export type VerificationInstructions = {
 
 export const domainsApi = {
   list: (tenantId: number) =>
-    apiClient.get<TenantDomain[]>(`/tenant-domains/${tenantId}`).then((res) => res.data),
+    apiClient.get<any>(`/tenant-domains/${tenantId}`).then((res) => {
+      const d = res.data;
+      if (!d) return [];
+      if (Array.isArray(d)) return d as TenantDomain[];
+      if (Array.isArray(d.items)) return d.items as TenantDomain[];
+      if (Array.isArray(d.domains)) return d.domains as TenantDomain[];
+      if (Array.isArray(d.data)) return d.data as TenantDomain[];
+      return [] as TenantDomain[];
+    }),
   
   add: (tenantId: number, domain: string) =>
-    apiClient.post<{ success: boolean; domain: TenantDomain }>(`/tenant-domains/${tenantId}`, { domain_name: domain }).then((res) => res.data),
+    apiClient.post<any>(`/tenant-domains/${tenantId}`, { domain_name: domain }).then((res) => res.data),
   
   getVerification: (tenantId: number, domainId: number) =>
     apiClient.get<VerificationInstructions>(`/tenant-domains/${tenantId}/${domainId}/verification`).then((res) => res.data),

@@ -17,11 +17,11 @@ import {
 } from "lucide-react";
 import { searchPatients } from "@/features/patients/api/patients.api";
 import type { Patient } from "@/features/patients/api/patients.api";
-import { initiateVisit, getServiceDeliveryPoints } from "../api/visits.api";
+import { initiateVisit, getServiceDeliveryPoints, getVisits } from "../api/visits.api";
 import type { ServiceDeliveryPoint } from "../api/visits.api";
 import { getVisitTemplates } from "../api/visit-flows.api";
 import type { VisitTemplate } from "../api/visit-flows.api";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { routes } from "@/config/routes";
 
 export function VisitInitiationPage() {
@@ -33,12 +33,12 @@ export function VisitInitiationPage() {
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(patientFromState || null);
   const [isSearching, setIsSearching] = useState(false);
-  
+
   const [sdps, setSdps] = useState<ServiceDeliveryPoint[]>([]);
   const [templates, setTemplates] = useState<VisitTemplate[]>([]);
   const [selectedSdp, setSelectedSdp] = useState<number | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
-  
+
   const [priority, setPriority] = useState("ROUTINE");
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,7 +133,7 @@ export function VisitInitiationPage() {
       // Surface the actual server complaint — FastAPI uses `detail`, some
       // endpoints use `message`, validation 422s come back as arrays.
       const data = err?.response?.data;
-      const message =
+      let message =
         (typeof data?.message === "string" && data.message) ||
         (typeof data?.detail === "string" && data.detail) ||
         (Array.isArray(data?.detail) &&
@@ -141,6 +141,25 @@ export function VisitInitiationPage() {
             .map((d: any) => `${d.loc?.join(".") ?? "field"}: ${d.msg ?? "invalid"}`)
             .join(" · ")) ||
         "Visit initiation failed. Please verify clinical capacity.";
+
+      // Smart handling for existing visits
+      if (message.includes("already has an active visit") && selectedPatient) {
+        try {
+          const visits = await getVisits({ patient_id: selectedPatient.id, status: 'ACTIVE' });
+          const active = visits.items?.[0];
+          if (active) {
+            setError(
+              <span>
+                {message} <Link to={`/visits/${active.id}`} className="underline font-black ml-2 hover:text-rose-700">View Active Visit #{active.visit_code}</Link>
+              </span> as any
+            );
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to lookup active visit", e);
+        }
+      }
+
       setError(message);
       // Also log the full payload for debugging
       console.error("Visit initiation failed", { payload: err?.config?.data, response: data });
@@ -155,11 +174,24 @@ export function VisitInitiationPage() {
     { value: "EMERGENCY", label: "Emergency", color: "bg-rose-500", icon: Flame },
   ];
 
+  console.log("selectedPatient", selectedPatient);
+  console.log("selectedSdp", selectedSdp);
+  console.log("priority", priority);
+  console.log("reason", reason);
+  console.log("selectedTemplate", selectedTemplate);
+  console.log("searchQuery", searchQuery);
+  console.log("searchResults", searchResults);
+  console.log("isSearching", isSearching);
+  console.log("isSubmitting", isSubmitting);
+  console.log("error", error);
+  console.log("sdps", sdps);
+  console.log("templates", templates);
+
   return (
     <div className="max-w-7xl mx-auto space-y-10 animate-fade-in pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <PageHeader 
-          title="Clinical Admission & Routing" 
+        <PageHeader
+          title="Clinical Admission & Routing"
           description="Initiate a new care lifecycle and orchestrate the patient pathway."
         />
         <div className="flex gap-3">
@@ -185,9 +217,9 @@ export function VisitInitiationPage() {
               <div className="space-y-6 flex-1">
                 <div className="relative group">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 group-focus-within:text-primary-500 transition-colors" />
-                  <input 
-                    type="text" 
-                    placeholder="Search by ID or Name..." 
+                  <input
+                    type="text"
+                    placeholder="Search by ID or Name..."
                     className="input-field pl-12 bg-white/80 border-secondary-100 h-14 text-sm"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -202,7 +234,7 @@ export function VisitInitiationPage() {
                     </div>
                   ) : searchResults.length > 0 ? (
                     searchResults.map(p => (
-                      <button 
+                      <button
                         key={p.id}
                         onClick={() => setSelectedPatient(p)}
                         className="w-full flex items-center justify-between p-5 rounded-[1.5rem] bg-white border border-secondary-50 hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/5 transition-all group"
@@ -230,14 +262,14 @@ export function VisitInitiationPage() {
               <div className="space-y-8 animate-slide-up flex-1">
                 <div className="relative p-8 rounded-[2.5rem] bg-slate-900 text-white shadow-2xl overflow-hidden group">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                  
-                  <button 
+
+                  <button
                     onClick={() => setSelectedPatient(null)}
                     className="absolute top-6 right-6 p-2.5 bg-white/10 hover:bg-white/20 rounded-2xl transition-all"
                   >
                     <RefreshCw className="h-4 w-4" />
                   </button>
-                  
+
                   <div className="flex flex-col items-center text-center space-y-6">
                     <div className="h-24 w-24 rounded-[2.5rem] bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-3xl font-black shadow-2xl">
                       {selectedPatient.first_name[0]}{selectedPatient.last_name[0]}
@@ -305,11 +337,10 @@ export function VisitInitiationPage() {
                         key={opt.value}
                         type="button"
                         onClick={() => setPriority(opt.value)}
-                        className={`flex-1 flex flex-col items-center gap-3 py-6 px-4 rounded-[2rem] transition-all border-2 ${
-                          priority === opt.value 
-                          ? `${opt.color} text-white border-transparent shadow-2xl` 
+                        className={`flex-1 flex flex-col items-center gap-3 py-6 px-4 rounded-[2rem] transition-all border-2 ${priority === opt.value
+                          ? `${opt.color} text-white border-transparent shadow-2xl`
                           : "bg-white border-secondary-100 text-secondary-400 hover:border-primary-200"
-                        }`}
+                          }`}
                       >
                         <opt.icon className={`h-6 w-6 ${priority === opt.value ? 'text-white' : 'text-secondary-300'}`} />
                         <span className="font-black text-[10px] uppercase tracking-widest">{opt.label}</span>
@@ -324,8 +355,8 @@ export function VisitInitiationPage() {
                     <Building2 className="h-4 w-4 text-primary-500" />
                     Initial Service Point (SDP)
                   </label>
-                  <select 
-                    value={selectedSdp || ""} 
+                  <select
+                    value={selectedSdp || ""}
                     onChange={(e) => setSelectedSdp(Number(e.target.value))}
                     className="input-field h-16 pl-6 font-black text-sm bg-white/50 border-secondary-100"
                   >
@@ -348,11 +379,10 @@ export function VisitInitiationPage() {
                     <button
                       key={t.id}
                       onClick={() => setSelectedTemplate(t.id)}
-                      className={`p-6 rounded-[2rem] border-2 text-left transition-all group ${
-                        selectedTemplate === t.id 
-                        ? "bg-slate-900 text-white border-slate-900 shadow-xl" 
+                      className={`p-6 rounded-[2rem] border-2 text-left transition-all group ${selectedTemplate === t.id
+                        ? "bg-slate-900 text-white border-slate-900 shadow-xl"
                         : "bg-white border-secondary-100 text-secondary-600 hover:border-primary-200"
-                      }`}
+                        }`}
                     >
                       <h5 className="font-black text-sm mb-2">{t.name}</h5>
                       <p className={`text-[10px] font-bold uppercase tracking-widest ${selectedTemplate === t.id ? 'text-white/40' : 'text-secondary-400'}`}>
@@ -382,10 +412,10 @@ export function VisitInitiationPage() {
                   <FileText className="h-4 w-4 text-emerald-500" />
                   Clinical Indication / Chief Complaint
                 </label>
-                <textarea 
+                <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  className="input-field h-32 pt-6 px-8 resize-none bg-white border-secondary-100 text-base font-medium" 
+                  className="input-field h-32 pt-6 px-8 resize-none bg-white border-secondary-100 text-base font-medium"
                   placeholder="Summarize the primary rationale for this clinical encounter..."
                 />
               </div>
@@ -396,8 +426,8 @@ export function VisitInitiationPage() {
                 <CheckCircle2 className="h-6 w-6 text-emerald-500" />
                 <p className="text-[10px] font-black uppercase tracking-widest">Enterprise Validation Ready</p>
               </div>
-              
-              <button 
+
+              <button
                 onClick={handleInitiate}
                 disabled={!selectedPatient || !selectedSdp || isSubmitting}
                 className="w-full md:w-auto btn-primary bg-slate-900 hover:bg-black text-white px-16 py-6 rounded-[2rem] font-black text-base tracking-tight shadow-2xl flex items-center justify-center gap-5 group disabled:opacity-30 transition-all active:scale-95"

@@ -11,13 +11,22 @@ export type ModuleCatalogEntry = {
 };
 
 export type TenantModule = {
-  module_code: string;
+  // Support both snake_case and the flat response seen in logs
+  code?: string;
+  module_code?: string;
+  
+  label?: string;
   module_name?: string;
-  is_enabled: boolean;
+  
+  effective?: boolean;
+  is_enabled?: boolean;
+  
+  plan_default?: boolean;
+  override?: boolean | null;
+  
   enabled_at?: string;
   category?: string;
   description?: string;
-  /** Optional aggregate fields the backend may include */
   notes?: string;
 };
 

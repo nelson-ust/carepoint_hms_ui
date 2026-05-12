@@ -30,10 +30,16 @@ export async function getCurrentStaff(staffList?: Staff[]): Promise<Staff | null
 export type Staff = {
   id: number;
   user_id: number;
-  staff_number: string;
+  username?: string;
+  staff_number?: string;
+  staff_no?: string;
   designation: string;
   department: string;
+  department_id?: number;
   status: string;
+  is_superuser?: boolean;
+  role_count?: number;
+  last_login_at?: string;
   /** Some endpoints embed the user object; others put names at the root.
    *  Both shapes are supported by the helpers below. */
   user?: {
@@ -65,7 +71,9 @@ export function staffLastName(s: Staff): string {
 export function staffDisplayName(s: Staff): string {
   const full = `${staffFirstName(s)} ${staffLastName(s)}`.trim();
   if (full) return full;
-  if (s.staff_number) return s.staff_number;
+  const sno = s.staff_no ?? s.staff_number;
+  if (sno) return sno;
+  if (s.username) return s.username;
   return `Staff #${s.id}`;
 }
 
@@ -76,7 +84,9 @@ export function staffInitials(s: Staff): string {
   if (first || last) {
     return `${first.charAt(0) || "?"}${last.charAt(0) || "?"}`.toUpperCase();
   }
-  if (s.staff_number) return s.staff_number.slice(0, 2).toUpperCase();
+  const sno = s.staff_no ?? s.staff_number;
+  if (sno) return sno.slice(0, 2).toUpperCase();
+  if (s.username) return s.username.slice(0, 2).toUpperCase();
   return "??";
 }
 

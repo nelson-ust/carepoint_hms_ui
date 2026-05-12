@@ -79,6 +79,16 @@ export type CreatePatientPayload = {
   };
 };
 
+export type LoyaltyProgram = {
+  id: number;
+  name: string;
+  code: string;
+  description: string;
+  points_per_currency_unit: string;
+  minimum_redemption_points: string;
+  is_auto_enroll: boolean;
+};
+
 
 
 export type PaginatedResponse<T> = {
@@ -127,5 +137,10 @@ export async function searchPatients(query: string) {
 
 export async function getPatientById(id: number) {
   const response = await apiClient.get<Patient>(`/patients/${id}`);
+  return response.data;
+}
+
+export async function getLoyaltyPrograms() {
+  const response = await apiClient.get<LoyaltyProgram[]>("/loyalty-network/programs");
   return response.data;
 }

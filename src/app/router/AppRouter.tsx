@@ -5,6 +5,8 @@ import { DashboardLayout } from "@/app/layouts/DashboardLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { routes } from "@/config/routes";
 import { RefreshCw } from "lucide-react";
+import { RouteErrorBoundary } from "@/components/common/ErrorBoundary";
+import { PatientDetailPage } from "@/features/patients/pages/PatientDetailPage";
 
 // --- Lazy Load Pages ---
 const LandingPage = lazy(() => import("@/features/landing/pages/LandingPage").then(m => ({ default: m.LandingPage })));
@@ -90,22 +92,48 @@ function PageLoader() {
 }
 
 const router = createBrowserRouter([
-  { path: routes.home, element: <Suspense fallback={<PageLoader />}><LandingPage /></Suspense> },
-  { path: routes.tenantRegister, element: <Suspense fallback={<PageLoader />}><TenantRegisterPage /></Suspense> },
-  { path: routes.saasLogin, element: <Suspense fallback={<PageLoader />}><SaasLoginPage /></Suspense> },
+  {
+    path: routes.home,
+    element: <Suspense fallback={<PageLoader />}><LandingPage /></Suspense>,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
+    path: routes.tenantRegister,
+    element: <Suspense fallback={<PageLoader />}><TenantRegisterPage /></Suspense>,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
+    path: routes.saasLogin,
+    element: <Suspense fallback={<PageLoader />}><SaasLoginPage /></Suspense>,
+    errorElement: <RouteErrorBoundary />
+  },
 
   {
     path: routes.login,
     element: <AuthLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [{ index: true, element: <Suspense fallback={<PageLoader />}><LoginPage /></Suspense> }],
   },
 
-  { path: routes.twoFactor, element: <Suspense fallback={<PageLoader />}><TwoFactorPage /></Suspense> },
-  { path: routes.forgotPassword, element: <Suspense fallback={<PageLoader />}><ForgotPasswordPage /></Suspense> },
-  { path: routes.resetPassword, element: <Suspense fallback={<PageLoader />}><ResetPasswordPage /></Suspense> },
+  {
+    path: routes.twoFactor,
+    element: <Suspense fallback={<PageLoader />}><TwoFactorPage /></Suspense>,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
+    path: routes.forgotPassword,
+    element: <Suspense fallback={<PageLoader />}><ForgotPasswordPage /></Suspense>,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
+    path: routes.resetPassword,
+    element: <Suspense fallback={<PageLoader />}><ResetPasswordPage /></Suspense>,
+    errorElement: <RouteErrorBoundary />
+  },
 
   {
     element: <ProtectedRoute />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         element: <DashboardLayout />,
@@ -114,6 +142,7 @@ const router = createBrowserRouter([
 
           // Patient Flow
           { path: routes.patients, element: <Suspense fallback={<PageLoader />}><PatientListingPage /></Suspense> },
+          { path: routes.patientDetail, element: <Suspense fallback={<PageLoader />}><PatientDetailPage /></Suspense> },
           { path: routes.loyalty, element: <Suspense fallback={<PageLoader />}><LoyaltyPage /></Suspense> },
           { path: routes.membershipCards, element: <Suspense fallback={<PageLoader />}><MembershipCardsPage /></Suspense> },
           { path: routes.patientRegister, element: <Suspense fallback={<PageLoader />}><PatientRegistrationPage /></Suspense> },

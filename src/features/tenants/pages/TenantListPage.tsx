@@ -198,11 +198,10 @@ export function TenantListPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -460,9 +459,8 @@ export function TenantListPage() {
               </p>
             </div>
             <span
-              className={`inline-flex px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${
-                statusStyles[actionTarget.status] ?? statusStyles.PENDING
-              }`}
+              className={`inline-flex px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${statusStyles[actionTarget.status] ?? statusStyles.PENDING
+                }`}
             >
               Currently {actionTarget.status}
             </span>
@@ -477,11 +475,10 @@ export function TenantListPage() {
                   key={s}
                   type="button"
                   onClick={() => setStatusForm(s)}
-                  className={`p-3 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
-                    statusForm === s
+                  className={`p-3 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${statusForm === s
                       ? "bg-primary-500 text-white border-primary-500 shadow-md"
                       : "bg-white border-secondary-100 text-secondary-600 hover:border-primary-300"
-                  }`}
+                    }`}
                 >
                   {s}
                 </button>
@@ -584,7 +581,7 @@ function ModalShell({
           : "bg-primary-600 shadow-primary-500/20";
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] p-10 max-w-xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
+      <div className="bg-white border rounded-[2.5rem] p-10 max-w-xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"

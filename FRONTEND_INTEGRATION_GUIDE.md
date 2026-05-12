@@ -1,3 +1,5 @@
+<!-- C:\Users\NELSON ATTAH\Desktop\carepoint\carepoint_hms_ui\FRONTEND_INTEGRATION_GUIDE.md -->
+
 # Carepoint HMS — Comprehensive Frontend Integration Guide
 
 ## 🚀 Overview

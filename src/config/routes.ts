@@ -17,6 +17,7 @@ export const routes = {
   patients: "/patients",
   patientRegister: "/patients/register",
   patientSearch: "/patients/search",
+  patientDetail: "/patients/:patientId",
   membershipCards: "/patients/membership-cards",
   
   visits: "/visits",

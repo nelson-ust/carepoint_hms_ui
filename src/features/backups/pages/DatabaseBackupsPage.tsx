@@ -11,14 +11,28 @@ import {
   ChevronRight,
   MoreVertical,
   CheckCircle2,
+  XCircle,
+  ShieldAlert,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { backupsApi, type Backup } from "../api/backups.api";
+import { Modal } from "@/components/ui/Modal";
+import { Spinner } from "@/components/ui/Spinner";
+import { resolveTenantCode } from "@/lib/tenant/tenant-resolver";
 
 export function DatabaseBackupsPage() {
   const [backups, setBackups] = useState<Backup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isTriggering, setIsTriggering] = useState(false);
+  
+  // Feedback Modal State
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    title: "",
+    message: "",
+    type: "success" as "success" | "error"
+  });
 
   const load = async () => {
     setIsLoading(true);
@@ -27,9 +41,52 @@ export function DatabaseBackupsPage() {
       const data = await backupsApi.list();
       setBackups(data || []);
     } catch (err: any) {
-      setError("Failed to connect to the backup vault.");
+      console.error("Backup load error:", err);
+      const tenant = resolveTenantCode();
+      if (err.message === "Network Error") {
+        setError(`Connectivity Blocked (CORS): The server at carepoint-hms.onrender.com is refusing requests from ${window.location.origin}. This is a security policy configuration on the backend.`);
+      } else {
+        setError(`System Error (500): The backup vault for tenant "${tenant}" is currently unreachable or crashed on the server.`);
+      }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleTriggerBackup = async () => {
+    setIsTriggering(true);
+    try {
+      await backupsApi.trigger();
+      setModalConfig({
+        title: "Backup Initiated",
+        message: "The system has successfully started a manual database snapshot. This recovery point will appear in the registry once processing is complete.",
+        type: "success"
+      });
+      setShowModal(true);
+      await load();
+    } catch (err: any) {
+      setModalConfig({
+        title: "Backup Failed",
+        message: err.response?.data?.message || "The system was unable to trigger a manual backup. Please verify your administrative permissions and storage availability.",
+        type: "error"
+      });
+      setShowModal(true);
+    } finally {
+      setIsTriggering(false);
+    }
+  };
+
+  const handleDownload = async (id: number) => {
+    try {
+      const response: any = await backupsApi.download(id);
+      if (response.s3_url || response.download_url) {
+        window.open(response.s3_url || response.download_url, '_blank');
+      } else {
+        alert("Secure download link could not be generated.");
+      }
+    } catch (err) {
+      console.error("Download error", err);
+      alert("Failed to retrieve the backup file.");
     }
   };
 
@@ -56,9 +113,17 @@ export function DatabaseBackupsPage() {
           <button onClick={load} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 transition-all">
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
-          <button className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
-            <Play className="h-5 w-5" />
-            <span className="font-bold">Trigger Manual Backup</span>
+          <button 
+            onClick={handleTriggerBackup} 
+            disabled={isTriggering}
+            className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20 disabled:opacity-70 disabled:cursor-wait"
+          >
+            {isTriggering ? (
+              <RefreshCw className="h-5 w-5 animate-spin" />
+            ) : (
+              <Play className="h-5 w-5" />
+            )}
+            <span className="font-bold">{isTriggering ? "Initializing..." : "Trigger Manual Backup"}</span>
           </button>
         </div>
       </div>
@@ -99,9 +164,27 @@ export function DatabaseBackupsPage() {
          {/* Backup History */}
          <div className="lg:col-span-3 space-y-6">
             {error && (
-               <div className="p-6 rounded-[2rem] bg-rose-50 border border-rose-100 text-rose-600 flex items-center gap-4">
-                  <AlertCircle className="h-6 w-6" />
-                  <p className="text-sm font-bold">{error}</p>
+               <div className="p-8 rounded-[2.5rem] bg-rose-50 border-2 border-rose-100 text-rose-600 space-y-4 shadow-lg shadow-rose-500/5">
+                  <div className="flex items-center gap-4">
+                    <ShieldAlert className="h-8 w-8 shrink-0" />
+                    <div>
+                      <h4 className="font-black text-lg">Access Denied or System Failure</h4>
+                      <p className="text-sm font-medium opacity-80">{error}</p>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-rose-200/50 flex flex-wrap gap-4">
+                    <div className="bg-white/50 px-4 py-2 rounded-xl border border-rose-200">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-rose-400 block">Resolved Tenant</span>
+                      <span className="text-xs font-black text-rose-700">{resolveTenantCode() || "NONE"}</span>
+                    </div>
+                    <div className="bg-white/50 px-4 py-2 rounded-xl border border-rose-200">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-rose-400 block">Origin</span>
+                      <span className="text-xs font-black text-rose-700">{window.location.origin}</span>
+                    </div>
+                  </div>
+                  <button onClick={load} className="w-full btn-primary bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-2xl shadow-xl shadow-rose-500/20">
+                    Retry Connection
+                  </button>
                </div>
             )}
 
@@ -157,7 +240,10 @@ export function DatabaseBackupsPage() {
                                  </span>
                               </td>
                               <td className="px-8 py-6 text-right">
-                                 <button className="h-10 w-10 rounded-xl bg-secondary-50 flex items-center justify-center text-secondary-400 hover:bg-primary-500 hover:text-white transition-all shadow-sm">
+                                 <button 
+                                   onClick={() => handleDownload(bk.id)}
+                                   className="h-10 w-10 rounded-xl bg-secondary-50 flex items-center justify-center text-secondary-400 hover:bg-primary-500 hover:text-white transition-all shadow-sm"
+                                 >
                                     <Download className="h-4 w-4" />
                                  </button>
                               </td>
@@ -169,6 +255,37 @@ export function DatabaseBackupsPage() {
             </div>
          </div>
       </div>
+
+      {/* Feedback Modal */}
+      <Modal 
+        isOpen={showModal} 
+        onClose={() => setShowModal(false)}
+        title={modalConfig.title}
+      >
+        <div className="p-6 text-center">
+          <div className={`h-20 w-20 mx-auto rounded-3xl flex items-center justify-center mb-6 ${
+            modalConfig.type === 'success' ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'
+          }`}>
+            {modalConfig.type === 'success' ? (
+              <CheckCircle2 className="h-10 w-10" />
+            ) : (
+              <XCircle className="h-10 w-10" />
+            )}
+          </div>
+          <h3 className="text-xl font-black text-secondary-900 mb-2">{modalConfig.title}</h3>
+          <p className="text-sm text-secondary-500 leading-relaxed mb-8">
+            {modalConfig.message}
+          </p>
+          <button 
+            onClick={() => setShowModal(false)}
+            className={`w-full py-4 rounded-2xl font-bold text-white shadow-lg transition-all ${
+              modalConfig.type === 'success' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-rose-500 shadow-rose-500/20'
+            }`}
+          >
+            Acknowledge
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

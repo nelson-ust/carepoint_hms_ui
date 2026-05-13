@@ -1,6 +1,9 @@
 Email: superadmin@carepointhms.com
 Password: SuperAdmin123!
 
+Email: superadmin@carepointhms.com
+Password: Alvin@oct2016
+
 
 Tenant Admin Email: nelson.attah@live.com
 Tenant Admin Password: S3cure!Password2026

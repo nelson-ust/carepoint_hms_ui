@@ -4,6 +4,7 @@ import { TenantRegistrationForm } from "../components/TenantRegistrationForm";
 import { routes } from "@/config/routes";
 import { useTheme } from "@/lib/theme/ThemeProvider";
 import { Sun, Moon } from "lucide-react";
+import logo from "@/assets/logo.jpeg";
 
 export function TenantRegisterPage() {
   const { theme, toggleTheme } = useTheme();
@@ -15,8 +16,8 @@ export function TenantRegisterPage() {
       <header className="sticky top-0 z-30 backdrop-blur-xl bg-white/70 dark:bg-secondary-950/70 border-b border-secondary-100 dark:border-white/5">
         <div className="max-w-6xl mx-auto px-6 lg:px-8 h-20 flex items-center justify-between">
           <Link to={routes.home} className="flex items-center gap-3 group">
-            <div className="h-11 w-11 rounded-2xl bg-primary-500 flex items-center justify-center shadow-lg shadow-primary-500/30 ring-4 ring-primary-500/10 group-hover:scale-105 transition-transform">
-              <ShieldCheck className="h-6 w-6 text-white" />
+            <div className="h-11 w-11 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-primary-500/10 ring-4 ring-white/5 group-hover:scale-105 transition-transform overflow-hidden p-1">
+              <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
             </div>
             <div className="hidden sm:block text-left">
               <p className="text-base font-black tracking-tight">Carepoint</p>
@@ -33,14 +34,12 @@ export function TenantRegisterPage() {
               className="relative p-2.5 rounded-xl hover:bg-secondary-100 dark:hover:bg-white/5"
             >
               <Sun
-                className={`h-5 w-5 text-secondary-600 dark:text-secondary-300 transition-all ${
-                  isDark ? "scale-0 rotate-90 opacity-0" : "scale-100 opacity-100"
-                }`}
+                className={`h-5 w-5 text-secondary-600 dark:text-secondary-300 transition-all ${isDark ? "scale-0 rotate-90 opacity-0" : "scale-100 opacity-100"
+                  }`}
               />
               <Moon
-                className={`h-5 w-5 absolute inset-0 m-auto text-secondary-300 transition-all ${
-                  isDark ? "scale-100 opacity-100" : "scale-0 -rotate-90 opacity-0"
-                }`}
+                className={`h-5 w-5 absolute inset-0 m-auto text-secondary-300 transition-all ${isDark ? "scale-100 opacity-100" : "scale-0 -rotate-90 opacity-0"
+                  }`}
               />
             </button>
             <Link

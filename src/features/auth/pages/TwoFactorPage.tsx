@@ -13,6 +13,7 @@ import {
 import { routes } from "@/config/routes";
 import { resendOtp, verifyTwoFactor } from "@/features/auth/api/auth.api";
 import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
+import logo from "@/assets/logo.jpeg";
 
 type LocationState = {
   userId?: number;
@@ -168,7 +169,7 @@ export function TwoFactorPage() {
       );
       setInfo(
         result?.message ||
-          `New code sent${result?.delivery_method ? ` via ${result.delivery_method}` : ""}.`,
+        `New code sent${result?.delivery_method ? ` via ${result.delivery_method}` : ""}.`,
       );
       setDigits(["", "", "", "", "", ""]);
       inputsRef.current[0]?.focus();
@@ -176,8 +177,8 @@ export function TwoFactorPage() {
       const data = err?.response?.data;
       setError(
         (typeof data?.message === "string" && data.message) ||
-          (typeof data?.detail === "string" && data.detail) ||
-          "We couldn't send a new code. Please try again in a moment.",
+        (typeof data?.detail === "string" && data.detail) ||
+        "We couldn't send a new code. Please try again in a moment.",
       );
     } finally {
       setIsResending(false);
@@ -188,8 +189,8 @@ export function TwoFactorPage() {
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500 shadow-xl shadow-emerald-500/20">
-            <ShieldCheck className="h-10 w-10 text-white" />
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2rem] bg-white shadow-xl shadow-primary-500/10 border border-secondary-100 overflow-hidden p-2">
+            <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
           </div>
           <h1 className="mt-6 text-3xl font-bold tracking-tight">Two-Factor Authentication</h1>
           <p className="mt-2 text-slate-500 text-sm max-w-xs mx-auto">

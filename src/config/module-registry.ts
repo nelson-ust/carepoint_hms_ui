@@ -87,6 +87,7 @@ export const appModules: AppModule[] = [
   { code: "SETTINGS", label: "Settings", path: routes.settings, icon: Settings, category: "Administrative", description: "Tenant configuration." },
 
   // SaaS
+  { code: "SAAS_DASHBOARD", label: "Overview", path: routes.saasDashboard, icon: LayoutDashboard, category: "SaaS", description: "Global performance metrics and tenant analytics." },
   { code: "TENANTS", label: "Tenants", path: routes.tenants, icon: Globe, category: "SaaS", description: "SaaS Tenant management." },
   { code: "TENANT_DOMAINS", label: "Custom Domains", path: routes.tenantDomains, icon: Globe, category: "SaaS", description: "Manage white-label domains and SSL." },
   { code: "SAAS_BILLING", label: "Subscription", path: routes.saasInvoices, icon: CreditCard, category: "SaaS", description: "Manage platform subscription and invoices." },

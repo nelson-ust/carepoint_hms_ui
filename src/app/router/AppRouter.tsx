@@ -45,6 +45,7 @@ const InvitationsPage = lazy(() => import("@/features/invitations/pages/Invitati
 const SaaSInvoicesPage = lazy(() => import("@/features/billing/pages/SaaSInvoicesPage").then(m => ({ default: m.SaaSInvoicesPage })));
 const SupportAccessPage = lazy(() => import("@/features/saas-dashboard/pages/SupportAccessPage").then(m => ({ default: m.SupportAccessPage })));
 const ConnectivityPage = lazy(() => import("@/features/saas-dashboard/pages/ConnectivityPage").then(m => ({ default: m.ConnectivityPage })));
+const SaasOverviewPage = lazy(() => import("@/features/saas-dashboard/pages/SaasOverviewPage").then(m => ({ default: m.SaasOverviewPage })));
 const DomainsPage = lazy(() => import("@/features/tenant-domains/pages/DomainsPage").then(m => ({ default: m.DomainsPage })));
 const TenantListPage = lazy(() => import("@/features/tenants/pages/TenantListPage").then(m => ({ default: m.TenantListPage })));
 const TenantDetailPage = lazy(() => import("@/features/tenants/pages/TenantDetailPage").then(m => ({ default: m.TenantDetailPage })));
@@ -139,6 +140,7 @@ const router = createBrowserRouter([
         element: <DashboardLayout />,
         children: [
           { path: routes.dashboard, element: <Suspense fallback={<PageLoader />}><TenantOverviewPage /></Suspense> },
+          { path: routes.saasDashboard, element: <Suspense fallback={<PageLoader />}><SaasOverviewPage /></Suspense> },
 
           // Patient Flow
           { path: routes.patients, element: <Suspense fallback={<PageLoader />}><PatientListingPage /></Suspense> },

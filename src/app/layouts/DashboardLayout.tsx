@@ -16,8 +16,8 @@ export function DashboardLayout() {
             <Outlet />
           </div>
         </main>
-        
-        <footer className="px-6 py-6 border-t border-secondary-200 bg-white/50 text-center">
+
+        <footer className="px-6 py-6 border-t border-black dark:border-white bg-white/50 dark:bg-secondary-950 text-center">
           <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-secondary-400">
             Carepoint HMS © 2026 • Enterprise Health Management Systems
           </p>

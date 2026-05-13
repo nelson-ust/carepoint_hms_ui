@@ -16,6 +16,7 @@ import { routes } from "@/config/routes";
 import { login } from "@/features/auth/api/auth.api";
 import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
 import { useTheme } from "@/lib/theme/ThemeProvider";
+import logo from "@/assets/logo.jpeg";
 
 /**
  * SaaS Administrator login.
@@ -82,12 +83,12 @@ export function SaasLoginPage() {
 
       localStorageService.set(storageKeys.user, JSON.stringify(user));
 
-      navigate(routes.dashboard);
+      navigate(routes.saasDashboard);
     } catch (err: any) {
       console.error("SaaS login failed:", err);
       setError(
         err?.response?.data?.message ||
-          "Invalid SaaS administrator credentials. Please try again.",
+        "Invalid SaaS administrator credentials. Please try again.",
       );
     } finally {
       setIsSubmitting(false);
@@ -103,8 +104,8 @@ export function SaasLoginPage() {
       {/* Top bar */}
       <header className="relative z-10 max-w-6xl mx-auto px-6 lg:px-8 h-20 flex items-center justify-between">
         <Link to={routes.home} className="flex items-center gap-3 group">
-          <div className="h-11 w-11 rounded-2xl bg-primary-500 flex items-center justify-center shadow-lg shadow-primary-500/30 ring-4 ring-primary-500/10 group-hover:scale-105 transition-transform">
-            <ShieldCheck className="h-6 w-6 text-white" />
+          <div className="h-11 w-11 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-primary-500/10 ring-4 ring-white/5 group-hover:scale-105 transition-transform overflow-hidden p-1">
+            <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
           </div>
           <div className="hidden sm:block text-left">
             <p className="text-base font-black tracking-tight">Carepoint</p>
@@ -121,14 +122,12 @@ export function SaasLoginPage() {
             className="relative p-2.5 rounded-xl hover:bg-white/10 transition-all"
           >
             <Sun
-              className={`h-5 w-5 text-secondary-300 transition-all ${
-                isDark ? "scale-0 rotate-90 opacity-0" : "scale-100 opacity-100"
-              }`}
+              className={`h-5 w-5 text-secondary-300 transition-all ${isDark ? "scale-0 rotate-90 opacity-0" : "scale-100 opacity-100"
+                }`}
             />
             <Moon
-              className={`h-5 w-5 absolute inset-0 m-auto text-secondary-300 transition-all ${
-                isDark ? "scale-100 opacity-100" : "scale-0 -rotate-90 opacity-0"
-              }`}
+              className={`h-5 w-5 absolute inset-0 m-auto text-secondary-300 transition-all ${isDark ? "scale-100 opacity-100" : "scale-0 -rotate-90 opacity-0"
+                }`}
             />
           </button>
           <Link
@@ -146,7 +145,8 @@ export function SaasLoginPage() {
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
             <div className="mx-auto h-20 w-20 rounded-[1.75rem] bg-gradient-to-br from-amber-400 via-amber-500 to-rose-500 flex items-center justify-center shadow-2xl shadow-amber-500/20">
-              <Crown className="h-10 w-10 text-white" />
+              {/* <Crown className="h-10 w-10 text-white" /> */}
+              <img src={logo} alt="Carepoint Logo" className="h-full w-full object-cover" />
             </div>
             <span className="inline-flex items-center gap-2 mt-6 px-4 py-1.5 rounded-full border border-amber-400/30 bg-amber-500/10 text-amber-300 text-[10px] font-bold uppercase tracking-[0.25em]">
               <ShieldCheck className="h-3 w-3" /> Platform Administration

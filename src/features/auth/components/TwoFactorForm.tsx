@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ShieldCheck, ChevronRight, AlertCircle, RefreshCw } from "lucide-react";
+import logo from "@/assets/logo.jpeg";
 
 export function TwoFactorForm() {
   const [code, setCode] = useState(["", "", "", "", "", ""]);
@@ -17,7 +18,7 @@ export function TwoFactorForm() {
 
   const handleChange = (index: number, value: string) => {
     if (isNaN(Number(value))) return;
-    
+
     const newCode = [...code];
     newCode[index] = value.substring(value.length - 1);
     setCode(newCode);
@@ -48,7 +49,7 @@ export function TwoFactorForm() {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
-    
+
     const fullCode = code.join("");
     if (fullCode.length < 6) {
       setError("Please enter the complete 6-digit code.");
@@ -67,8 +68,8 @@ export function TwoFactorForm() {
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8 animate-fade-in">
         <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-500 shadow-xl shadow-primary-500/20">
-            <ShieldCheck className="h-10 w-10 text-white" />
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2rem] bg-white shadow-xl shadow-primary-500/10 border border-secondary-100 overflow-hidden p-2">
+            <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
           </div>
           <h1 className="mt-6 text-3xl font-bold tracking-tight text-secondary-900 font-display">Two-Factor Auth</h1>
           <p className="mt-2 text-secondary-500 text-sm">
@@ -125,7 +126,7 @@ export function TwoFactorForm() {
               {timer > 0 ? (
                 `Resend code in ${timer}s`
               ) : (
-                <button 
+                <button
                   onClick={() => setTimer(60)}
                   className="text-primary-600 font-bold hover:underline"
                 >

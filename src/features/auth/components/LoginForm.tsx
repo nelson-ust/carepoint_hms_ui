@@ -6,6 +6,7 @@ import { routes } from "@/config/routes";
 import { login } from "@/features/auth/api/auth.api";
 import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
 import { resolveTenantCode } from "@/lib/tenant/tenant-resolver";
+import logo from "@/assets/logo.jpeg";
 
 const backgroundImages = [
   "/nigeria_hospital_reception_1_1778593918777.png",
@@ -114,7 +115,7 @@ export function LoginForm() {
 
       localStorageService.set(storageKeys.user, JSON.stringify(user));
 
-      let target: string = isSaaSAdmin ? routes.tenants : routes.dashboard;
+      let target: string = isSaaSAdmin ? routes.saasDashboard : routes.dashboard;
       try {
         const stored = window.sessionStorage.getItem("carepoint.return_to");
         if (stored && stored !== "/login" && !stored.startsWith("/login")) {
@@ -153,8 +154,8 @@ export function LoginForm() {
       <div className="relative z-10 w-full max-w-xl p-4 lg:p-8 flex flex-col items-center">
         {/* Branding */}
         <div className="text-center mb-10 group">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2.5rem] bg-emerald-500 shadow-[0_20px_50px_rgba(16,185,129,0.3)] ring-8 ring-emerald-500/10 mb-6 transition-transform group-hover:rotate-12 duration-500">
-            <ShieldCheck className="h-10 w-10 text-white" />
+          <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[2.5rem] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] ring-8 ring-white/10 mb-6 transition-transform group-hover:scale-110 duration-500 overflow-hidden p-2">
+            <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
           </div>
           <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tighter font-display">
             Carepoint<span className="text-emerald-400">.</span>

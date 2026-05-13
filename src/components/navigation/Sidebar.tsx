@@ -5,6 +5,7 @@ import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
 import { useNavigate } from "react-router-dom";
 import { routes } from "@/config/routes";
 import { useUI } from "@/app/providers/UIProvider";
+import logo from "@/assets/logo.jpeg";
 
 export function Sidebar() {
   const { isSidebarCollapsed } = useUI();
@@ -26,8 +27,8 @@ export function Sidebar() {
     <aside className={`hidden lg:fixed lg:inset-y-0 lg:flex lg:flex-col bg-secondary-900 border-r border-white transition-all duration-300 z-50 ${isSidebarCollapsed ? "lg:w-24" : "lg:w-72"}`}>
       {/* Brand Logo */}
       <div className={`px-8 py-10 flex items-center gap-3 ${isSidebarCollapsed ? "justify-center px-0" : ""}`}>
-        <div className="h-12 w-12 shrink-0 rounded-2xl bg-primary-500 flex items-center justify-center shadow-lg shadow-primary-500/20 ring-4 ring-primary-500/10">
-          <ShieldCheck className="h-7 w-7 text-white" />
+        <div className="h-12 w-12 shrink-0 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-primary-500/10 ring-4 ring-white/5 overflow-hidden p-1">
+          <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
         </div>
         {!isSidebarCollapsed && (
           <div className="animate-in fade-in duration-500">

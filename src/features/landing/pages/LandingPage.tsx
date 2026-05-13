@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/lib/theme/ThemeProvider";
 import { routes } from "@/config/routes";
+import logo from "@/assets/logo.jpeg";
 
 type SectionLink = { id: string; label: string };
 
@@ -95,8 +96,8 @@ export function LandingPage() {
             onClick={() => handleAnchor("home")}
             className="flex items-center gap-3 group"
           >
-            <div className="h-11 w-11 rounded-2xl bg-primary-500 flex items-center justify-center shadow-lg shadow-primary-500/30 ring-4 ring-primary-500/10 group-hover:scale-105 transition-transform">
-              <ShieldCheck className="h-6 w-6 text-white" />
+            <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-primary-500/10 ring-4 ring-white/5 group-hover:scale-105 transition-transform overflow-hidden p-1">
+              <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
             </div>
             <div className="hidden sm:block text-left">
               <p className="text-base font-black tracking-tight">Carepoint</p>
@@ -111,11 +112,10 @@ export function LandingPage() {
               <button
                 key={link.id}
                 onClick={() => handleAnchor(link.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
-                  activeSection === link.id
+                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${activeSection === link.id
                     ? "bg-primary-500 text-white shadow-md shadow-primary-500/20"
                     : "text-secondary-500 hover:text-secondary-900 dark:hover:text-white"
-                }`}
+                  }`}
               >
                 {link.label}
               </button>
@@ -129,14 +129,12 @@ export function LandingPage() {
               className="relative p-2.5 rounded-xl hover:bg-secondary-100 dark:hover:bg-white/5 transition-all"
             >
               <Sun
-                className={`h-5 w-5 text-secondary-600 dark:text-secondary-300 transition-all ${
-                  isDark ? "scale-0 rotate-90 opacity-0" : "scale-100 opacity-100"
-                }`}
+                className={`h-5 w-5 text-secondary-600 dark:text-secondary-300 transition-all ${isDark ? "scale-0 rotate-90 opacity-0" : "scale-100 opacity-100"
+                  }`}
               />
               <Moon
-                className={`h-5 w-5 absolute inset-0 m-auto text-secondary-300 transition-all ${
-                  isDark ? "scale-100 opacity-100" : "scale-0 -rotate-90 opacity-0"
-                }`}
+                className={`h-5 w-5 absolute inset-0 m-auto text-secondary-300 transition-all ${isDark ? "scale-100 opacity-100" : "scale-0 -rotate-90 opacity-0"
+                  }`}
               />
             </button>
             <Link
@@ -169,11 +167,10 @@ export function LandingPage() {
                 <button
                   key={link.id}
                   onClick={() => handleAnchor(link.id)}
-                  className={`text-left px-4 py-3 rounded-xl text-sm font-bold ${
-                    activeSection === link.id
+                  className={`text-left px-4 py-3 rounded-xl text-sm font-bold ${activeSection === link.id
                       ? "bg-primary-500 text-white"
                       : "text-secondary-600 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-white/5"
-                  }`}
+                    }`}
                 >
                   {link.label}
                 </button>
@@ -385,8 +382,8 @@ export function LandingPage() {
         <footer className="mt-20 border-t border-secondary-100 dark:border-white/5 pt-10 pb-8">
           <div className="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-[11px] text-secondary-400 font-bold uppercase tracking-[0.2em]">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-primary-500 flex items-center justify-center">
-                <ShieldCheck className="h-4 w-4 text-white" />
+              <div className="h-10 w-10 rounded-lg bg-white flex items-center justify-center border border-secondary-200 dark:border-white/10 overflow-hidden p-1">
+                <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
               </div>
               <span>Carepoint HMS · © 2026</span>
             </div>
@@ -422,11 +419,10 @@ function SectionHeader({
   return (
     <div className={`max-w-3xl mx-auto text-center mb-14 ${inverted ? "text-white" : ""}`}>
       <span
-        className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-[0.25em] mb-5 ${
-          inverted
+        className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-[0.25em] mb-5 ${inverted
             ? "border-white/15 bg-white/10 text-primary-300"
             : "border-primary-500/20 bg-primary-500/10 text-primary-700 dark:text-primary-300"
-        }`}
+          }`}
       >
         {tag}
       </span>
@@ -434,9 +430,8 @@ function SectionHeader({
         {title}
       </h2>
       <p
-        className={`text-base md:text-lg leading-relaxed ${
-          inverted ? "text-secondary-300" : "text-secondary-600 dark:text-secondary-300"
-        }`}
+        className={`text-base md:text-lg leading-relaxed ${inverted ? "text-secondary-300" : "text-secondary-600 dark:text-secondary-300"
+          }`}
       >
         {subtitle}
       </p>

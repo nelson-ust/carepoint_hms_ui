@@ -5,12 +5,13 @@ export type TemplateStep = {
   id: number;
   template_id: number;
   service_delivery_point_id: number;
+  service_delivery_point_name: string;
   step_order: number;
-  is_required: boolean;
-  notes?: string;
-  service_delivery_point: ServiceDeliveryPoint;
-  created_at: string;
-  updated_at: string;
+  notes: string | null;
+  is_required?: boolean;
+  service_delivery_point?: ServiceDeliveryPoint;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type VisitTemplate = {
@@ -18,9 +19,9 @@ export type VisitTemplate = {
   name: string;
   code: string;
   description?: string;
-  steps: TemplateStep[];
-  created_at: string;
-  updated_at: string;
+  associated_visit_flow_templates_steps: TemplateStep[];
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type VisitStep = {
@@ -107,8 +108,10 @@ export type CombinedCreateResponse = {
 };
 
 // ----- Templates -----
-export async function getVisitTemplates() {
-  const response = await apiClient.get<PaginatedResponse<VisitTemplate>>("/visit-flows/templates");
+export async function getVisitTemplates(skip: number = 0, limit: number = 20) {
+  const response = await apiClient.get<PaginatedResponse<VisitTemplate>>("/visit-flows/templates", {
+    params: { skip, limit },
+  });
   return response.data;
 }
 

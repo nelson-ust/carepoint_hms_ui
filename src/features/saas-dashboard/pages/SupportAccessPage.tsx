@@ -1,3 +1,5 @@
+// carepoint_hms_ui/src/features/saas-dashboard/pages/SupportAccessPage.tsx
+
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import {
@@ -17,9 +19,9 @@ import {
   Building2,
   AlertTriangle,
 } from "lucide-react";
-import { 
-  useAllSupportGrants, 
-  useRevokeSupportGrant, 
+import {
+  useAllSupportGrants,
+  useRevokeSupportGrant,
   useRequestSupportAccess,
   useApproveSupportGrant
 } from "../hooks/use-support-access";
@@ -33,13 +35,13 @@ export function SupportAccessPage() {
   const revokeMutation = useRevokeSupportGrant();
   const requestMutation = useRequestSupportAccess();
   const approveMutation = useApproveSupportGrant();
-  
+
   const grants = Array.isArray(data) ? data : data?.items || [];
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [isLoadingTenants, setIsLoadingTenants] = useState(false);
-  
+
   // Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -113,7 +115,7 @@ export function SupportAccessPage() {
         valid_hours: formData.valid_hours,
         permissions: formData.permissions,
       });
-      
+
       setFeedback({ type: "success", message: "Support access grant requested successfully." });
       setIsModalOpen(false);
       setFormData({
@@ -122,7 +124,7 @@ export function SupportAccessPage() {
         valid_hours: 4,
         permissions: ["super_admin"]
       });
-      
+
       setTimeout(() => setFeedback(null), 5000);
     } catch (err: any) {
       setFormError(err?.response?.data?.message || "Failed to request access grant. Please try again.");
@@ -151,7 +153,7 @@ export function SupportAccessPage() {
           title="Support Access"
           description="Manage and monitor temporary access grants provided to platform support engineers."
         />
-        <button 
+        <button
           onClick={() => setIsModalOpen(true)}
           className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20"
         >
@@ -161,42 +163,21 @@ export function SupportAccessPage() {
       </div>
 
       {feedback && (
-        <div className={`p-4 rounded-[1.5rem] border flex items-center gap-4 animate-slide-up ${
-          feedback.type === "success" 
-            ? "bg-emerald-50 border-emerald-100 text-emerald-700" 
-            : "bg-rose-50 border-rose-100 text-rose-700"
-        }`}>
+        <div className={`p-4 rounded-[1.5rem] border flex items-center gap-4 animate-slide-up ${feedback.type === "success"
+          ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+          : "bg-rose-50 border-rose-100 text-rose-700"
+          }`}>
           {feedback.type === "success" ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
           <p className="text-sm font-bold">{feedback.message}</p>
           <button onClick={() => setFeedback(null)} className="ml-auto text-xs opacity-50 hover:opacity-100">Dismiss</button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        <div className="lg:col-span-1">
-          <div className="glass-card rounded-[2.5rem] p-8 border border-rose-100 bg-rose-50/30">
-            <div className="h-14 w-14 rounded-2xl bg-rose-500 flex items-center justify-center mb-6 shadow-lg shadow-rose-500/20">
-              <ShieldAlert className="h-7 w-7 text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-secondary-900 mb-4">Security Protocol</h3>
-            <p className="text-sm text-secondary-600 leading-relaxed mb-6">
-              Granting support access allows authorized engineers to view your data for troubleshooting. 
-              <strong> All actions are logged and audited.</strong> Access automatically expires after the granted duration.
-            </p>
-            <div className="space-y-4">
-               <div className="flex items-center gap-3 text-xs font-bold text-rose-700">
-                  <div className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                  <span>Only grant access when requested by support</span>
-               </div>
-               <div className="flex items-center gap-3 text-xs font-bold text-rose-700">
-                  <div className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                  <span>Revoke immediately after issue resolution</span>
-               </div>
-            </div>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-10">
 
-        <div className="lg:col-span-2 space-y-6">
+
+        {/* Access Table */}
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-secondary-900 flex items-center gap-2">
               <History className="h-5 w-5 text-primary-500" />
@@ -227,8 +208,8 @@ export function SupportAccessPage() {
                     ))
                   ) : grants.length > 0 ? (
                     grants.map((grant: any) => (
-                      <tr 
-                        key={grant.id} 
+                      <tr
+                        key={grant.id}
                         className="hover:bg-primary-50/30 transition-all group cursor-pointer"
                         onClick={() => setSelectedGrant(grant)}
                       >
@@ -254,13 +235,13 @@ export function SupportAccessPage() {
                         </td>
                         <td className="px-8 py-6">
                           <div className="flex items-center gap-2 text-xs font-bold text-secondary-600">
-                             <Clock className="h-3.5 w-3.5 text-secondary-400" />
-                             {format(new Date(grant.valid_until), "MMM d, HH:mm")}
+                            <Clock className="h-3.5 w-3.5 text-secondary-400" />
+                            {format(new Date(grant.valid_until), "MMM d, HH:mm")}
                           </div>
                         </td>
                         <td className="px-8 py-6 text-right" onClick={(e) => e.stopPropagation()}>
                           {grant.status === "APPROVED" ? (
-                            <button 
+                            <button
                               onClick={() => handleActionClick("revoke", grant.id)}
                               disabled={revokeMutation.isPending}
                               className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-600 text-[10px] font-bold uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all border border-rose-100"
@@ -268,7 +249,7 @@ export function SupportAccessPage() {
                               Revoke
                             </button>
                           ) : grant.status === "REQUESTED" ? (
-                            <button 
+                            <button
                               onClick={() => handleActionClick("approve", grant.id)}
                               disabled={approveMutation.isPending}
                               className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-600 text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all border border-emerald-100"
@@ -295,6 +276,32 @@ export function SupportAccessPage() {
             </div>
           </div>
         </div>
+
+
+        <div className="lg:col-span-1">
+          <div className="glass-card rounded-[2.5rem] p-8 border border-rose-100 bg-rose-50/30">
+            <div className="h-14 w-14 rounded-2xl bg-rose-500 flex items-center justify-center mb-6 shadow-lg shadow-rose-500/20">
+              <ShieldAlert className="h-7 w-7 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-secondary-900 mb-4">Security Protocol</h3>
+            <p className="text-sm text-secondary-600 leading-relaxed mb-6">
+              Granting support access allows authorized engineers to view your data for troubleshooting.
+              <strong> All actions are logged and audited.</strong> Access automatically expires after the granted duration.
+            </p>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 text-xs font-bold text-rose-700">
+                <div className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                <span>Only grant access when requested by support</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs font-bold text-rose-700">
+                <div className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                <span>Revoke immediately after issue resolution</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
       </div>
 
       {/* Grant Details Modal */}
@@ -357,16 +364,16 @@ export function SupportAccessPage() {
             </div>
 
             <div className="pt-4 grid grid-cols-1 gap-3">
-               <div className="flex items-center justify-between text-[10px] font-bold text-secondary-400 uppercase tracking-widest px-1">
-                  <span>Approved At: {selectedGrant.approved_at ? format(new Date(selectedGrant.approved_at), "MMM d, HH:mm") : "N/A"}</span>
-                  <span>Grant ID: #{selectedGrant.id}</span>
-               </div>
-               <button
-                 onClick={() => setSelectedGrant(null)}
-                 className="w-full btn-secondary py-4 rounded-2xl font-bold"
-               >
-                 Close Details
-               </button>
+              <div className="flex items-center justify-between text-[10px] font-bold text-secondary-400 uppercase tracking-widest px-1">
+                <span>Approved At: {selectedGrant.approved_at ? format(new Date(selectedGrant.approved_at), "MMM d, HH:mm") : "N/A"}</span>
+                <span>Grant ID: #{selectedGrant.id}</span>
+              </div>
+              <button
+                onClick={() => setSelectedGrant(null)}
+                className="w-full btn-secondary py-4 rounded-2xl font-bold"
+              >
+                Close Details
+              </button>
             </div>
           </div>
         )}
@@ -488,11 +495,10 @@ export function SupportAccessPage() {
         title="Confirm Action"
       >
         <div className="text-center py-6 space-y-6">
-          <div className={`h-24 w-24 rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl ${
-            confirmModal.type === 'approve' 
-              ? 'bg-emerald-500 text-white shadow-emerald-500/20' 
-              : 'bg-rose-500 text-white shadow-rose-500/20'
-          }`}>
+          <div className={`h-24 w-24 rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl ${confirmModal.type === 'approve'
+            ? 'bg-emerald-500 text-white shadow-emerald-500/20'
+            : 'bg-rose-500 text-white shadow-rose-500/20'
+            }`}>
             {confirmModal.type === 'approve' ? <ShieldCheck className="h-12 w-12" /> : <ShieldAlert className="h-12 w-12" />}
           </div>
           <div className="space-y-2">
@@ -500,7 +506,7 @@ export function SupportAccessPage() {
               {confirmModal.type === 'approve' ? 'Approve Access Grant?' : 'Revoke Access Grant?'}
             </h3>
             <p className="text-sm text-secondary-500 font-medium px-4">
-              {confirmModal.type === 'approve' 
+              {confirmModal.type === 'approve'
                 ? 'Are you sure you want to approve this support access request? This will allow the engineer to access the tenant environment.'
                 : 'Are you sure you want to revoke this active grant? The engineer will immediately lose all access permissions.'}
             </p>
@@ -515,11 +521,10 @@ export function SupportAccessPage() {
             <button
               onClick={handleConfirmAction}
               disabled={approveMutation.isPending || revokeMutation.isPending}
-              className={`flex-1 py-4 rounded-2xl font-bold text-sm text-white transition-all ${
-                confirmModal.type === 'approve' 
-                  ? 'bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-500/20' 
-                  : 'bg-rose-500 hover:bg-rose-600 shadow-xl shadow-rose-500/20'
-              }`}
+              className={`flex-1 py-4 rounded-2xl font-bold text-sm text-white transition-all ${confirmModal.type === 'approve'
+                ? 'bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-500/20'
+                : 'bg-rose-500 hover:bg-rose-600 shadow-xl shadow-rose-500/20'
+                }`}
             >
               {approveMutation.isPending || revokeMutation.isPending ? (
                 <Loader2 className="h-5 w-5 animate-spin mx-auto" />

@@ -125,7 +125,7 @@ export function AmbulanceDetailPage() {
               <div className="space-y-4">
                  <div className="flex justify-between py-3 border-b border-secondary-50">
                     <span className="text-xs text-secondary-400 font-bold">Year</span>
-                    <span className="text-xs text-secondary-900 font-black">{ambulance.year}</span>
+                    <span className="text-xs text-secondary-900 font-black">{ambulance.year_of_manufacture}</span>
                  </div>
                  <div className="flex justify-between py-3 border-b border-secondary-50">
                     <span className="text-xs text-secondary-400 font-bold">Engine Type</span>

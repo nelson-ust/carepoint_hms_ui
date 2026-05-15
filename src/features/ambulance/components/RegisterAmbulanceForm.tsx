@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Truck, Shield, AlertTriangle } from "lucide-react";
+import { Truck, Shield, AlertTriangle, RefreshCw } from "lucide-react";
 import { useCreateAmbulance } from "../hooks/use-ambulance";
 
 const ambulanceSchema = z.object({
@@ -9,8 +9,10 @@ const ambulanceSchema = z.object({
   plate_number: z.string().min(5, "Plate number is required"),
   manufacturer: z.string().min(2, "Manufacturer is required"),
   model: z.string().min(2, "Model is required"),
-  year: z.preprocess((val) => Number(val), z.number().min(1900).max(new Date().getFullYear())),
-  current_mileage: z.preprocess((val) => Number(val), z.number().min(0)),
+  year_of_manufacture: z.number().min(1900).max(new Date().getFullYear()),
+  current_mileage: z.number().min(0),
+  color: z.string().min(1, "Color is required"),
+  notes: z.string().optional(),
 });
 
 type AmbulanceFormValues = z.infer<typeof ambulanceSchema>;
@@ -27,11 +29,12 @@ export function RegisterAmbulanceForm({ onSuccess, onCancel }: RegisterAmbulance
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<AmbulanceFormValues>({
+  } = useForm({
     resolver: zodResolver(ambulanceSchema),
     defaultValues: {
-      year: new Date().getFullYear(),
+      year_of_manufacture: new Date().getFullYear(),
       current_mileage: 0,
+      color: "White",
     }
   });
 
@@ -90,17 +93,36 @@ export function RegisterAmbulanceForm({ onSuccess, onCancel }: RegisterAmbulance
           <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">Year</label>
           <input
             type="number"
-            {...register("year")}
+            {...register("year_of_manufacture", { valueAsNumber: true })}
             className="w-full bg-secondary-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
           />
         </div>
 
         <div className="space-y-2 col-span-2 sm:col-span-1">
+          <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">Color</label>
+          <input
+            {...register("color")}
+            className={`w-full bg-secondary-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium ${errors.color ? 'ring-2 ring-rose-500/50' : ''}`}
+            placeholder="e.g. White"
+          />
+          {errors.color && <p className="text-[10px] font-bold text-rose-500 ml-1">{errors.color.message}</p>}
+        </div>
+
+        <div className="space-y-2 col-span-2">
           <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">Initial Mileage (KM)</label>
           <input
             type="number"
-            {...register("current_mileage")}
+            {...register("current_mileage", { valueAsNumber: true })}
             className="w-full bg-secondary-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
+          />
+        </div>
+
+        <div className="space-y-2 col-span-2">
+          <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">Notes (Optional)</label>
+          <textarea
+            {...register("notes")}
+            className="w-full bg-secondary-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium min-h-[100px]"
+            placeholder="Any additional information about the vehicle..."
           />
         </div>
       </div>

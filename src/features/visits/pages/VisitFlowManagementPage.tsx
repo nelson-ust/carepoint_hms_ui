@@ -156,7 +156,9 @@ export function VisitFlowManagementPage() {
 
   const sortedSteps = useMemo(() => {
     if (!activeTemplate) return [] as TemplateStep[];
-    const items = Array.isArray(activeTemplate.steps) ? activeTemplate.steps : [];
+    const items = Array.isArray(activeTemplate.associated_visit_flow_templates_steps) 
+      ? activeTemplate.associated_visit_flow_templates_steps 
+      : [];
     return [...items].sort((a, b) => a.step_order - b.step_order);
   }, [activeTemplate]);
 
@@ -526,7 +528,9 @@ export function VisitFlowManagementPage() {
             ) : (
               <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
                 {filteredTemplates.map((t) => {
-                  const stepCount = Array.isArray(t.steps) ? t.steps.length : 0;
+                  const stepCount = Array.isArray(t.associated_visit_flow_templates_steps) 
+                    ? t.associated_visit_flow_templates_steps.length 
+                    : 0;
                   const isActive = t.id === activeTemplateId;
                   return (
                     <button

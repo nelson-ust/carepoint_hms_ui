@@ -386,7 +386,7 @@ export function VisitInitiationPage() {
                     >
                       <h5 className="font-black text-sm mb-2">{t.name}</h5>
                       <p className={`text-[10px] font-bold uppercase tracking-widest ${selectedTemplate === t.id ? 'text-white/40' : 'text-secondary-400'}`}>
-                        {Array.isArray(t.steps) ? t.steps.length : 0} Defined Checkpoints
+                        {Array.isArray(t.associated_visit_flow_templates_steps) ? t.associated_visit_flow_templates_steps.length : 0} Defined Checkpoints
                       </p>
                       {t.code && (
                         <p className={`text-[9px] font-mono font-bold mt-1 ${selectedTemplate === t.id ? 'text-white/30' : 'text-secondary-300'}`}>

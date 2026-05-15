@@ -130,6 +130,13 @@ export type OtpResult = {
   verified: boolean;
   user?: User;
   tokens?: AuthTokens;
+  // SaaS flat response support
+  access_token?: string;
+  refresh_token?: string;
+  admin_id?: number;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
 };
 
 export type ResendOtpPayload = {

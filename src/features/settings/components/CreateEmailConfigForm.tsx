@@ -7,13 +7,13 @@ import { useCreateEmailConfig } from "../hooks/use-email-settings";
 const emailSchema = z.object({
   provider_name: z.string().min(2, "Provider name is required"),
   smtp_host: z.string().min(3, "SMTP host is required"),
-  smtp_port: z.preprocess((val) => Number(val), z.number().min(1).max(65535)),
+  smtp_port: z.number().min(1).max(65535),
   smtp_user: z.string().min(1, "SMTP user is required"),
   smtp_password: z.string().min(1, "SMTP password is required"),
   sender_email: z.string().email("Invalid sender email"),
   sender_name: z.string().min(1, "Sender name is required"),
-  use_tls: z.boolean().default(true),
-  is_active: z.boolean().default(true),
+  use_tls: z.boolean(),
+  is_active: z.boolean(),
 });
 
 type EmailFormValues = z.infer<typeof emailSchema>;
@@ -30,7 +30,7 @@ export function CreateEmailConfigForm({ onSuccess, onCancel }: CreateEmailConfig
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<EmailFormValues>({
+  } = useForm({
     resolver: zodResolver(emailSchema),
     defaultValues: {
       smtp_port: 587,
@@ -72,7 +72,7 @@ export function CreateEmailConfigForm({ onSuccess, onCancel }: CreateEmailConfig
           <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">SMTP Port</label>
           <input
             type="number"
-            {...register("smtp_port")}
+            {...register("smtp_port", { valueAsNumber: true })}
             className="w-full bg-secondary-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
           />
         </div>

@@ -1,40 +1,47 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
-  ArrowLeft,
   ChevronRight,
-  Crown,
   Lock,
   Mail,
-  Moon,
   ShieldCheck,
-  Sun,
+  Eye,
+  EyeOff,
+  Sparkles,
 } from "lucide-react";
 import { routes } from "@/config/routes";
 import { login } from "@/features/auth/api/auth.api";
 import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
-import { useTheme } from "@/lib/theme/ThemeProvider";
 import logo from "@/assets/logo.jpeg";
 
-/**
- * SaaS Administrator login.
- *
- * Lives at /saas/login on the bare domain (no tenant subdomain). Authenticates
- * platform admins who manage tenants, billing, modules, etc. The login call is
- * made WITHOUT a tenant code header so the backend treats it as a SaaS-level
- * authentication.
- */
+const backgroundImages = [
+  "/nigeria_hospital_reception_1_1778593918777.png",
+  "/nigeria_hospital_doctors_2_1778593934424.png",
+  "/nigeria_hospital_tech_3_1778593950760.png",
+  "/nigeria_hospital_pediatrics_4_1778593966044.png",
+  "/nigeria_hospital_exterior_5_1778593988122.png",
+  "/nigeria_hospital_surgery_6_1778594007242.png",
+  "/nigeria_hospital_consultation_7_1778594026243.png",
+];
+
 export function SaasLoginPage() {
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
-  const isDark = theme === "dark";
 
   const [identifier, setIdentifier] = useState("superadmin@carepointhms.com");
   const [password, setPassword] = useState("Alvin@oct2016");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bgIndex, setBgIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setBgIndex((prev) => (prev + 1) % backgroundImages.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,209 +49,194 @@ export function SaasLoginPage() {
     setError(null);
 
     try {
-      // Strip any cached tenant context — SaaS admins are not bound to a tenant.
+      // SaaS Admin login never uses a tenant code header
       localStorageService.remove(storageKeys.tenantCode);
 
-      // Passing "" as the tenant code tells the api-client helper to explicitly
-      // SUPPRESS the auto-injected X-Tenant-Code header. SaaS-level endpoints
-      // reject the header even when it would resolve to nothing.
-      const result = await login(
-        { identifier, password, remember_me: false },
-        "",
-      );
+      const result = await login({ identifier, password, remember_me: true }, "");
 
-      if (!result.success) {
-        throw new Error(result.message || "Login failed.");
+      if (result.tokens?.two_factor_required && !result.tokens.two_factor_verified) {
+        navigate(routes.twoFactor, {
+          state: {
+            userId: result.user?.id || result.admin_id,
+            identifier,
+            tenantCode: null,
+            isSaaSAdmin: true,
+            preToken: result.tokens.access_token,
+          },
+        });
+        return;
       }
+
+      if (!result.success) throw new Error(result.message || "Login failed.");
 
       const accessToken = result.tokens?.access_token || result.access_token;
       const refreshToken = result.tokens?.refresh_token || result.refresh_token;
 
-      if (accessToken) {
-        localStorageService.set(storageKeys.accessToken, accessToken);
-      }
-      if (refreshToken) {
-        localStorageService.set(storageKeys.refreshToken, refreshToken);
-      }
+      if (!accessToken) throw new Error("No access token received.");
 
-      // Reconstruct user object from flat response if needed
-      const user = result.user || {
-        id: result.admin_id || 0,
-        email: result.email || "",
-        first_name: result.first_name || "",
-        last_name: result.last_name || "",
-        username: result.email || "",
-        status: "ACTIVE",
-        is_superuser: true,
-        is_email_verified: true,
-        is_phone_verified: true,
-        is_two_factor_enabled: false,
+      localStorageService.set(storageKeys.accessToken, accessToken);
+      if (refreshToken) localStorageService.set(storageKeys.refreshToken, refreshToken);
+
+      const rawUser = (result.user || result) as any;
+      const user = {
+        id: rawUser.id || rawUser.admin_id || 0,
+        email: rawUser.email || "",
+        first_name: rawUser.first_name || "",
+        last_name: rawUser.last_name || "",
+        name: rawUser.name || `${rawUser.first_name || ""} ${rawUser.last_name || ""}`.trim() || "SaaS Admin",
+        username: rawUser.username || rawUser.email || "",
+        status: rawUser.status || "ACTIVE",
+        role: rawUser.role || "SAAS_ADMIN",
+        is_superuser: !!rawUser.is_superuser,
+        is_saas_admin: true,
       };
 
       localStorageService.set(storageKeys.user, JSON.stringify(user));
-
       navigate(routes.saasDashboard);
     } catch (err: any) {
-      console.error("SaaS login failed:", err);
-      setError(
-        err?.response?.data?.message ||
-        "Invalid SaaS administrator credentials. Please try again.",
-      );
+      setError(err?.response?.data?.message || "Invalid credentials. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-secondary-950 via-secondary-900 to-secondary-950 text-white relative overflow-hidden">
-      {/* Decorative orbs */}
-      <div className="absolute top-0 right-0 w-[40rem] h-[40rem] rounded-full bg-primary-500/15 blur-3xl -translate-y-1/3 translate-x-1/3 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[32rem] h-[32rem] rounded-full bg-amber-500/10 blur-3xl translate-y-1/3 -translate-x-1/3 pointer-events-none" />
+    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-slate-950">
+      {/* Background Slideshow */}
+      {backgroundImages.map((src, idx) => (
+        <div
+          key={src}
+          className={`absolute inset-0 z-0 transition-opacity duration-[3000ms] ease-in-out ${idx === bgIndex ? "opacity-30 scale-105" : "opacity-0 scale-100"
+            } transform-gpu`}
+          style={{
+            backgroundImage: `url(${src})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+      ))}
 
-      {/* Top bar */}
-      <header className="relative z-10 max-w-6xl mx-auto px-6 lg:px-8 h-20 flex items-center justify-between">
-        <Link to={routes.home} className="flex items-center gap-3 group">
-          <div className="h-11 w-11 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-primary-500/10 ring-4 ring-white/5 group-hover:scale-105 transition-transform overflow-hidden p-1">
+      {/* Glass Overlay */}
+      <div className="absolute inset-0 z-[1] bg-gradient-to-br from-slate-950/90 via-slate-900/60 to-emerald-950/90" />
+
+      {/* Main Content */}
+      <div className="relative z-10 w-full max-w-xl p-4 lg:p-8 flex flex-col items-center">
+        {/* Branding */}
+        <div className="text-center mb-10 group">
+          <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[2.5rem] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] ring-8 ring-white/10 mb-6 transition-transform group-hover:scale-110 duration-500 overflow-hidden p-2">
             <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
           </div>
-          <div className="hidden sm:block text-left">
-            <p className="text-base font-black tracking-tight">Carepoint</p>
-            <p className="text-[9px] uppercase tracking-[0.25em] font-bold text-primary-300">
-              SaaS Console
-            </p>
-          </div>
-        </Link>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggleTheme}
-            aria-label="Toggle theme"
-            className="relative p-2.5 rounded-xl hover:bg-white/10 transition-all"
-          >
-            <Sun
-              className={`h-5 w-5 text-secondary-300 transition-all ${isDark ? "scale-0 rotate-90 opacity-0" : "scale-100 opacity-100"
-                }`}
-            />
-            <Moon
-              className={`h-5 w-5 absolute inset-0 m-auto text-secondary-300 transition-all ${isDark ? "scale-100 opacity-100" : "scale-0 -rotate-90 opacity-0"
-                }`}
-            />
-          </button>
-          <Link
-            to={routes.home}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest text-secondary-300 hover:bg-white/10"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Back to Home</span>
-          </Link>
-        </div>
-      </header>
-
-      {/* Body */}
-      <main className="relative z-10 flex flex-col items-center justify-center px-6 py-12 md:py-20">
-        <div className="w-full max-w-md space-y-8">
-          <div className="text-center">
-            <div className="mx-auto h-20 w-20 rounded-[1.75rem] bg-gradient-to-br from-amber-400 via-amber-500 to-rose-500 flex items-center justify-center shadow-2xl shadow-amber-500/20">
-              {/* <Crown className="h-10 w-10 text-white" /> */}
-              <img src={logo} alt="Carepoint Logo" className="h-full w-full object-cover" />
-            </div>
-            <span className="inline-flex items-center gap-2 mt-6 px-4 py-1.5 rounded-full border border-amber-400/30 bg-amber-500/10 text-amber-300 text-[10px] font-bold uppercase tracking-[0.25em]">
-              <ShieldCheck className="h-3 w-3" /> Platform Administration
-            </span>
-            <h1 className="mt-6 text-3xl md:text-4xl font-black font-display tracking-tight">
-              SaaS Administrator
-            </h1>
-            <p className="mt-3 text-secondary-300 text-sm leading-relaxed max-w-sm mx-auto">
-              Secure portal for Carepoint platform staff. Manage tenants, billing, modules,
-              and platform-level operations.
-            </p>
-          </div>
-
-          <div className="rounded-[2rem] p-8 bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {error && (
-                <div className="flex items-center gap-3 rounded-xl bg-rose-500/10 border border-rose-500/20 p-4 text-sm text-rose-300">
-                  <AlertCircle className="h-5 w-5 shrink-0" />
-                  <p className="font-bold">{error}</p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-300 ml-1">
-                  Email or Username
-                </label>
-                <div className="relative group">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-secondary-400 group-focus-within:text-primary-400 transition-colors" />
-                  <input
-                    type="text"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-secondary-500 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                    placeholder="admin@carepoint.com"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between ml-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-300">
-                    Password
-                  </label>
-                  <Link
-                    to={routes.forgotPassword}
-                    className="text-[10px] font-bold text-primary-300 hover:text-primary-200 uppercase tracking-widest"
-                  >
-                    Forgot?
-                  </Link>
-                </div>
-                <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-secondary-400 group-focus-within:text-primary-400 transition-colors" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full h-12 pl-12 pr-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-secondary-500 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                    placeholder="••••••••"
-                    required
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white text-sm font-black uppercase tracking-widest shadow-2xl shadow-primary-500/30 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
-              >
-                {isSubmitting ? (
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                ) : (
-                  <>
-                    <span>Access Console</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </>
-                )}
-              </button>
-            </form>
-
-            <div className="mt-6 pt-6 border-t border-white/10 text-center">
-              <p className="text-[11px] text-secondary-400 font-bold">
-                Need a tenant workspace instead?
-              </p>
-              <Link
-                to={routes.login}
-                className="mt-2 inline-block text-xs font-bold text-primary-300 hover:text-primary-200 underline-offset-4 hover:underline"
-              >
-                Tenant staff sign-in
-              </Link>
-            </div>
-          </div>
-
-          <p className="text-center text-[10px] text-secondary-500 uppercase tracking-[0.25em] font-bold">
-            Powered by Carepoint HMS · v1.0
+          <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tighter font-display">
+            Carepoint<span className="text-emerald-400">.</span>
+          </h1>
+          <p className="mt-3 text-emerald-400/80 font-bold text-[10px] uppercase tracking-[0.4em]">
+            SaaS Platform Administration
           </p>
         </div>
-      </main>
+
+        {/* Login Card */}
+        <div className="w-full glass-card rounded-[3rem] p-8 lg:p-12 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] bg-white/10 backdrop-blur-3xl border border-white/20">
+          <div className="mb-10 text-center">
+            <h2 className="text-2xl font-black text-white tracking-tight">
+              Control Center
+            </h2>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <Sparkles className="h-4 w-4 text-emerald-400 animate-pulse" />
+              <p className="text-slate-400 text-xs font-medium uppercase tracking-widest">
+                System Administrator Login
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="flex items-center gap-3 rounded-2xl bg-rose-500/10 p-4 text-sm text-rose-400 border border-rose-500/20 animate-shake">
+                <AlertCircle className="h-5 w-5 shrink-0" />
+                <p className="font-medium">{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Identity</label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-5 text-slate-500 group-focus-within:text-emerald-400 transition-colors">
+                  <Mail className="h-5 w-5" />
+                </div>
+                <input
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-5 py-4 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40 transition-all outline-none font-medium"
+                  placeholder="Admin Email or Username"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between ml-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Passkey</label>
+              </div>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-5 text-slate-500 group-focus-within:text-emerald-400 transition-colors">
+                  <Lock className="h-5 w-5" />
+                </div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-14 py-4 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40 transition-all outline-none"
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-5 text-slate-500 hover:text-emerald-400 transition-colors focus:outline-none"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 animate-in zoom-in duration-300" />
+                  ) : (
+                    <Eye className="h-5 w-5 animate-in zoom-in duration-300" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full btn-primary group py-4 mt-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest text-xs shadow-[0_10px_30px_rgba(16,185,129,0.3)] flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              ) : (
+                <>
+                  <span>Authenticate Session</span>
+                  <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-8 text-center">
+            <Link
+              to={routes.login}
+              className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-emerald-400 transition-colors"
+            >
+              <ShieldCheck className="h-3 w-3" />
+              Return to Hospital Portal
+            </Link>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-12 text-center">
+          <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-600">
+            Carepoint HMS • Platform Management v1.0
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

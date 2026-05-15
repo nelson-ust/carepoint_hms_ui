@@ -1,3 +1,5 @@
+<!-- carepoint_hms_ui/UI_UX_DESIGN_SPECIFICATION-UPDATED.md -->
+
 # Carepoint HMS — UI/UX Design Specification & API Form Registry
 
 ## 🎨 1. Design Language & Aesthetics

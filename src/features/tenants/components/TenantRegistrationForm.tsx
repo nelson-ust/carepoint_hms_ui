@@ -1,22 +1,23 @@
+// carepoint_hms_ui/src/features/tenants/components/TenantRegistrationForm.tsx
+
 import { useForm } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Building2, Mail, Phone, User, Lock, Globe, MapPin, ChevronRight, CheckCircle2 } from "lucide-react";
-import { registerTenant } from "../api/tenants.api";
-import type { TenantRegistrationPayload } from "../api/tenants.api";
-import { useState } from "react";
+import { registerTenant, listSubscriptionPlans } from "../api/tenants.api";
+import type { TenantRegistrationPayload, SubscriptionPlan } from "../api/tenants.api";
+import { useState, useEffect } from "react";
 
 const registrationSchema = z.object({
   tenant_name: z.string().min(5, "Organization name must be at least 5 characters"),
   tenant_code: z.string().min(3, "Tenant code must be at least 3 characters").regex(/^[A-Z0-9]+$/, "Code must be uppercase alphanumeric"),
-  domain_url: z.string().url().optional().or(z.literal("")),
   billing_email: z.string().email("Invalid email address"),
   billing_phone: z.string().min(10, "Invalid phone number"),
   billing_contact_name: z.string().min(3, "Contact name is required"),
   billing_address: z.string().min(5, "Billing address is required"),
   tax_id: z.string().optional(),
-  plan_code: z.string().default("BASIC"),
+  plan_code: z.string().min(1, "Please select a plan"),
   admin_email: z.string().email("Invalid admin email"),
   admin_username: z.string().min(3, "Admin username is required"),
   admin_password: z.string().min(8, "Password must be at least 8 characters"),
@@ -27,40 +28,81 @@ const registrationSchema = z.object({
 type FormData = z.infer<typeof registrationSchema>;
 
 export function TenantRegistrationForm() {
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { register, handleSubmit, formState: { errors }, trigger } = useForm<FormData>({
-    // The schema's INPUT type differs from the OUTPUT type because of
-    // `.default()` and `.optional().or(z.literal(""))`. We coerce here so the
-    // useForm generic stays the OUTPUT type (FormData) without TypeScript
-    // complaining about the resolver's input/output mismatch.
+  const { register, handleSubmit, formState: { errors }, trigger, setValue, watch } = useForm<FormData>({
     resolver: zodResolver(registrationSchema) as unknown as Resolver<FormData>,
     defaultValues: {
       plan_code: "BASIC",
     },
   });
 
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const availablePlans = await listSubscriptionPlans();
+        setPlans(availablePlans);
+
+        if (availablePlans.length > 0) {
+          const basicPlan = availablePlans.find(p => p.code?.toUpperCase() === "BASIC") || availablePlans[0];
+          setSelectedPlan(basicPlan);
+          setValue("plan_code", basicPlan.code || "BASIC");
+        }
+      } catch (err) {
+        console.error("Failed to fetch onboarding data", err);
+      }
+    }
+    fetchData();
+  }, [setValue]);
+
   const nextStep = async () => {
     let fieldsToValidate: (keyof FormData)[] = [];
-    if (step === 1) fieldsToValidate = ["tenant_name", "tenant_code", "domain_url"];
+    if (step === 1) fieldsToValidate = ["tenant_name", "tenant_code"];
     if (step === 2) fieldsToValidate = ["billing_contact_name", "billing_email", "billing_phone", "billing_address"];
     if (step === 3) fieldsToValidate = ["admin_first_name", "admin_last_name", "admin_email", "admin_username", "admin_password"];
+    if (step === 4) fieldsToValidate = ["plan_code"];
 
     const isValid = await trigger(fieldsToValidate);
     if (isValid) setStep(step + 1);
   };
 
   const onSubmit = async (data: FormData) => {
+    console.log("[Registration] Starting submission with data:", data);
     setIsSubmitting(true);
     setError(null);
     try {
-      await registerTenant(data as TenantRegistrationPayload);
+      // Clean up optional fields
+      const payload: any = { ...data };
+      
+      // Construct the domain_url automatically from tenant_code
+      payload.domain_url = `https://${payload.tenant_code.toLowerCase()}.carepoint-hms.com`;
+      
+      if (!payload.tax_id) {
+        payload.tax_id = "N/A";
+      }
+
+      console.log("[Registration] Cleaned payload to be sent:", payload);
+
+      const result = await registerTenant(payload as TenantRegistrationPayload);
+      console.log("[Registration] Success response:", result);
       setIsSuccess(true);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to register tenant. Please check your information.");
+      const errorMsg = err.response?.data?.message || "Failed to register tenant. Please check your information.";
+      const validationDetails = err.response?.data?.detail;
+      
+      console.error("[Registration] Error during submission:", {
+        status: err.response?.status,
+        message: errorMsg,
+        details: validationDetails,
+        fullError: err
+      });
+
+      setError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -217,29 +259,80 @@ export function TenantRegistrationForm() {
           {step === 4 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
               <div className="border-b border-slate-100 pb-4">
-                <h3 className="text-xl font-bold">Final Review</h3>
-                <p className="text-sm text-slate-500">Confirm your subscription plan</p>
+                <h3 className="text-xl font-bold">Select Subscription Plan</h3>
+                <p className="text-sm text-slate-500">Choose the tier that fits your facility's needs</p>
               </div>
-              <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-100">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-emerald-800 font-bold">Selected Plan: BASIC</span>
-                  <span className="text-emerald-600 text-sm font-semibold underline cursor-pointer">Change</span>
-                </div>
-                <ul className="space-y-2 text-sm text-emerald-700/80">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4" /> Up to 500 Patients
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4" /> Core HMS Modules
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4" /> 24/7 Support
-                  </li>
-                </ul>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {plans.map((p) => (
+                  <div
+                    key={p.code}
+                    onClick={() => {
+                      setSelectedPlan(p);
+                      setValue("plan_code", p.code);
+                    }}
+                    className={`relative p-6 rounded-[2rem] border-2 transition-all cursor-pointer overflow-hidden flex flex-col ${selectedPlan?.code === p.code
+                      ? "bg-emerald-50/50 border-emerald-500 shadow-xl shadow-emerald-500/10 scale-[1.02]"
+                      : "bg-white border-slate-100 hover:border-emerald-200"
+                      }`}
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className={`text-lg font-black ${selectedPlan?.code === p.code ? "text-emerald-900" : "text-slate-900"}`}>
+                          {p.name}
+                        </h4>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{p.code}</p>
+                      </div>
+                      {selectedPlan?.code === p.code && (
+                        <div className="h-6 w-6 bg-emerald-500 rounded-full flex items-center justify-center animate-in zoom-in">
+                          <CheckCircle2 className="h-4 w-4 text-white" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mb-6">
+                      <p className="text-2xl font-black text-slate-900">
+                        {p.currency} {Number(p.price).toLocaleString()}
+                        <span className="text-xs font-bold text-slate-400"> / {p.interval.toLowerCase()}</span>
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">{p.description}</p>
+                    </div>
+
+                    <div className="space-y-3 flex-1">
+                      <div className="pt-3 border-t border-slate-100">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Capabilities</p>
+                        <ul className="grid grid-cols-1 gap-1.5">
+                          {[
+                            { label: "Clinical", show: p.has_clinical },
+                            { label: "Inpatient", show: p.has_inpatient },
+                            { label: "Lab", show: p.has_laboratory },
+                            { label: "Pharmacy", show: p.has_pharmacy },
+                            { label: "Inventory", show: p.has_inventory },
+                            { label: "Billing", show: p.has_billing },
+                            { label: "Reporting", show: p.has_reporting },
+                            { label: "Appointments", show: p.has_appointments },
+                            { label: "Portal", show: p.has_patient_portal },
+                          ].filter(f => f.show).map(f => (
+                            <li key={f.label} className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
+                              <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                              {f.label}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-100">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Quotas</p>
+                        <div className="flex flex-wrap gap-2">
+                          <QuotaBadge label="Facilities" value={p.max_facilities} />
+                          <QuotaBadge label="Users" value={p.max_users} />
+                          <QuotaBadge label="Patients" value={p.max_patients} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <p className="text-xs text-slate-400 italic">
-                By clicking "Complete Registration", you agree to our Terms of Service and Privacy Policy.
-              </p>
+              {errors.plan_code && <p className="text-xs text-rose-500 text-center font-bold animate-shake">{errors.plan_code.message}</p>}
             </div>
           )}
 
@@ -277,6 +370,19 @@ export function TenantRegistrationForm() {
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// Sub-components
+// =====================================================================
+
+function QuotaBadge({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-100 flex flex-col items-center min-w-[60px]">
+      <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">{label}</span>
+      <span className="text-[10px] font-black text-slate-900">{value === null ? "∞" : value}</span>
     </div>
   );
 }

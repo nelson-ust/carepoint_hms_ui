@@ -31,8 +31,8 @@ export function SaasLoginPage() {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
 
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
+  const [identifier, setIdentifier] = useState("superadmin@carepointhms.com");
+  const [password, setPassword] = useState("Alvin@oct2016");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

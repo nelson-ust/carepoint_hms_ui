@@ -1,3 +1,38 @@
+# carepoint_hms_ui/.gitignore
+
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Production / Build outputs
+dist
+dist-ssr
+build
+out
+.next
+.vercel
+.turbo
+
+# Vite / Tooling artifacts
+.vite
+.swc
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+.prettiercache
+
+# Environment variables & secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.local
+*.pem
+*.key
+
 # Logs
 logs
 *.log
@@ -7,18 +42,28 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Testing
+coverage
+.nyc_output
 
-# Editor directories and files
+# Editor / IDE
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+desktop.ini
+
+# Optional: TypeScript
+tsconfig.tsbuildinfo

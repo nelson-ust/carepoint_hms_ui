@@ -4,12 +4,32 @@ import { apiClient } from "@/lib/api/api-client";
 
 export type SubscriptionPlan = {
   id: number | string;
-  name?: string;
-  code?: string;
-  description?: string;
-  monthly_price?: number;
-  annual_price?: number;
-  features?: string[] | string;
+  name: string;
+  code: string;
+  description: string;
+  price: string | number;
+  currency: string;
+  interval: "MONTHLY" | "YEARLY";
+  max_facilities: number | null;
+  max_users: number | null;
+  max_patients: number | null;
+  has_clinical: boolean;
+  has_inpatient: boolean;
+  has_laboratory: boolean;
+  has_pharmacy: boolean;
+  has_inventory: boolean;
+  has_billing: boolean;
+  has_reporting: boolean;
+  has_appointments?: boolean;
+  has_patient_portal?: boolean;
+  has_insurance?: boolean;
+  has_radiology?: boolean;
+  has_surgical?: boolean;
+  has_hr?: boolean;
+  has_dietary?: boolean;
+  has_ambulance?: boolean;
+  has_compliance?: boolean;
+  is_active: boolean;
 };
 
 export type TenantSubscription = {
@@ -110,7 +130,10 @@ export async function getTenant(tenantId: number | string): Promise<Tenant> {
 export async function registerTenant(
   payload: TenantRegistrationPayload,
 ): Promise<unknown> {
-  const response = await apiClient.post("/tenants/register", payload);
+  console.log("[API] registerTenant calling /tenants/register with payload:", payload);
+  const response = await apiClient.post("/tenants/register", payload, {
+    headers: { "X-Tenant-Code": "" } // Suppress header for registration
+  });
   return response.data;
 }
 
@@ -126,5 +149,12 @@ export async function updateTenantStatus(
   const response = await apiClient.put<Tenant>(`/tenants/${tenantId}/status`, {
     status,
   } satisfies UpdateTenantStatusPayload);
+  return response.data;
+}
+
+export async function listSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+  const response = await apiClient.get<SubscriptionPlan[]>("/saas/plans", {
+    headers: { "X-Tenant-Code": "" } // Suppress header for public plans list
+  });
   return response.data;
 }

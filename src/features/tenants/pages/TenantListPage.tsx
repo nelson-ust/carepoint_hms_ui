@@ -182,7 +182,7 @@ export function TenantListPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
@@ -199,8 +199,8 @@ export function TenantListPage() {
       {feedback && (
         <div
           className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
-              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-              : "bg-rose-50 text-rose-700 border-rose-100"
+            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+            : "bg-rose-50 text-rose-700 border-rose-100"
             }`}
         >
           {feedback.tone === "success" ? (
@@ -236,7 +236,7 @@ export function TenantListPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
           >
             {STATUS_FILTERS.map((s) => (
               <option key={s.value} value={s.value}>
@@ -248,7 +248,7 @@ export function TenantListPage() {
       </div>
 
       {/* Table */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -303,9 +303,9 @@ export function TenantListPage() {
                     <tr key={t.id} className="hover:bg-primary-50/30 transition-all">
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-3">
-                          <div className="h-11 w-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md">
+                          {/* <div className="h-11 w-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md">
                             <Building2 className="h-5 w-5" />
-                          </div>
+                          </div> */}
                           <div>
                             <p className="text-sm font-bold text-secondary-900">{t.name}</p>
                             <span className="inline-flex items-center gap-1 mt-1 bg-secondary-100 text-secondary-500 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold">
@@ -451,7 +451,7 @@ export function TenantListPage() {
           tone="amber"
         >
           {actionError && <ErrorBanner message={actionError} />}
-          <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-100 flex items-center justify-between flex-wrap gap-2">
+          <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-400 flex items-center justify-between flex-wrap gap-2">
             <div>
               <p className="text-sm font-bold text-secondary-900">{actionTarget.name}</p>
               <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase mt-0.5">
@@ -476,8 +476,8 @@ export function TenantListPage() {
                   type="button"
                   onClick={() => setStatusForm(s)}
                   className={`p-3 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${statusForm === s
-                      ? "bg-primary-500 text-white border-primary-500 shadow-md"
-                      : "bg-white border-secondary-100 text-secondary-600 hover:border-primary-300"
+                    ? "bg-primary-500 text-white border-primary-500 shadow-md"
+                    : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-300"
                     }`}
                 >
                   {s}

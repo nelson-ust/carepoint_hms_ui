@@ -78,32 +78,32 @@ export function PatientListingPage() {
 
       <div className="grid gap-8">
         {/* Advanced Filters Bar */}
-        <div className="glass-card rounded-[2rem] p-4 flex flex-col md:flex-row gap-4 items-center bg-white/40 backdrop-blur-md">
+        <div className="rounded flex flex-col md:flex-row gap-4 items-center">
           <div className="relative flex-1 w-full">
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-secondary-400" />
             <input
               type="text"
               placeholder="Search by hospital number, name, or phone..."
-              className="w-full bg-white/50 border-none rounded-2xl pl-14 pr-6 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
+              className="w-full bg-white/50 border border-secondary-400 rounded pl-14 pr-6 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
             />
           </div>
           <div className="flex gap-3 w-full md:w-auto">
-            <button className="btn-secondary flex-1 md:flex-none gap-2 px-6 py-4 rounded-2xl bg-white/80 border-secondary-100">
+            <button className="btn-secondary flex-1 md:flex-none gap-2 px-6 py-4 rounded bg-white/80 border border-secondary-400">
               <Filter className="h-4 w-4" />
               <span className="text-sm font-bold">Filters</span>
             </button>
-            <button onClick={loadPatients} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500">
+            <button onClick={loadPatients} className="btn-secondary p-4 rounded bg-white/80 border border-secondary-400 hover:rotate-180 transition-transform duration-500">
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
         {/* Records Table */}
-        <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+        <div className="glass-card rounded overflow-hidden border border-secondary-200 shadow-premium bg-white/40">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-secondary-900/5">
+                <tr className="bg-secondary-500/50">
                   <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Patient Profile</th>
                   <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Hospital ID</th>
                   <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Engagement</th>
@@ -111,12 +111,12 @@ export function PatientListingPage() {
                   <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500 text-right">Operations</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-secondary-100/50">
+              <tbody className="divide-y divide-secondary-400">
                 {isLoading ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
                       <td colSpan={5} className="px-8 py-8">
-                        <div className="h-16 bg-secondary-100/30 rounded-2xl w-full" />
+                        <div className="h-16 bg-secondary-100/30 rounded w-full" />
                       </td>
                     </tr>
                   ))
@@ -134,25 +134,25 @@ export function PatientListingPage() {
                   patients.map((patient) => (
                     <tr key={patient.id} className="hover:bg-primary-50/30 transition-all group">
                       <td className="px-8 py-6">
-                          <Link 
-                            to={routes.patientDetail.replace(':patientId', String(patient.id))}
-                            className="flex items-center gap-4 hover:opacity-80 transition-opacity"
-                          >
-                            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-base font-bold shadow-lg shadow-primary-500/20">
-                              {patient.first_name?.[0] || '?'}{patient.last_name?.[0] || '?'}
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-secondary-900 group-hover:text-primary-600 transition-colors">
-                                {patient.first_name} {patient.last_name}
-                              </p>
-                              <p className="text-[11px] font-bold text-secondary-400 uppercase tracking-tighter mt-0.5">
-                                {patient.gender} • {patient.date_of_birth ? `${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} Years` : 'Age Unknown'}
-                              </p>
-                            </div>
-                          </Link>
+                        <Link
+                          to={routes.patientDetail.replace(':patientId', String(patient.id))}
+                          className="flex items-center gap-4 hover:opacity-80 transition-opacity"
+                        >
+                          <div className="h-12 w-12 rounded bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-base font-bold shadow-lg shadow-primary-500/20">
+                            {patient.first_name?.[0] || '?'}{patient.last_name?.[0] || '?'}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-secondary-900 group-hover:text-primary-600 transition-colors">
+                              {patient.first_name} {patient.last_name}
+                            </p>
+                            <p className="text-[11px] font-bold text-secondary-400 uppercase tracking-tighter mt-0.5">
+                              {patient.gender} • {patient.date_of_birth ? `${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} Years` : 'Age Unknown'}
+                            </p>
+                          </div>
+                        </Link>
                       </td>
                       <td className="px-8 py-6">
-                        <div className="inline-flex items-center gap-2 bg-secondary-900/5 border border-secondary-900/10 px-3 py-1.5 rounded-xl">
+                        <div className="inline-flex items-center gap-2 bg-secondary-900/5 border border-secondary-900/10 px-3 py-1.5 rounded">
                           <span className="text-[11px] font-mono font-bold text-secondary-600 tracking-tight">
                             {patient.hospital_number}
                           </span>
@@ -171,7 +171,7 @@ export function PatientListingPage() {
                         </div>
                       </td>
                       <td className="px-8 py-6">
-                        <span className="px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-100">
+                        <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-100">
                           {patient.payer_type || 'OUT-OF-POCKET'}
                         </span>
                       </td>
@@ -179,20 +179,20 @@ export function PatientListingPage() {
                         <div className="flex items-center justify-end gap-2">
                           <Link
                             to={routes.patientDetail.replace(':patientId', String(patient.id))}
-                            className="p-2.5 hover:bg-primary-50 text-primary-600 rounded-xl transition-all shadow-sm border border-primary-100"
+                            className="p-2.5 hover:bg-primary-50 text-primary-600 rounded transition-all shadow-sm border border-primary-100"
                             title="Patient Dashboard"
                           >
                             <User className="h-5 w-5" />
                           </Link>
                           <button
                             onClick={() => navigate(routes.visitInitiate, { state: { patient } })}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-primary-700 transition-all shadow-lg shadow-primary-500/10"
+                            className="flex items-center gap-2 px-4 py-2 rounded bg-primary-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-primary-700 transition-all shadow-lg shadow-primary-500/10"
                           >
                             <span>Initiate Visit</span>
                             <ArrowRight className="h-3.5 w-3.5" />
                           </button>
                           <div className="relative group/menu">
-                            <button className="p-2.5 hover:bg-secondary-100 rounded-xl transition-all">
+                            <button className="p-2.5 hover:bg-secondary-100 rounded transition-all">
                               <MoreHorizontal className="h-5 w-5 text-secondary-400" />
                             </button>
                           </div>
@@ -223,7 +223,7 @@ export function PatientListingPage() {
 
           {/* Luxury Pagination */}
           {meta && (
-            <div className="px-8 py-6 bg-secondary-50/50 border-t border-secondary-100/50 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="px-8 py-6 bg-secondary-50/50 border-t border-secondary-400/50 flex flex-col sm:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-4">
                 <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-[0.2em]">
                   Showing <span className="text-secondary-900">{meta.skip + 1} - {Math.min(meta.skip + meta.limit, meta.total)}</span> of {meta.total} Records
@@ -232,13 +232,13 @@ export function PatientListingPage() {
               <div className="flex gap-2">
                 <button
                   disabled={!meta.has_previous}
-                  className="px-6 py-2 rounded-xl border border-secondary-200 text-[10px] font-bold uppercase tracking-widest hover:bg-white disabled:opacity-30 transition-all"
+                  className="px-6 py-2 rounded border border-secondary-200 text-[10px] font-bold uppercase tracking-widest hover:bg-white disabled:opacity-30 transition-all"
                 >
                   Previous
                 </button>
                 <button
                   disabled={!meta.has_next}
-                  className="px-6 py-2 rounded-xl border border-secondary-200 bg-white text-[10px] font-bold uppercase tracking-widest hover:bg-secondary-900 hover:text-white disabled:opacity-30 transition-all"
+                  className="px-6 py-2 rounded border border-secondary-200 bg-white text-[10px] font-bold uppercase tracking-widest hover:bg-secondary-900 hover:text-white disabled:opacity-30 transition-all"
                 >
                   Next
                 </button>

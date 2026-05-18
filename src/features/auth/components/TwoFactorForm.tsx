@@ -68,7 +68,7 @@ export function TwoFactorForm() {
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8 animate-fade-in">
         <div className="text-center">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2rem] bg-white shadow-xl shadow-primary-500/10 border border-secondary-100 overflow-hidden p-2">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2rem] bg-white shadow-xl shadow-primary-500/10 border border-secondary-400 overflow-hidden p-2">
             <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
           </div>
           <h1 className="mt-6 text-3xl font-bold tracking-tight text-secondary-900 font-display">Two-Factor Auth</h1>

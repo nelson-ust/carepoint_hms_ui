@@ -339,21 +339,21 @@ export function LabOrdersPage() {
         <div className="flex items-center gap-3">
           <Link
             to="/laboratory/tests"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <Layers className="h-4 w-4" />
             <span className="text-sm font-bold">Tests Catalogue</span>
           </Link>
           <Link
             to="/laboratory/results"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <FileText className="h-4 w-4" />
             <span className="text-sm font-bold">Results Queue</span>
           </Link>
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
             title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -363,11 +363,10 @@ export function LabOrdersPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -403,7 +402,7 @@ export function LabOrdersPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
           >
             {STATUS_FILTERS.map((s) => (
               <option key={s.value} value={s.value}>
@@ -415,7 +414,7 @@ export function LabOrdersPage() {
       </div>
 
       {/* Table */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -562,7 +561,7 @@ export function LabOrdersPage() {
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => toggleExpand(order.id)}
-                              className="px-4 py-2 rounded-xl bg-white border border-secondary-100 text-[10px] font-bold uppercase tracking-widest hover:bg-secondary-50 transition-all"
+                              className="px-4 py-2 rounded-xl bg-white border border-secondary-400 text-[10px] font-bold uppercase tracking-widest hover:bg-secondary-50 transition-all"
                             >
                               {isExpanded ? "Hide Items" : "View Items"}
                             </button>
@@ -581,9 +580,9 @@ export function LabOrdersPage() {
                       {isExpanded && (
                         <tr key={`order-${order.id}-items`}>
                           <td colSpan={7} className="px-6 pb-6 pt-0 bg-secondary-50/40">
-                            <div className="rounded-2xl bg-white border border-secondary-100 overflow-hidden">
+                            <div className="rounded-2xl bg-white border border-secondary-400 overflow-hidden">
                               {order.clinical_note && (
-                                <div className="p-5 border-b border-secondary-100 bg-amber-50/40">
+                                <div className="p-5 border-b border-secondary-400 bg-amber-50/40">
                                   <div className="flex items-start gap-3">
                                     <FileText className="h-4 w-4 text-amber-600 mt-0.5" />
                                     <div className="flex-1">
@@ -885,9 +884,8 @@ function ActionModal({
         </button>
         <div className="flex items-center gap-5 mb-8">
           <div
-            className={`h-14 w-14 rounded-2xl flex items-center justify-center shadow-xl text-white ${
-              tone === "amber" ? "bg-amber-500 shadow-amber-500/20" : "bg-rose-500 shadow-rose-500/20"
-            }`}
+            className={`h-14 w-14 rounded-2xl flex items-center justify-center shadow-xl text-white ${tone === "amber" ? "bg-amber-500 shadow-amber-500/20" : "bg-rose-500 shadow-rose-500/20"
+              }`}
           >
             {isCollect ? <Droplets className="h-6 w-6" /> : <Ban className="h-6 w-6" />}
           </div>
@@ -901,7 +899,7 @@ function ActionModal({
 
         {/* Context strip */}
         {(order || item) && (
-          <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-100">
+          <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-400">
             {order && (
               <div className="flex items-center gap-3">
                 <FlaskConical className="h-4 w-4 text-secondary-500" />
@@ -947,7 +945,7 @@ function ActionModal({
                     onCollectFormChange({ ...collectForm, specimen_id: e.target.value.toUpperCase() })
                   }
                   placeholder="LAB-2026-04-001"
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
                 />
               </div>
               <div className="space-y-2">
@@ -962,7 +960,7 @@ function ActionModal({
                       collected_by_staff_id: e.target.value ? Number(e.target.value) : null,
                     })
                   }
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                 >
                   <option value="">Select collector...</option>
                   {staffList.map((s) => (
@@ -983,7 +981,7 @@ function ActionModal({
                     onCollectFormChange({ ...collectForm, note: e.target.value })
                   }
                   placeholder="Pre-analytical notes, sample condition, container type..."
-                  className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                  className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
                 />
               </div>
             </>
@@ -1002,7 +1000,7 @@ function ActionModal({
                     ? "Why is this entire order being cancelled?"
                     : "Why is this test item being cancelled?"
                 }
-                className="input-field h-28 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-28 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </div>
           )}
@@ -1019,11 +1017,10 @@ function ActionModal({
           <button
             onClick={onSubmit}
             disabled={pending}
-            className={`flex-[2] py-4 rounded-2xl text-white font-black tracking-tight shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 ${
-              tone === "amber"
+            className={`flex-[2] py-4 rounded-2xl text-white font-black tracking-tight shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 ${tone === "amber"
                 ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20"
                 : "bg-rose-500 hover:bg-rose-600 shadow-rose-500/20"
-            }`}
+              }`}
           >
             <Save className="h-4 w-4" />
             {pending ? "Working..." : meta.cta}

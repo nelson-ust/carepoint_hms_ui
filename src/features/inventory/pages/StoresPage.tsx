@@ -181,21 +181,21 @@ export function StoresPage() {
         <div className="flex items-center gap-3">
           <Link
             to="/inventory/items"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <Boxes className="h-4 w-4" />
             <span className="text-sm font-bold">Stock Items</span>
           </Link>
           <Link
             to="/inventory/movements"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <History className="h-4 w-4" />
             <span className="text-sm font-bold">Movements</span>
           </Link>
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
             title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -212,11 +212,10 @@ export function StoresPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -277,7 +276,7 @@ export function StoresPage() {
           {filtered.map((s) => (
             <div
               key={s.id}
-              className="glass-card rounded-[2rem] p-7 bg-white border border-secondary-100 hover:border-primary-300 hover:shadow-xl hover:shadow-primary-500/5 transition-all"
+              className="glass-card rounded-[2rem] p-7 bg-white border border-secondary-400 hover:border-primary-300 hover:shadow-xl hover:shadow-primary-500/5 transition-all"
             >
               <div className="flex items-start justify-between mb-5">
                 <div className="h-14 w-14 rounded-[1.25rem] bg-slate-900 text-white flex items-center justify-center shadow-md">
@@ -316,7 +315,7 @@ export function StoresPage() {
                   {s.description}
                 </p>
               )}
-              <div className="mt-5 pt-4 border-t border-secondary-100 flex gap-2">
+              <div className="mt-5 pt-4 border-t border-secondary-400 flex gap-2">
                 <Link
                   to={`/inventory/items?store=${s.id}`}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-secondary-50 hover:bg-secondary-100 text-secondary-600 text-[10px] font-bold uppercase tracking-widest transition-all"
@@ -381,7 +380,7 @@ export function StoresPage() {
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="What this store is used for..."
-                className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </div>
           </div>
@@ -463,9 +462,8 @@ function FieldRow({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className={`input-field h-12 bg-secondary-50 border-secondary-100 w-full ${
-          mono ? "font-mono" : ""
-        } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+        className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${mono ? "font-mono" : ""
+          } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
       />
       {hint && (
         <p className="text-[9px] font-bold uppercase tracking-widest text-secondary-400">{hint}</p>
@@ -500,11 +498,10 @@ function ModalShell({
         </button>
         <div className="flex items-center gap-5 mb-8">
           <div
-            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${
-              tone === "rose"
+            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${tone === "rose"
                 ? "bg-rose-500 shadow-rose-500/20"
                 : "bg-primary-600 shadow-primary-500/20"
-            }`}
+              }`}
           >
             <Icon className="h-6 w-6" />
           </div>

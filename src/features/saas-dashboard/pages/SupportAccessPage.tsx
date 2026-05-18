@@ -140,9 +140,9 @@ export function SupportAccessPage() {
       case "REVOKED":
         return "bg-rose-50 text-rose-600 border-rose-100";
       case "EXPIRED":
-        return "bg-secondary-50 text-secondary-600 border-secondary-100";
+        return "bg-secondary-50 text-secondary-600 border-secondary-400";
       default:
-        return "bg-secondary-50 text-secondary-600 border-secondary-100";
+        return "bg-secondary-50 text-secondary-600 border-secondary-400";
     }
   };
 
@@ -188,7 +188,7 @@ export function SupportAccessPage() {
             </button>
           </div>
 
-          <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+          <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
@@ -312,7 +312,7 @@ export function SupportAccessPage() {
       >
         {selectedGrant && (
           <div className="space-y-8">
-            <div className="flex items-center justify-between p-6 bg-secondary-50 rounded-[2rem] border border-secondary-100">
+            <div className="flex items-center justify-between p-6 bg-secondary-50 rounded-[2rem] border border-secondary-400">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-2xl bg-secondary-900 text-white flex items-center justify-center">
                   <User className="h-6 w-6" />
@@ -328,14 +328,14 @@ export function SupportAccessPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-1.5 p-5 rounded-2xl bg-white border border-secondary-100 shadow-sm">
+              <div className="space-y-1.5 p-5 rounded-2xl bg-white border border-secondary-400 shadow-sm">
                 <p className="text-[10px] font-black text-secondary-400 uppercase tracking-tighter">Valid From</p>
                 <div className="flex items-center gap-2 text-sm font-bold text-secondary-900">
                   <Clock className="h-4 w-4 text-primary-500" />
                   {format(new Date(selectedGrant.valid_from), "MMM d, yyyy HH:mm")}
                 </div>
               </div>
-              <div className="space-y-1.5 p-5 rounded-2xl bg-white border border-secondary-100 shadow-sm">
+              <div className="space-y-1.5 p-5 rounded-2xl bg-white border border-secondary-400 shadow-sm">
                 <p className="text-[10px] font-black text-secondary-400 uppercase tracking-tighter">Valid Until</p>
                 <div className="flex items-center gap-2 text-sm font-bold text-secondary-900">
                   <Clock className="h-4 w-4 text-rose-500" />
@@ -346,7 +346,7 @@ export function SupportAccessPage() {
 
             <div className="space-y-3">
               <h4 className="text-xs font-black text-secondary-400 uppercase tracking-widest ml-1">Access Reason</h4>
-              <div className="p-6 rounded-[2rem] bg-white border border-secondary-100 shadow-premium-sm italic text-secondary-700 text-sm leading-relaxed">
+              <div className="p-6 rounded-[2rem] bg-white border border-secondary-400 shadow-premium-sm italic text-secondary-700 text-sm leading-relaxed">
                 "{selectedGrant.reason}"
               </div>
             </div>

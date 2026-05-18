@@ -19,7 +19,7 @@ export function InvitationsPage() {
   const { data, isLoading, error, refetch } = useInvitations();
   const resendMutation = useResendInvitation();
   const cancelMutation = useCancelInvitation();
-  
+
   const invitations = data?.items || [];
 
   const getStatusColor = (status: string) => {
@@ -29,11 +29,11 @@ export function InvitationsPage() {
       case "ACCEPTED":
         return "bg-emerald-50 text-emerald-600 border-emerald-100";
       case "EXPIRED":
-        return "bg-secondary-50 text-secondary-600 border-secondary-100";
+        return "bg-secondary-50 text-secondary-600 border-secondary-400";
       case "CANCELLED":
         return "bg-rose-50 text-rose-600 border-rose-100";
       default:
-        return "bg-secondary-50 text-secondary-600 border-secondary-100";
+        return "bg-secondary-50 text-secondary-600 border-secondary-400";
     }
   };
 
@@ -77,14 +77,14 @@ export function InvitationsPage() {
             />
           </div>
           <div className="flex gap-3 w-full md:w-auto">
-            <button className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500">
+            <button className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500">
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
         {/* Table */}
-        <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+        <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -137,18 +137,18 @@ export function InvitationsPage() {
                         <div className="flex items-center justify-end gap-2">
                           {inv.status === "PENDING" && (
                             <>
-                              <button 
+                              <button
                                 onClick={() => resendMutation.mutate(inv.id)}
                                 disabled={resendMutation.isPending}
-                                className="p-2.5 hover:bg-primary-50 text-primary-600 rounded-xl transition-all" 
+                                className="p-2.5 hover:bg-primary-50 text-primary-600 rounded-xl transition-all"
                                 title="Resend"
                               >
                                 <Send className="h-4 w-4" />
                               </button>
-                              <button 
+                              <button
                                 onClick={() => cancelMutation.mutate(inv.id)}
                                 disabled={cancelMutation.isPending}
-                                className="p-2.5 hover:bg-rose-50 text-rose-500 rounded-xl transition-all" 
+                                className="p-2.5 hover:bg-rose-50 text-rose-500 rounded-xl transition-all"
                                 title="Cancel"
                               >
                                 <XCircle className="h-4 w-4" />

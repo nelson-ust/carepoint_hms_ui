@@ -88,7 +88,7 @@ export function StaffManagementPage() {
           title="Workforce Management"
           description="Oversee hospital personnel, designations, and system access levels."
         />
-        <div className="flex bg-white/40 p-1 rounded-2xl border border-secondary-100/50 mr-2">
+        <div className="flex bg-white/40 p-1 rounded-2xl border border-secondary-400/50 mr-2">
           <button
             onClick={() => setViewMode('table')}
             className={`p-3 rounded-xl transition-all ${viewMode === 'table' ? 'bg-secondary-900 text-white shadow-lg' : 'text-secondary-400 hover:text-secondary-600'}`}
@@ -106,7 +106,7 @@ export function StaffManagementPage() {
         </div>
         <button
           onClick={load}
-          className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+          className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
           title="Refresh"
         >
           <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -158,7 +158,7 @@ export function StaffManagementPage() {
               </p>
             </div>
           ) : (
-            <div className="md:col-span-2 lg:col-span-3 glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+            <div className="md:col-span-2 lg:col-span-3 glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-secondary-900 text-white shadow-lg">
@@ -285,13 +285,13 @@ export function StaffManagementPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* System Access & Security */}
-              <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-100 bg-secondary-50/30">
+              <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400 bg-secondary-50/30">
                 <h4 className="text-xs font-black text-secondary-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                   <Shield className="h-4 w-4" />
                   System Permissions
                 </h4>
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-white border border-secondary-100">
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-white border border-secondary-400">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
                         <Lock className="h-5 w-5" />
@@ -304,7 +304,7 @@ export function StaffManagementPage() {
                     <button className="text-xs font-black text-primary-600 hover:underline">Manage</button>
                   </div>
 
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-white border border-secondary-100">
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-white border border-secondary-400">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                         <UserCheck className="h-5 w-5" />
@@ -320,23 +320,23 @@ export function StaffManagementPage() {
               </div>
 
               {/* Account Lifecycle */}
-              <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-100 bg-secondary-50/30">
+              <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400 bg-secondary-50/30">
                 <h4 className="text-xs font-black text-secondary-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                   <Clock className="h-4 w-4" />
                   Activity Audit
                 </h4>
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="p-5 rounded-2xl bg-white border border-secondary-100">
+                    <div className="p-5 rounded-2xl bg-white border border-secondary-400">
                       <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest block mb-1">Username</span>
                       <span className="text-sm font-black text-secondary-900">{selectedStaff.username || 'N/A'}</span>
                     </div>
-                    <div className="p-5 rounded-2xl bg-white border border-secondary-100">
+                    <div className="p-5 rounded-2xl bg-white border border-secondary-400">
                       <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest block mb-1">Staff ID</span>
                       <span className="text-sm font-black text-secondary-900">#CP-{selectedStaff.id}</span>
                     </div>
                   </div>
-                  <div className="p-5 rounded-2xl bg-white border border-secondary-100">
+                  <div className="p-5 rounded-2xl bg-white border border-secondary-400">
                     <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest block mb-1">Last System Access</span>
                     <span className="text-sm font-black text-secondary-900">
                       {selectedStaff.last_login_at ? new Date(selectedStaff.last_login_at).toLocaleString() : 'Never logged in'}
@@ -346,7 +346,7 @@ export function StaffManagementPage() {
               </div>
             </div>
 
-            <div className="flex gap-4 pt-4 border-t border-secondary-100">
+            <div className="flex gap-4 pt-4 border-t border-secondary-400">
               <button className="flex-1 btn-primary py-4 rounded-2xl font-black shadow-xl shadow-primary-500/20">
                 Edit Profile Details
               </button>

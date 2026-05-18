@@ -209,7 +209,7 @@ export function TenantDetailPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
@@ -234,11 +234,10 @@ export function TenantDetailPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -344,7 +343,7 @@ export function TenantDetailPage() {
                 {tenant.subscriptions.map((s) => (
                   <div
                     key={s.id}
-                    className="p-5 rounded-2xl bg-white border border-secondary-100 hover:border-primary-200 transition-all"
+                    className="p-5 rounded-2xl bg-white border border-secondary-400 hover:border-primary-200 transition-all"
                   >
                     <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
                       <div>
@@ -360,9 +359,8 @@ export function TenantDetailPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span
-                          className={`inline-flex px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest ${
-                            statusStyles[s.status?.toUpperCase()] ?? statusStyles.PENDING
-                          }`}
+                          className={`inline-flex px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest ${statusStyles[s.status?.toUpperCase()] ?? statusStyles.PENDING
+                            }`}
                         >
                           {s.status}
                         </span>
@@ -471,11 +469,10 @@ export function TenantDetailPage() {
                   key={s}
                   type="button"
                   onClick={() => setStatusForm(s)}
-                  className={`p-3 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
-                    statusForm === s
+                  className={`p-3 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${statusForm === s
                       ? "bg-primary-500 text-white border-primary-500 shadow-md"
-                      : "bg-white border-secondary-100 text-secondary-600 hover:border-primary-300"
-                  }`}
+                      : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-300"
+                    }`}
                 >
                   {s}
                 </button>
@@ -515,25 +512,22 @@ function DetailRow({
 }) {
   return (
     <div
-      className={`flex items-start gap-3 p-3 rounded-xl border ${
-        tone === "amber"
+      className={`flex items-start gap-3 p-3 rounded-xl border ${tone === "amber"
           ? "bg-amber-50/50 border-amber-100"
-          : "bg-secondary-50 border-secondary-100"
-      }`}
+          : "bg-secondary-50 border-secondary-400"
+        }`}
     >
       <Icon
-        className={`h-3.5 w-3.5 mt-0.5 ${
-          tone === "amber" ? "text-amber-500" : "text-secondary-400"
-        }`}
+        className={`h-3.5 w-3.5 mt-0.5 ${tone === "amber" ? "text-amber-500" : "text-secondary-400"
+          }`}
       />
       <div className="min-w-0 flex-1">
         <p className="text-[9px] font-bold uppercase tracking-widest text-secondary-400">
           {label}
         </p>
         <p
-          className={`text-xs font-bold text-secondary-700 mt-0.5 truncate ${
-            mono ? "font-mono" : ""
-          }`}
+          className={`text-xs font-bold text-secondary-700 mt-0.5 truncate ${mono ? "font-mono" : ""
+            }`}
         >
           {value}
         </p>
@@ -552,7 +546,7 @@ function DetailMicro({
   value: string;
 }) {
   return (
-    <div className="p-3 rounded-xl bg-secondary-50 border border-secondary-100">
+    <div className="p-3 rounded-xl bg-secondary-50 border border-secondary-400">
       <p className="text-[9px] font-bold uppercase tracking-widest text-secondary-400 flex items-center gap-1">
         <Icon className="h-2.5 w-2.5" />
         {label}

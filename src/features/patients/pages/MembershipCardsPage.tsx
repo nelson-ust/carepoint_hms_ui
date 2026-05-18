@@ -47,7 +47,7 @@ export function MembershipCardsPage() {
                description="Issue and manage physical or digital patient identification cards."
             />
             <div className="flex gap-3">
-               <button onClick={load} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 transition-all active:rotate-180 duration-500">
+               <button onClick={load} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 transition-all active:rotate-180 duration-500">
                   <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                </button>
                <button className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
@@ -60,7 +60,7 @@ export function MembershipCardsPage() {
          <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
             {/* Summary */}
             <div className="lg:col-span-1 space-y-6">
-               <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 bg-white/40 shadow-premium">
+               <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
                   <div className="h-16 w-16 rounded-2xl bg-primary-900 text-white flex items-center justify-center mb-6 shadow-lg shadow-primary-900/20">
                      <ShieldCheck className="h-8 w-8" />
                   </div>
@@ -89,7 +89,7 @@ export function MembershipCardsPage() {
                      <input
                         type="text"
                         placeholder="Search by card number or patient name..."
-                        className="w-full pl-12 pr-6 py-3 rounded-2xl bg-white/60 border border-secondary-100 focus:border-primary-500 transition-all text-sm font-medium outline-none"
+                        className="w-full pl-12 pr-6 py-3 rounded-2xl bg-white/60 border border-secondary-400 focus:border-primary-500 transition-all text-sm font-medium outline-none"
                      />
                   </div>
                </div>
@@ -107,14 +107,14 @@ export function MembershipCardsPage() {
                         <div key={i} className="h-48 bg-white/40 rounded-[2.5rem] animate-pulse" />
                      ))
                   ) : cards.length === 0 ? (
-                     <div className="col-span-2 py-32 text-center bg-white/20 rounded-[3rem] border-2 border-dashed border-secondary-100">
+                     <div className="col-span-2 py-32 text-center bg-white/20 rounded-[3rem] border-2 border-dashed border-secondary-400">
                         <CreditCard className="h-12 w-12 mx-auto text-secondary-200 mb-4" />
                         <h4 className="text-lg font-bold text-secondary-900">No Cards Issued</h4>
                         <p className="text-sm text-secondary-400 mt-2">Start issuing identification cards to patients.</p>
                      </div>
                   ) : (
                      cards.map((card) => (
-                        <div key={card.id} className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 bg-white/40 hover:bg-white/60 transition-all group relative overflow-hidden">
+                        <div key={card.id} className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 hover:bg-white/60 transition-all group relative overflow-hidden">
                            <div className="absolute -top-6 -right-6 h-24 w-24 bg-primary-500/5 rounded-full blur-xl" />
                            <div className="flex items-start justify-between mb-8">
                               <div className="flex items-center gap-4">
@@ -132,7 +132,7 @@ export function MembershipCardsPage() {
                               </span>
                            </div>
 
-                           <div className="flex items-center justify-between pt-6 border-t border-secondary-100/50">
+                           <div className="flex items-center justify-between pt-6 border-t border-secondary-400/50">
                               <div className="flex flex-col">
                                  <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Valid Thru</span>
                                  <span className="text-xs font-black text-secondary-900">{new Date(card.expiry_date).toLocaleDateString()}</span>

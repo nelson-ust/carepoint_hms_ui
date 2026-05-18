@@ -4,8 +4,8 @@ interface SkeletonProps {
 
 export function Skeleton({ className }: SkeletonProps) {
   return (
-    <div 
-      className={`animate-pulse bg-secondary-100 rounded-lg ${className}`} 
+    <div
+      className={`animate-pulse bg-secondary-100 rounded-lg ${className}`}
     />
   );
 }
@@ -26,13 +26,13 @@ export function TableSkeleton() {
 
 export function CardSkeleton() {
   return (
-    <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 bg-white/40 shadow-premium space-y-4">
+    <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium space-y-4">
       <Skeleton className="h-12 w-12 rounded-2xl" />
       <Skeleton className="h-6 w-3/4" />
       <Skeleton className="h-4 w-1/2" />
       <div className="pt-6 border-t border-secondary-50 flex justify-between">
-         <Skeleton className="h-4 w-20" />
-         <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-16" />
       </div>
     </div>
   );

@@ -95,14 +95,14 @@ export function TenantModulesPage() {
         <div className="flex items-center gap-3">
           <Link
             to="/tenants"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <Building2 className="h-4 w-4" />
             <span className="text-sm font-bold">All Tenants</span>
           </Link>
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
@@ -130,7 +130,7 @@ export function TenantModulesPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search tenants..."
-                className="w-full bg-white/70 border border-secondary-100 rounded-xl pl-11 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary-500/40 transition-all"
+                className="w-full bg-white/70 border border-secondary-400 rounded-xl pl-11 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary-500/40 transition-all"
               />
             </div>
 
@@ -166,29 +166,26 @@ export function TenantModulesPage() {
                     <button
                       key={t.id}
                       onClick={() => setActiveTenantId(String(t.id))}
-                      className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                        isActive
+                      className={`w-full text-left p-4 rounded-2xl border transition-all ${isActive
                           ? "bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/20"
-                          : "bg-white border-secondary-100 hover:border-primary-200"
-                      }`}
+                          : "bg-white border-secondary-400 hover:border-primary-200"
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-1.5 gap-2">
                         <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${
-                            isActive
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${isActive
                               ? "bg-white/20 text-white"
                               : "bg-secondary-100 text-secondary-500"
-                          }`}
+                            }`}
                         >
                           <Hash className="h-2.5 w-2.5" />
                           {t.code}
                         </span>
                         <span
-                          className={`px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-widest ${
-                            isActive
+                          className={`px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-widest ${isActive
                               ? "bg-white/20 text-white border-white/30"
                               : statusStyles[statusKey] ?? statusStyles.PENDING
-                          }`}
+                            }`}
                         >
                           {statusKey}
                         </span>
@@ -196,9 +193,8 @@ export function TenantModulesPage() {
                       <p className="text-sm font-black truncate">{t.name}</p>
                       {t.custom_domain && (
                         <p
-                          className={`text-[10px] font-mono mt-1 truncate inline-flex items-center gap-1 ${
-                            isActive ? "text-white/70" : "text-secondary-500"
-                          }`}
+                          className={`text-[10px] font-mono mt-1 truncate inline-flex items-center gap-1 ${isActive ? "text-white/70" : "text-secondary-500"
+                            }`}
                         >
                           <Globe className="h-2.5 w-2.5" />
                           {t.custom_domain}
@@ -245,10 +241,9 @@ export function TenantModulesPage() {
                         {activeTenant.code}
                       </span>
                       <span
-                        className={`px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-widest ${
-                          statusStyles[(activeTenant.status || "PENDING").toUpperCase()] ??
+                        className={`px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-widest ${statusStyles[(activeTenant.status || "PENDING").toUpperCase()] ??
                           statusStyles.PENDING
-                        }`}
+                          }`}
                       >
                         {activeTenant.status}
                       </span>

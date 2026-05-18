@@ -3,19 +3,19 @@ import { useForm, useFieldArray } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
-  ShieldCheck, 
-  Save, 
-  X, 
-  Activity, 
-  Users, 
-  Contact, 
-  FileText, 
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  ShieldCheck,
+  Save,
+  X,
+  Activity,
+  Users,
+  Contact,
+  FileText,
   AlertCircle,
   Heart,
   CreditCard,
@@ -178,7 +178,7 @@ export function PatientRegistrationPage() {
 
       // Final sanitization for backend alignment
       if (payload.preferred_payer_id === 0) delete payload.preferred_payer_id;
-      
+
       // Ensure specific optional sub-objects are removed when their PK is missing
       if (payload.insurance_enrollment && !payload.insurance_enrollment.insurance_provider_id) {
         delete payload.insurance_enrollment;
@@ -214,11 +214,10 @@ export function PatientRegistrationPage() {
     <button
       type="button"
       onClick={() => setActiveSection(id)}
-      className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all duration-300 font-bold text-sm ${
-        activeSection === id 
-        ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20 translate-y-[-2px]" 
-        : "text-secondary-500 hover:bg-secondary-50"
-      }`}
+      className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all duration-300 font-bold text-sm ${activeSection === id
+          ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20 translate-y-[-2px]"
+          : "text-secondary-500 hover:bg-secondary-50"
+        }`}
     >
       <Icon className="h-4 w-4" />
       <span>{label}</span>
@@ -272,11 +271,11 @@ export function PatientRegistrationPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20">
       <div className="flex items-center justify-between">
-        <PageHeader 
-          title="Patient Onboarding" 
+        <PageHeader
+          title="Patient Onboarding"
           description="Register new patients with full enterprise clinical and administrative profiles."
         />
-        <button 
+        <button
           onClick={() => navigate(routes.patients)}
           className="btn-secondary px-4 py-2 flex items-center gap-2"
         >
@@ -285,7 +284,7 @@ export function PatientRegistrationPage() {
         </button>
       </div>
 
-      <div className="flex gap-4 p-2 bg-white/50 backdrop-blur-md rounded-[2rem] border border-secondary-100 overflow-x-auto scrollbar-hide">
+      <div className="flex gap-4 p-2 bg-white/50 backdrop-blur-md rounded-[2rem] border border-secondary-400 overflow-x-auto scrollbar-hide">
         <SectionTab id="basic" label="Identity & Contact" icon={User} />
         <SectionTab id="clinical" label="Clinical Profile" icon={Heart} />
         <SectionTab id="insurance" label="Insurance Details" icon={ShieldCheck} />
@@ -518,8 +517,8 @@ export function PatientRegistrationPage() {
                     </div>
                     <h3 className="text-xl font-bold font-display">Historical Identifiers</h3>
                   </div>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => appendIdentifier({ identifier_type: "HOSPITAL_ID", identifier_value: "", is_primary: false, is_active: true })}
                     className="btn-secondary gap-2 px-4 py-2"
                   >
@@ -530,7 +529,7 @@ export function PatientRegistrationPage() {
 
                 <div className="space-y-6">
                   {identifierFields.map((field, index) => (
-                    <div key={field.id} className="p-6 bg-secondary-50/50 rounded-2xl border border-secondary-100 flex gap-6 items-end">
+                    <div key={field.id} className="p-6 bg-secondary-50/50 rounded-2xl border border-secondary-400 flex gap-6 items-end">
                       <div className="flex-1 grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
                           <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">ID Type</label>
@@ -541,8 +540,8 @@ export function PatientRegistrationPage() {
                           <input {...register(`previous_identifiers.${index}.identifier_value`)} className="input-field bg-white" placeholder="Value..." />
                         </div>
                       </div>
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => removeIdentifier(index)}
                         className="p-3 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
                       >
@@ -658,15 +657,15 @@ export function PatientRegistrationPage() {
             <p className="text-xs text-white/50 tracking-wide">Please ensure all mandatory clinical fields are populated before saving.</p>
           </div>
           <div className="flex gap-4 w-full md:w-auto">
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => navigate(routes.patients)}
               className="flex-1 md:flex-none px-8 py-4 rounded-2xl border border-white/20 font-bold text-sm hover:bg-white/10 transition-all"
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isSubmitting}
               className="flex-1 md:flex-none bg-primary-500 hover:bg-primary-600 px-12 py-4 rounded-2xl font-bold text-sm shadow-xl shadow-primary-500/20 transition-all flex items-center justify-center gap-3"
             >

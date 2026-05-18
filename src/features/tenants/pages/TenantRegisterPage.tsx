@@ -13,7 +13,7 @@ export function TenantRegisterPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-secondary-50 via-white to-primary-50/40 dark:from-secondary-950 dark:via-secondary-900 dark:to-secondary-950 text-secondary-900 dark:text-secondary-100">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 backdrop-blur-xl bg-white/70 dark:bg-secondary-950/70 border-b border-secondary-100 dark:border-white/5">
+      <header className="sticky top-0 z-30 backdrop-blur-xl bg-white/70 dark:bg-secondary-950/70 border-b border-secondary-400 dark:border-white/50">
         <div className="max-w-6xl mx-auto px-6 lg:px-8 h-20 flex items-center justify-between">
           <Link to={routes.home} className="flex items-center gap-3 group">
             <div className="h-11 w-11 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-primary-500/10 ring-4 ring-white/5 group-hover:scale-105 transition-transform overflow-hidden p-1">
@@ -51,7 +51,7 @@ export function TenantRegisterPage() {
             </Link>
             <Link
               to={routes.login}
-              className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-secondary-200 dark:border-white/10 text-xs font-bold uppercase tracking-widest hover:border-primary-500 transition-all"
+              className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-secondary-200 dark:border-white/50 text-xs font-bold uppercase tracking-widest hover:border-primary-500 transition-all"
             >
               Already Onboarded? Sign In
             </Link>
@@ -78,7 +78,7 @@ export function TenantRegisterPage() {
         </div>
 
         {/* Three-step preview */}
-        <div className="grid gap-4 md:grid-cols-4 max-w-4xl mx-auto mb-12">
+        <div className="grid gap-4 md:grid-cols-4 mx-auto mb-12">
           {[
             { n: 1, t: "Identity", d: "Hospital name & code" },
             { n: 2, t: "Billing", d: "Contact & address" },
@@ -87,7 +87,7 @@ export function TenantRegisterPage() {
           ].map((s) => (
             <div
               key={s.n}
-              className="p-4 rounded-2xl bg-white/60 dark:bg-secondary-900/60 border border-secondary-200/60 dark:border-white/5 backdrop-blur"
+              className="p-4 rounded-2xl bg-white/60 dark:bg-secondary-900/60 border border-secondary-200/60 dark:border-white/50 backdrop-blur"
             >
               <div className="flex items-center gap-3 mb-2">
                 <div className="h-8 w-8 rounded-xl bg-primary-500/15 text-primary-600 dark:text-primary-300 flex items-center justify-center text-xs font-black">

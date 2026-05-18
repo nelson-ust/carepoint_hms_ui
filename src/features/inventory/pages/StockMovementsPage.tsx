@@ -324,21 +324,21 @@ export function StockMovementsPage() {
         <div className="flex items-center gap-3 flex-wrap">
           <Link
             to="/inventory/stores"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <Package className="h-4 w-4" />
             <span className="text-sm font-bold">Stores</span>
           </Link>
           <Link
             to="/inventory/items"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <Boxes className="h-4 w-4" />
             <span className="text-sm font-bold">Items</span>
           </Link>
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
@@ -361,11 +361,10 @@ export function StockMovementsPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
           <span className="text-sm font-bold">{feedback.message}</span>
@@ -396,7 +395,7 @@ export function StockMovementsPage() {
           <select
             value={storeFilter}
             onChange={(e) => setStoreFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
           >
             <option value="">All Stores</option>
             {stores.map((s) => (
@@ -411,7 +410,7 @@ export function StockMovementsPage() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
           >
             <option value="">All Types</option>
             {MOVEMENT_TYPES.map((t) => (
@@ -424,7 +423,7 @@ export function StockMovementsPage() {
       </div>
 
       {/* Table */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -574,11 +573,10 @@ export function StockMovementsPage() {
                       key={t}
                       type="button"
                       onClick={() => setRecordForm({ ...recordForm, movement_type: t })}
-                      className={`flex flex-col items-center gap-1 px-3 py-3 rounded-xl border-2 transition-all ${
-                        isActive
+                      className={`flex flex-col items-center gap-1 px-3 py-3 rounded-xl border-2 transition-all ${isActive
                           ? "bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/20"
-                          : "bg-white border-secondary-100 text-secondary-500 hover:border-primary-300"
-                      }`}
+                          : "bg-white border-secondary-400 text-secondary-500 hover:border-primary-300"
+                        }`}
                     >
                       <Icon className="h-4 w-4" />
                       <span className="text-[9px] font-bold uppercase tracking-widest">
@@ -599,7 +597,7 @@ export function StockMovementsPage() {
                 onChange={(e) =>
                   setRecordForm({ ...recordForm, store_id: e.target.value, stock_item_id: "" })
                 }
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">Pick a store...</option>
                 {stores.map((s) => (
@@ -618,7 +616,7 @@ export function StockMovementsPage() {
                 onChange={(e) =>
                   setRecordForm({ ...recordForm, stock_item_id: e.target.value })
                 }
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                 disabled={!recordForm.store_id}
               >
                 <option value="">Pick an item...</option>
@@ -644,7 +642,7 @@ export function StockMovementsPage() {
                 value={recordForm.quantity}
                 onChange={(e) => setRecordForm({ ...recordForm, quantity: e.target.value })}
                 placeholder="50"
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
               />
             </div>
             <div className="space-y-2">
@@ -658,7 +656,7 @@ export function StockMovementsPage() {
                   setRecordForm({ ...recordForm, reference_no: e.target.value })
                 }
                 placeholder="GRN-2026-04-001"
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
               />
             </div>
 
@@ -674,7 +672,7 @@ export function StockMovementsPage() {
                     performed_by_staff_id: e.target.value ? Number(e.target.value) : null,
                   })
                 }
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">Anonymous (system)</option>
                 {staffList.map((s) => (
@@ -693,7 +691,7 @@ export function StockMovementsPage() {
                 value={recordForm.note}
                 onChange={(e) => setRecordForm({ ...recordForm, note: e.target.value })}
                 placeholder="Why this movement is being recorded..."
-                className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </div>
           </div>
@@ -743,7 +741,7 @@ export function StockMovementsPage() {
                 onChange={(e) =>
                   setTransferForm({ ...transferForm, from_stock_item_id: e.target.value })
                 }
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">Pick the source item...</option>
                 {items.map((i) => (
@@ -763,7 +761,7 @@ export function StockMovementsPage() {
                 onChange={(e) =>
                   setTransferForm({ ...transferForm, to_store_id: e.target.value })
                 }
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">Pick the destination...</option>
                 {stores
@@ -793,7 +791,7 @@ export function StockMovementsPage() {
                   setTransferForm({ ...transferForm, quantity: e.target.value })
                 }
                 placeholder="20"
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
               />
             </div>
 
@@ -809,7 +807,7 @@ export function StockMovementsPage() {
                     performed_by_staff_id: e.target.value ? Number(e.target.value) : null,
                   })
                 }
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">Anonymous (system)</option>
                 {staffList.map((s) => (
@@ -828,7 +826,7 @@ export function StockMovementsPage() {
                 value={transferForm.note}
                 onChange={(e) => setTransferForm({ ...transferForm, note: e.target.value })}
                 placeholder="Reason for transfer, vehicle/courier details..."
-                className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </div>
           </div>
@@ -915,9 +913,8 @@ function ModalShell({
         </button>
         <div className="flex items-center gap-5 mb-8">
           <div
-            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${
-              tone === "amber" ? "bg-amber-500 shadow-amber-500/20" : "bg-primary-600 shadow-primary-500/20"
-            }`}
+            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${tone === "amber" ? "bg-amber-500 shadow-amber-500/20" : "bg-primary-600 shadow-primary-500/20"
+              }`}
           >
             <Icon className="h-6 w-6" />
           </div>

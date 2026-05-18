@@ -45,7 +45,7 @@ export function ClinicalTemplatesPage() {
                description="Standardize consultations with reusable SOAP, history, and examination templates."
             />
             <div className="flex gap-3">
-               <button onClick={load} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 transition-all">
+               <button onClick={load} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 transition-all">
                   <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                </button>
                <button className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
@@ -58,7 +58,7 @@ export function ClinicalTemplatesPage() {
          <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
             {/* Template Library Stats */}
             <div className="lg:col-span-1 space-y-6">
-               <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 bg-white/40 shadow-premium">
+               <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
                   <div className="h-16 w-16 rounded-2xl bg-secondary-900 text-white flex items-center justify-center mb-6 shadow-lg">
                      <Layers className="h-8 w-8" />
                   </div>
@@ -87,7 +87,7 @@ export function ClinicalTemplatesPage() {
                      <input
                         type="text"
                         placeholder="Search templates by name or specialty..."
-                        className="w-full pl-12 pr-6 py-3 rounded-2xl bg-white/60 border border-secondary-100 focus:border-primary-500 transition-all text-sm font-medium outline-none"
+                        className="w-full pl-12 pr-6 py-3 rounded-2xl bg-white/60 border border-secondary-400 focus:border-primary-500 transition-all text-sm font-medium outline-none"
                      />
                   </div>
                   <button className="btn-secondary py-3 px-6 rounded-2xl gap-2 text-xs font-bold">
@@ -109,14 +109,14 @@ export function ClinicalTemplatesPage() {
                         <div key={i} className="h-48 bg-white/40 rounded-[2.5rem] animate-pulse" />
                      ))
                   ) : templates.length === 0 ? (
-                     <div className="col-span-2 py-32 text-center bg-white/20 rounded-[3rem] border-2 border-dashed border-secondary-100">
+                     <div className="col-span-2 py-32 text-center bg-white/20 rounded-[3rem] border-2 border-dashed border-secondary-400">
                         <FileText className="h-12 w-12 mx-auto text-secondary-200 mb-4" />
                         <h4 className="text-lg font-bold text-secondary-900">Library is Empty</h4>
                         <p className="text-sm text-secondary-400 mt-2">Create your first clinical documentation template.</p>
                      </div>
                   ) : (
                      templates.map((tpl) => (
-                        <div key={tpl.id} className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 bg-white/40 hover:bg-white/60 transition-all group relative overflow-hidden">
+                        <div key={tpl.id} className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 hover:bg-white/60 transition-all group relative overflow-hidden">
                            <div className="flex items-start justify-between mb-6">
                               <div className="h-12 w-12 rounded-2xl bg-primary-500/10 text-primary-600 flex items-center justify-center shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-all">
                                  <FileText className="h-6 w-6" />
@@ -135,7 +135,7 @@ export function ClinicalTemplatesPage() {
                               <span className="px-2 py-0.5 rounded-lg bg-secondary-900 text-white text-[8px] font-black uppercase tracking-widest">{tpl.specialty || 'General'}</span>
                               <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">{tpl.sections_count || 0} Sections</span>
                            </div>
-                           <div className="mt-8 pt-6 border-t border-secondary-100/50 flex items-center justify-between">
+                           <div className="mt-8 pt-6 border-t border-secondary-400/50 flex items-center justify-between">
                               <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Last updated {new Date(tpl.updated_at).toLocaleDateString()}</span>
                               <button className="text-primary-600 text-xs font-black uppercase tracking-widest hover:underline">Preview →</button>
                            </div>

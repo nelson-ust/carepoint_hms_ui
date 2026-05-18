@@ -189,7 +189,7 @@ export function TwoFactorPage() {
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2rem] bg-white shadow-xl shadow-primary-500/10 border border-secondary-100 overflow-hidden p-2">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2rem] bg-white shadow-xl shadow-primary-500/10 border border-secondary-400 overflow-hidden p-2">
             <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
           </div>
           <h1 className="mt-6 text-3xl font-bold tracking-tight">Two-Factor Authentication</h1>
@@ -230,7 +230,7 @@ export function TwoFactorPage() {
                   onChange={(e) => handleChange(idx, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(idx, e)}
                   autoFocus={idx === 0}
-                  className="h-14 w-12 text-center text-2xl font-black font-mono rounded-2xl border-2 border-secondary-100 bg-white focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 focus:outline-none transition-all"
+                  className="h-14 w-12 text-center text-2xl font-black font-mono rounded-2xl border-2 border-secondary-400 bg-white focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 focus:outline-none transition-all"
                 />
               ))}
             </div>
@@ -251,7 +251,7 @@ export function TwoFactorPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-secondary-100 text-center space-y-2">
+          <div className="mt-6 pt-6 border-t border-secondary-400 text-center space-y-2">
             <button
               onClick={handleResend}
               disabled={isResending}

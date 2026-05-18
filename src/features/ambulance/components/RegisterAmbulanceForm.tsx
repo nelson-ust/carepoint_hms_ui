@@ -24,7 +24,7 @@ interface RegisterAmbulanceFormProps {
 
 export function RegisterAmbulanceForm({ onSuccess, onCancel }: RegisterAmbulanceFormProps) {
   const { mutate, isPending } = useCreateAmbulance();
-  
+
   const {
     register,
     handleSubmit,
@@ -58,7 +58,7 @@ export function RegisterAmbulanceForm({ onSuccess, onCancel }: RegisterAmbulance
           />
           {errors.code && <p className="text-[10px] font-bold text-rose-500 ml-1">{errors.code.message}</p>}
         </div>
-        
+
         <div className="space-y-2 col-span-2 sm:col-span-1">
           <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">Plate Number</label>
           <input
@@ -127,7 +127,7 @@ export function RegisterAmbulanceForm({ onSuccess, onCancel }: RegisterAmbulance
         </div>
       </div>
 
-      <div className="flex gap-4 pt-6 border-t border-secondary-100">
+      <div className="flex gap-4 pt-6 border-t border-secondary-400">
         <button
           type="button"
           onClick={onCancel}

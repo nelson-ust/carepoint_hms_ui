@@ -343,7 +343,7 @@ export function DrugsPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
             title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -362,11 +362,10 @@ export function DrugsPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -392,18 +391,16 @@ export function DrugsPage() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
-                tab === t
+              className={`px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${tab === t
                   ? "bg-slate-900 text-white shadow-md"
                   : "bg-white/60 text-secondary-600 hover:bg-white"
-              }`}
+                }`}
             >
               {t === "DRUGS" ? <Pill className="h-3 w-3" /> : <Layers className="h-3 w-3" />}
               {t === "DRUGS" ? "Drugs" : "Categories"}
               <span
-                className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${
-                  tab === t ? "bg-white/20" : "bg-secondary-100 text-secondary-500"
-                }`}
+                className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${tab === t ? "bg-white/20" : "bg-secondary-100 text-secondary-500"
+                  }`}
               >
                 {t === "DRUGS" ? drugs.length : categories.length}
               </span>
@@ -427,7 +424,7 @@ export function DrugsPage() {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-3 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+                className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-3 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
               >
                 <option value="">All Categories</option>
                 {categories.map((c) => (
@@ -525,7 +522,7 @@ export function DrugsPage() {
               <select
                 value={drugForm.dosage_form}
                 onChange={(e) => setDrugForm({ ...drugForm, dosage_form: e.target.value })}
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 {DOSAGE_FORMS.map((f) => (
                   <option key={f} value={f}>
@@ -556,7 +553,7 @@ export function DrugsPage() {
                 onChange={(e) =>
                   setDrugForm({ ...drugForm, drug_category_id: e.target.value })
                 }
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">— Uncategorised —</option>
                 {categories.map((c) => (
@@ -586,11 +583,10 @@ export function DrugsPage() {
                 onClick={() =>
                   setDrugForm({ ...drugForm, is_controlled: !drugForm.is_controlled })
                 }
-                className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
-                  drugForm.is_controlled
+                className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${drugForm.is_controlled
                     ? "bg-rose-50 border-rose-200 text-rose-700"
-                    : "bg-secondary-50 border-secondary-100 text-secondary-500"
-                }`}
+                    : "bg-secondary-50 border-secondary-400 text-secondary-500"
+                  }`}
               >
                 <div className="text-left flex items-center gap-3">
                   <ShieldAlert className="h-5 w-5" />
@@ -604,14 +600,12 @@ export function DrugsPage() {
                   </div>
                 </div>
                 <div
-                  className={`h-6 w-12 rounded-full p-0.5 transition-all ${
-                    drugForm.is_controlled ? "bg-rose-500" : "bg-secondary-200"
-                  }`}
+                  className={`h-6 w-12 rounded-full p-0.5 transition-all ${drugForm.is_controlled ? "bg-rose-500" : "bg-secondary-200"
+                    }`}
                 >
                   <div
-                    className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                      drugForm.is_controlled ? "translate-x-6" : ""
-                    }`}
+                    className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${drugForm.is_controlled ? "translate-x-6" : ""
+                      }`}
                   />
                 </div>
               </button>
@@ -673,7 +667,7 @@ export function DrugsPage() {
                 value={catForm.description}
                 onChange={(e) => setCatForm({ ...catForm, description: e.target.value })}
                 placeholder="Notes for clinicians and pharmacists..."
-                className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </div>
           </div>
@@ -757,7 +751,7 @@ function DrugsTable({
   onCreate: () => void;
 }) {
   return (
-    <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+    <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
@@ -898,7 +892,7 @@ function CategoriesTable({
   onCreate: () => void;
 }) {
   return (
-    <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+    <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
@@ -1046,7 +1040,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`input-field h-12 bg-secondary-50 border-secondary-100 w-full ${mono ? "font-mono" : ""}`}
+        className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${mono ? "font-mono" : ""}`}
       />
     </div>
   );
@@ -1080,9 +1074,8 @@ function Modal({
         </button>
         <div className="flex items-center gap-5 mb-8">
           <div
-            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${
-              tone === "rose" ? "bg-rose-500 shadow-rose-500/20" : "bg-primary-600 shadow-primary-500/20"
-            }`}
+            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${tone === "rose" ? "bg-rose-500 shadow-rose-500/20" : "bg-primary-600 shadow-primary-500/20"
+              }`}
           >
             <Icon className="h-6 w-6" />
           </div>

@@ -40,27 +40,27 @@ export function Modal({ isOpen, onClose, title, children, size = "md" }: ModalPr
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-secondary-900/60 backdrop-blur-sm transition-opacity animate-fade-in"
         onClick={onClose}
       />
-      
+
       {/* Modal Content */}
-      <div 
+      <div
         ref={modalRef}
         className={`relative w-full ${sizeClasses[size]} bg-white rounded-[2.5rem] shadow-premium-lg border border-white/20 animate-slide-up flex flex-col max-h-[90vh]`}
       >
         {/* Header */}
-        <div className="px-8 py-6 border-b border-secondary-100 flex items-center justify-between shrink-0">
+        <div className="px-8 py-6 border-b border-secondary-400 flex items-center justify-between shrink-0">
           <h3 className="text-xl font-bold text-secondary-900">{title}</h3>
-          <button 
+          <button
             onClick={onClose}
             className="p-2 hover:bg-secondary-50 rounded-xl transition-all text-secondary-400 hover:text-secondary-900"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
-        
+
         {/* Body */}
         <div className="p-8 overflow-y-auto scrollbar-hide flex-1">
           {children}

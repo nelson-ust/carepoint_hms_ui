@@ -20,7 +20,7 @@ export function TenantJobsPage() {
   const { data, isLoading, refetch } = useTenantJobs();
   const { data: handlers } = useJobHandlers();
   const deleteMutation = useDeleteJob();
-  
+
   const jobs = data?.items || [];
 
   return (
@@ -39,16 +39,16 @@ export function TenantJobsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         {/* Handlers Info */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 bg-white/40">
-             <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-6">Available Handlers</h4>
-             <div className="space-y-4">
-                {handlers?.map(handler => (
-                  <div key={handler.name} className="p-4 rounded-2xl bg-secondary-900/5 border border-secondary-900/10">
-                    <p className="text-xs font-black text-secondary-900">{handler.name}</p>
-                    <p className="text-[10px] text-secondary-500 mt-1">{handler.description}</p>
-                  </div>
-                ))}
-             </div>
+          <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40">
+            <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-6">Available Handlers</h4>
+            <div className="space-y-4">
+              {handlers?.map(handler => (
+                <div key={handler.name} className="p-4 rounded-2xl bg-secondary-900/5 border border-secondary-900/10">
+                  <p className="text-xs font-black text-secondary-900">{handler.name}</p>
+                  <p className="text-[10px] text-secondary-500 mt-1">{handler.description}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -71,9 +71,9 @@ export function TenantJobsPage() {
               ))
             ) : jobs.length > 0 ? (
               jobs.map((job) => (
-                <div 
+                <div
                   key={job.id}
-                  className="glass-card rounded-[2.5rem] p-6 border border-secondary-100/50 bg-white/40 hover:bg-white/60 transition-all group"
+                  className="glass-card rounded-[2.5rem] p-6 border border-secondary-400/50 bg-white/40 hover:bg-white/60 transition-all group"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-5">
@@ -83,7 +83,7 @@ export function TenantJobsPage() {
                       <div>
                         <div className="flex items-center gap-3">
                           <h4 className="font-bold text-secondary-900">{job.job_name}</h4>
-                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${job.is_active ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-secondary-50 text-secondary-500 border-secondary-100'}`}>
+                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${job.is_active ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-secondary-50 text-secondary-500 border-secondary-400'}`}>
                             {job.is_active ? 'ACTIVE' : 'PAUSED'}
                           </span>
                         </div>
@@ -92,23 +92,23 @@ export function TenantJobsPage() {
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-4">
-                       <div className="text-right hidden sm:block">
-                          <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Last Run</p>
-                          <p className="text-[11px] font-bold text-secondary-900">
-                             {job.last_run_at ? format(new Date(job.last_run_at), "MMM d, HH:mm") : 'Never'}
-                          </p>
-                       </div>
-                       <button className="p-2.5 hover:bg-secondary-100 rounded-xl transition-all">
-                          <MoreHorizontal className="h-5 w-5 text-secondary-400" />
-                       </button>
+                      <div className="text-right hidden sm:block">
+                        <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Last Run</p>
+                        <p className="text-[11px] font-bold text-secondary-900">
+                          {job.last_run_at ? format(new Date(job.last_run_at), "MMM d, HH:mm") : 'Never'}
+                        </p>
+                      </div>
+                      <button className="p-2.5 hover:bg-secondary-100 rounded-xl transition-all">
+                        <MoreHorizontal className="h-5 w-5 text-secondary-400" />
+                      </button>
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="py-20 text-center bg-white/20 rounded-[2.5rem] border-2 border-dashed border-secondary-100">
+              <div className="py-20 text-center bg-white/20 rounded-[2.5rem] border-2 border-dashed border-secondary-400">
                 <p className="text-secondary-500 font-bold">No background jobs configured.</p>
               </div>
             )}

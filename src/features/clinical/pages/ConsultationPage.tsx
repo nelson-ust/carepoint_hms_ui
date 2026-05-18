@@ -200,7 +200,7 @@ export function ConsultationPage() {
       console.error("Failed to load consultation context", err);
       setError(
         err?.response?.data?.message ||
-          "Unable to load this visit. The record may have been removed or the registry is offline.",
+        "Unable to load this visit. The record may have been removed or the registry is offline.",
       );
     } finally {
       setIsLoading(false);
@@ -449,7 +449,7 @@ export function ConsultationPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={loadAll}
-            className="btn-secondary p-3 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-3 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
             title="Refresh"
           >
             <RefreshCw className="h-4 w-4" />
@@ -469,11 +469,10 @@ export function ConsultationPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -587,11 +586,10 @@ export function ConsultationPage() {
                     <button
                       key={c.id}
                       onClick={() => handleSelectConsultation(c.id)}
-                      className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                        isActive
+                      className={`w-full text-left p-4 rounded-2xl border transition-all ${isActive
                           ? "bg-primary-50 border-primary-200 shadow-md"
-                          : "bg-white border-secondary-100 hover:border-primary-200"
-                      }`}
+                          : "bg-white border-secondary-400 hover:border-primary-200"
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-mono font-bold text-secondary-400 uppercase">
@@ -654,7 +652,7 @@ export function ConsultationPage() {
             </div>
           ) : (
             <div className="glass-card rounded-[2.5rem] p-10 md:p-12 space-y-8">
-              <div className="flex items-center justify-between border-b border-secondary-100 pb-6">
+              <div className="flex items-center justify-between border-b border-secondary-400 pb-6">
                 <div className="flex items-center gap-4">
                   <div className="h-12 w-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md">
                     <Stethoscope className="h-6 w-6" />
@@ -673,16 +671,15 @@ export function ConsultationPage() {
                   </div>
                 </div>
                 <span
-                  className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${
-                    statusStyles[consultationStatusKey] ?? statusStyles.DRAFT
-                  }`}
+                  className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${statusStyles[consultationStatusKey] ?? statusStyles.DRAFT
+                    }`}
                 >
                   {consultationStatusKey || "DRAFT"}
                 </span>
               </div>
 
               {isReadOnly && (
-                <div className="p-4 rounded-2xl bg-secondary-50 border border-secondary-100 text-secondary-600 text-xs font-bold flex items-center gap-3">
+                <div className="p-4 rounded-2xl bg-secondary-50 border border-secondary-400 text-secondary-600 text-xs font-bold flex items-center gap-3">
                   <CheckCircle2 className="h-4 w-4" />
                   This consultation is{" "}
                   {consultationStatusKey === "CANCELLED" ? "cancelled" : "finalized"} and is now
@@ -732,7 +729,7 @@ export function ConsultationPage() {
               />
 
               {!isReadOnly && (
-                <div className="flex flex-wrap items-center justify-between pt-6 border-t border-secondary-100 gap-3">
+                <div className="flex flex-wrap items-center justify-between pt-6 border-t border-secondary-400 gap-3">
                   <button
                     onClick={handleCancel}
                     disabled={isCancelling}
@@ -813,7 +810,7 @@ export function ConsultationPage() {
                     clinician_staff_id: e.target.value ? Number(e.target.value) : null,
                   })
                 }
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">Select clinician...</option>
                 {staffList.map((s) => (
@@ -824,7 +821,7 @@ export function ConsultationPage() {
                 ))}
               </select>
             </div>
-            <details className="rounded-2xl border border-secondary-100 bg-secondary-50/50">
+            <details className="rounded-2xl border border-secondary-400 bg-secondary-50/50">
               <summary className="cursor-pointer p-4 text-[10px] font-bold uppercase tracking-widest text-secondary-500 hover:text-secondary-700">
                 Optional: Pre-fill SOAP notes
               </summary>
@@ -910,7 +907,7 @@ export function ConsultationPage() {
                   })
                 }
                 disabled={finalizeForm.end_visit}
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full disabled:opacity-50"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full disabled:opacity-50"
               >
                 <option value="">No routing — keep at current SDP</option>
                 {sdps
@@ -928,11 +925,10 @@ export function ConsultationPage() {
               onClick={() =>
                 setFinalizeForm({ ...finalizeForm, end_visit: !finalizeForm.end_visit })
               }
-              className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
-                finalizeForm.end_visit
+              className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${finalizeForm.end_visit
                   ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                  : "bg-secondary-50 border-secondary-100 text-secondary-500"
-              }`}
+                  : "bg-secondary-50 border-secondary-400 text-secondary-500"
+                }`}
             >
               <div className="text-left">
                 <p className="text-xs font-bold uppercase tracking-widest">End Visit</p>
@@ -941,14 +937,12 @@ export function ConsultationPage() {
                 </p>
               </div>
               <div
-                className={`h-6 w-12 rounded-full p-0.5 transition-all ${
-                  finalizeForm.end_visit ? "bg-emerald-500" : "bg-secondary-200"
-                }`}
+                className={`h-6 w-12 rounded-full p-0.5 transition-all ${finalizeForm.end_visit ? "bg-emerald-500" : "bg-secondary-200"
+                  }`}
               >
                 <div
-                  className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                    finalizeForm.end_visit ? "translate-x-6" : ""
-                  }`}
+                  className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${finalizeForm.end_visit ? "translate-x-6" : ""
+                    }`}
                 />
               </div>
             </button>
@@ -964,7 +958,7 @@ export function ConsultationPage() {
                   setFinalizeForm({ ...finalizeForm, closing_note: e.target.value })
                 }
                 placeholder="Summary, hand-off note, or instructions for the next care team..."
-                className="input-field h-28 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-28 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </div>
           </div>
@@ -1016,9 +1010,8 @@ function SoapField({ label, hint, value, onChange, disabled, compact }: SoapFiel
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         placeholder={`${label} note...`}
-        className={`input-field ${
-          compact ? "h-20" : "h-32"
-        } pt-3 px-4 resize-none disabled:opacity-70 disabled:cursor-not-allowed`}
+        className={`input-field ${compact ? "h-20" : "h-32"
+          } pt-3 px-4 resize-none disabled:opacity-70 disabled:cursor-not-allowed`}
       />
     </div>
   );

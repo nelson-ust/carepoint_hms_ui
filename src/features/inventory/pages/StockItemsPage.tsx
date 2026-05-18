@@ -304,21 +304,21 @@ export function StockItemsPage() {
         <div className="flex items-center gap-3">
           <Link
             to="/inventory/stores"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <Package className="h-4 w-4" />
             <span className="text-sm font-bold">Stores</span>
           </Link>
           <Link
             to="/inventory/movements"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <History className="h-4 w-4" />
             <span className="text-sm font-bold">Movements</span>
           </Link>
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
@@ -334,11 +334,10 @@ export function StockItemsPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
           <span className="text-sm font-bold">{feedback.message}</span>
@@ -370,7 +369,7 @@ export function StockItemsPage() {
           <select
             value={storeFilter}
             onChange={(e) => setStoreFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
           >
             <option value="">All Stores</option>
             {stores.map((s) => (
@@ -385,7 +384,7 @@ export function StockItemsPage() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
           >
             <option value="">All Types</option>
             {STOCK_ITEM_TYPES.map((t) => (
@@ -397,11 +396,10 @@ export function StockItemsPage() {
         </div>
         <button
           onClick={() => setLowOnly((v) => !v)}
-          className={`flex items-center gap-2 px-5 py-4 rounded-2xl text-xs font-bold uppercase tracking-widest border transition-all ${
-            lowOnly
+          className={`flex items-center gap-2 px-5 py-4 rounded-2xl text-xs font-bold uppercase tracking-widest border transition-all ${lowOnly
               ? "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20"
-              : "bg-white/80 text-secondary-600 border-secondary-100"
-          }`}
+              : "bg-white/80 text-secondary-600 border-secondary-400"
+            }`}
         >
           <TrendingDown className="h-4 w-4" />
           Low Only
@@ -409,7 +407,7 @@ export function StockItemsPage() {
       </div>
 
       {/* Table */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -468,8 +466,8 @@ export function StockItemsPage() {
                   const expired = isExpired(it.expiry_date);
                   const low = isLowStock(it);
                   return (
-                    <tr 
-                      key={it.id} 
+                    <tr
+                      key={it.id}
                       onClick={() => navigate(routes.inventoryItems + `/${it.id}`)}
                       className="hover:bg-primary-50/30 transition-all cursor-pointer group"
                     >
@@ -530,13 +528,12 @@ export function StockItemsPage() {
                         {it.expiry_date ? (
                           <div className="space-y-1">
                             <div
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border ${
-                                expired
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border ${expired
                                   ? "bg-rose-50 text-rose-600 border-rose-100"
                                   : expiringSoon
-                                  ? "bg-amber-50 text-amber-600 border-amber-100"
-                                  : "bg-secondary-50 text-secondary-600 border-secondary-100"
-                              }`}
+                                    ? "bg-amber-50 text-amber-600 border-amber-100"
+                                    : "bg-secondary-50 text-secondary-600 border-secondary-400"
+                                }`}
                             >
                               <Clock className="h-2.5 w-2.5" />
                               {new Date(it.expiry_date).toLocaleDateString("en-GB", {
@@ -716,9 +713,8 @@ function ItemModal({
               value={form.store_id}
               onChange={(e) => onChange({ ...form, store_id: e.target.value })}
               disabled={!!editing}
-              className={`input-field h-12 bg-secondary-50 border-secondary-100 w-full ${
-                editing ? "opacity-60 cursor-not-allowed" : ""
-              }`}
+              className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${editing ? "opacity-60 cursor-not-allowed" : ""
+                }`}
             >
               <option value="">Pick a store...</option>
               {stores.map((s) => (
@@ -736,9 +732,8 @@ function ItemModal({
               value={form.item_type}
               onChange={(e) => onChange({ ...form, item_type: e.target.value })}
               disabled={!!editing}
-              className={`input-field h-12 bg-secondary-50 border-secondary-100 w-full ${
-                editing ? "opacity-60 cursor-not-allowed" : ""
-              }`}
+              className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${editing ? "opacity-60 cursor-not-allowed" : ""
+                }`}
             >
               {STOCK_ITEM_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -765,7 +760,7 @@ function ItemModal({
                     sku: drug?.sku || form.sku,
                   });
                 }}
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">— No drug linkage —</option>
                 {drugs.map((d) => (
@@ -786,7 +781,7 @@ function ItemModal({
               value={form.item_name}
               onChange={(e) => onChange({ ...form, item_name: e.target.value })}
               placeholder="Paracetamol 500mg Tablets"
-              className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
             />
           </div>
 
@@ -799,7 +794,7 @@ function ItemModal({
               value={form.sku}
               onChange={(e) => onChange({ ...form, sku: e.target.value.toUpperCase() })}
               placeholder="PCM-500-T"
-              className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
             />
           </div>
           <div className="space-y-2">
@@ -811,7 +806,7 @@ function ItemModal({
               value={form.unit_of_measure}
               onChange={(e) => onChange({ ...form, unit_of_measure: e.target.value })}
               placeholder="tabs, ml, vials"
-              className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
             />
           </div>
 
@@ -825,9 +820,8 @@ function ItemModal({
               value={form.quantity_on_hand}
               onChange={(e) => onChange({ ...form, quantity_on_hand: e.target.value })}
               disabled={!!editing}
-              className={`input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono ${
-                editing ? "opacity-60 cursor-not-allowed" : ""
-              }`}
+              className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono ${editing ? "opacity-60 cursor-not-allowed" : ""
+                }`}
             />
             {editing && (
               <p className="text-[9px] font-bold text-secondary-400 uppercase tracking-widest">
@@ -845,7 +839,7 @@ function ItemModal({
               value={form.reorder_level}
               onChange={(e) => onChange({ ...form, reorder_level: e.target.value })}
               placeholder="50"
-              className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
             />
           </div>
 
@@ -859,7 +853,7 @@ function ItemModal({
               value={form.unit_cost}
               onChange={(e) => onChange({ ...form, unit_cost: e.target.value })}
               placeholder="125.00"
-              className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
             />
           </div>
           <div className="space-y-2">
@@ -871,7 +865,7 @@ function ItemModal({
               value={form.batch_no}
               onChange={(e) => onChange({ ...form, batch_no: e.target.value })}
               placeholder="B-2026-04-A"
-              className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
             />
           </div>
 
@@ -883,7 +877,7 @@ function ItemModal({
               type="date"
               value={form.expiry_date}
               onChange={(e) => onChange({ ...form, expiry_date: e.target.value })}
-              className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
             />
           </div>
         </div>

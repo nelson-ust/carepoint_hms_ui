@@ -474,21 +474,21 @@ export function LabResultsPage() {
         <div className="flex items-center gap-3">
           <Link
             to="/laboratory/orders"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <FlaskConical className="h-4 w-4" />
             <span className="text-sm font-bold">Worklist</span>
           </Link>
           <Link
             to="/laboratory/tests"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <Layers className="h-4 w-4" />
             <span className="text-sm font-bold">Tests Catalogue</span>
           </Link>
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
             title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -498,11 +498,10 @@ export function LabResultsPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -532,17 +531,15 @@ export function LabResultsPage() {
               <button
                 key={t.value}
                 onClick={() => setTab(t.value)}
-                className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
-                  isActive
+                className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${isActive
                     ? "bg-slate-900 text-white shadow-md"
                     : "bg-white/60 text-secondary-600 hover:bg-white"
-                }`}
+                  }`}
               >
                 {t.label}
                 <span
-                  className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${
-                    isActive ? "bg-white/20" : "bg-secondary-100 text-secondary-500"
-                  }`}
+                  className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${isActive ? "bg-white/20" : "bg-secondary-100 text-secondary-500"
+                    }`}
                 >
                   {c}
                 </span>
@@ -666,11 +663,10 @@ function ResultRow({
 
   return (
     <div
-      className={`glass-card rounded-[2rem] p-7 bg-white border transition-all ${
-        focused
+      className={`glass-card rounded-[2rem] p-7 bg-white border transition-all ${focused
           ? "border-primary-500 shadow-2xl shadow-primary-500/10 ring-4 ring-primary-500/10"
-          : "border-secondary-100 hover:border-primary-300/50"
-      }`}
+          : "border-secondary-400 hover:border-primary-300/50"
+        }`}
     >
       <div className="flex flex-col xl:flex-row gap-6">
         {/* Left: meta */}
@@ -730,7 +726,7 @@ function ResultRow({
           {/* Result preview */}
           {result && (
             <div className="mt-5 grid sm:grid-cols-2 gap-3">
-              <div className="p-4 rounded-2xl bg-secondary-50 border border-secondary-100 space-y-2">
+              <div className="p-4 rounded-2xl bg-secondary-50 border border-secondary-400 space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
                   Value
                 </p>
@@ -748,7 +744,7 @@ function ResultRow({
                   </p>
                 )}
               </div>
-              <div className="p-4 rounded-2xl bg-secondary-50 border border-secondary-100 space-y-2">
+              <div className="p-4 rounded-2xl bg-secondary-50 border border-secondary-400 space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
                   Interpretation
                 </p>
@@ -977,15 +973,14 @@ function ActionModal({
         </button>
         <div className="flex items-center gap-5 mb-8">
           <div
-            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${
-              m.tone === "rose"
+            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${m.tone === "rose"
                 ? "bg-rose-500 shadow-rose-500/20"
                 : m.tone === "amber"
-                ? "bg-amber-500 shadow-amber-500/20"
-                : m.tone === "emerald"
-                ? "bg-emerald-500 shadow-emerald-500/20"
-                : "bg-primary-500 shadow-primary-500/20"
-            }`}
+                  ? "bg-amber-500 shadow-amber-500/20"
+                  : m.tone === "emerald"
+                    ? "bg-emerald-500 shadow-emerald-500/20"
+                    : "bg-primary-500 shadow-primary-500/20"
+              }`}
           >
             {kind === "enter" || kind === "update" ? (
               <Edit3 className="h-6 w-6" />
@@ -1006,7 +1001,7 @@ function ActionModal({
         </div>
 
         {/* Context strip */}
-        <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-100">
+        <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-400">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3">
               <FlaskConical className="h-4 w-4 text-secondary-500" />
@@ -1056,7 +1051,7 @@ function ActionModal({
                         entered_by_staff_id: e.target.value ? Number(e.target.value) : null,
                       })
                     }
-                    className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                    className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                   >
                     <option value="">Select staff...</option>
                     {staffList.map((s) => (
@@ -1080,7 +1075,7 @@ function ActionModal({
                       onEntryFormChange({ ...entryForm, result_value: e.target.value })
                     }
                     placeholder="e.g. 13.5"
-                    className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+                    className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1094,7 +1089,7 @@ function ActionModal({
                       onEntryFormChange({ ...entryForm, unit_of_measure: e.target.value })
                     }
                     placeholder="g/dL"
-                    className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                    className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                   />
                 </div>
               </div>
@@ -1109,7 +1104,7 @@ function ActionModal({
                     onEntryFormChange({ ...entryForm, reference_range: e.target.value })
                   }
                   placeholder="12-16 g/dL"
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
                 />
               </div>
               <div className="space-y-2">
@@ -1122,7 +1117,7 @@ function ActionModal({
                     onEntryFormChange({ ...entryForm, result_text: e.target.value })
                   }
                   placeholder="Free-text findings, especially for non-numeric results..."
-                  className="input-field h-20 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                  className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
                 />
               </div>
               <div className="space-y-2">
@@ -1135,7 +1130,7 @@ function ActionModal({
                     onEntryFormChange({ ...entryForm, interpretation: e.target.value })
                   }
                   placeholder="Clinical impression, flagging anomalies..."
-                  className="input-field h-20 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                  className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
                 />
               </div>
             </>
@@ -1155,7 +1150,7 @@ function ActionModal({
                       verified_by_staff_id: e.target.value ? Number(e.target.value) : null,
                     })
                   }
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                 >
                   <option value="">Select verifier...</option>
                   {staffList.map((s) => (
@@ -1176,7 +1171,7 @@ function ActionModal({
                     onVerifyFormChange({ ...verifyForm, verification_note: e.target.value })
                   }
                   placeholder="Quality check notes, repeat indication, etc."
-                  className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                  className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
                 />
               </div>
             </>
@@ -1192,17 +1187,15 @@ function ActionModal({
                     notify_clinician: !releaseForm.notify_clinician,
                   })
                 }
-                className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
-                  releaseForm.notify_clinician
+                className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${releaseForm.notify_clinician
                     ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                    : "bg-secondary-50 border-secondary-100 text-secondary-500"
-                }`}
+                    : "bg-secondary-50 border-secondary-400 text-secondary-500"
+                  }`}
               >
                 <div className="text-left flex items-center gap-3">
                   <Bell
-                    className={`h-4 w-4 ${
-                      releaseForm.notify_clinician ? "text-emerald-600" : "text-secondary-400"
-                    }`}
+                    className={`h-4 w-4 ${releaseForm.notify_clinician ? "text-emerald-600" : "text-secondary-400"
+                      }`}
                   />
                   <div>
                     <p className="text-xs font-bold uppercase tracking-widest">
@@ -1214,14 +1207,12 @@ function ActionModal({
                   </div>
                 </div>
                 <div
-                  className={`h-6 w-12 rounded-full p-0.5 transition-all ${
-                    releaseForm.notify_clinician ? "bg-emerald-500" : "bg-secondary-200"
-                  }`}
+                  className={`h-6 w-12 rounded-full p-0.5 transition-all ${releaseForm.notify_clinician ? "bg-emerald-500" : "bg-secondary-200"
+                    }`}
                 >
                   <div
-                    className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                      releaseForm.notify_clinician ? "translate-x-6" : ""
-                    }`}
+                    className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${releaseForm.notify_clinician ? "translate-x-6" : ""
+                      }`}
                   />
                 </div>
               </button>
@@ -1240,7 +1231,7 @@ function ActionModal({
                         : null,
                     })
                   }
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                 >
                   <option value="">No routing — keep visit at current SDP</option>
                   {sdps.map((s) => (
@@ -1260,7 +1251,7 @@ function ActionModal({
                     onReleaseFormChange({ ...releaseForm, release_note: e.target.value })
                   }
                   placeholder="Hand-off note for the clinician..."
-                  className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                  className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
                 />
               </div>
             </>
@@ -1289,15 +1280,14 @@ function ActionModal({
           <button
             onClick={onSubmit}
             disabled={pending}
-            className={`flex-[2] py-4 rounded-2xl text-white font-black tracking-tight shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 ${
-              m.tone === "rose"
+            className={`flex-[2] py-4 rounded-2xl text-white font-black tracking-tight shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 ${m.tone === "rose"
                 ? "bg-rose-500 hover:bg-rose-600 shadow-rose-500/20"
                 : m.tone === "amber"
-                ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20"
-                : m.tone === "emerald"
-                ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
-                : "bg-primary-500 hover:bg-primary-600 shadow-primary-500/20"
-            }`}
+                  ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20"
+                  : m.tone === "emerald"
+                    ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
+                    : "bg-primary-500 hover:bg-primary-600 shadow-primary-500/20"
+              }`}
           >
             <Save className="h-4 w-4" />
             {pending ? "Working..." : m.cta}

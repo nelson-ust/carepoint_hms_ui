@@ -84,7 +84,7 @@ function PageLoader() {
   return (
     <div className="h-screen w-full flex flex-col items-center justify-center bg-secondary-50/30 backdrop-blur-sm">
       <div className="relative">
-        <div className="h-16 w-16 border-4 border-secondary-100 rounded-full" />
+        <div className="h-16 w-16 border-4 border-secondary-400 rounded-full" />
         <div className="absolute inset-0 h-16 w-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
       </div>
       <p className="mt-6 text-xs font-bold text-secondary-400 uppercase tracking-[0.3em] animate-pulse">Initializing Interface</p>

@@ -243,7 +243,7 @@ export function LabTestsPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
             title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -260,11 +260,10 @@ export function LabTestsPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -300,7 +299,7 @@ export function LabTestsPage() {
           <select
             value={sampleFilter}
             onChange={(e) => setSampleFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
           >
             <option value="">All Samples</option>
             {sampleTypeOptions.map((s) => (
@@ -313,7 +312,7 @@ export function LabTestsPage() {
       </div>
 
       {/* Table */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -417,11 +416,10 @@ export function LabTestsPage() {
                     </td>
                     <td className="px-8 py-6">
                       <span
-                        className={`inline-flex px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${
-                          t.is_active
+                        className={`inline-flex px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${t.is_active
                             ? "bg-emerald-50 text-emerald-600 border-emerald-100"
                             : "bg-secondary-100 text-secondary-500 border-secondary-200"
-                        }`}
+                          }`}
                       >
                         {t.is_active ? "Active" : "Inactive"}
                       </span>
@@ -528,7 +526,7 @@ export function LabTestsPage() {
                 <select
                   value={form.sample_type}
                   onChange={(e) => setForm({ ...form, sample_type: e.target.value })}
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                 >
                   {SAMPLE_TYPES.map((s) => (
                     <option key={s} value={s}>
@@ -564,7 +562,7 @@ export function LabTestsPage() {
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   placeholder="Notes for clinicians and lab staff..."
-                  className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                  className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
                 />
               </div>
             </div>
@@ -696,9 +694,8 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className={`input-field h-12 bg-secondary-50 border-secondary-100 w-full ${
-          mono ? "font-mono" : ""
-        } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+        className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${mono ? "font-mono" : ""
+          } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
       />
       {disabled && (
         <p className="text-[9px] font-bold uppercase tracking-widest text-secondary-400 flex items-center gap-1">

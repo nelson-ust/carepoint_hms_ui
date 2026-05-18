@@ -170,8 +170,8 @@ export function DiagnosesPanel({ visitId, consultationId, disabled }: DiagnosesP
   const canAdd = !disabled && !!consultationId;
 
   return (
-    <div className="glass-card rounded-[2.5rem] p-10 md:p-12 space-y-6">
-      <div className="flex items-center justify-between border-b border-secondary-100 pb-6">
+    <div className="glass-card rounded p-10 md:p-12 space-y-6">
+      <div className="flex items-center justify-between border-b border-secondary-400 pb-6">
         <div className="flex items-center gap-4">
           <div className="h-12 w-12 rounded-2xl bg-rose-500 text-white flex items-center justify-center shadow-md shadow-rose-500/20">
             <Stethoscope className="h-6 w-6" />
@@ -247,8 +247,8 @@ export function DiagnosesPanel({ visitId, consultationId, disabled }: DiagnosesP
                   {isThisConsultation
                     ? "This Consultation"
                     : groupKey === 0
-                    ? "Unlinked"
-                    : `Consultation #${groupKey}`}
+                      ? "Unlinked"
+                      : `Consultation #${groupKey}`}
                 </h4>
                 <div className="space-y-3">
                   {items.map((d) => {
@@ -258,7 +258,7 @@ export function DiagnosesPanel({ visitId, consultationId, disabled }: DiagnosesP
                     return (
                       <div
                         key={d.id}
-                        className="p-5 rounded-2xl bg-white border border-secondary-100 hover:border-rose-200 transition-all"
+                        className="p-5 rounded-2xl bg-white border border-secondary-400 hover:border-rose-200 transition-all"
                       >
                         <div className="flex items-start justify-between gap-4 mb-2">
                           <div className="flex-1 min-w-0">
@@ -309,7 +309,7 @@ export function DiagnosesPanel({ visitId, consultationId, disabled }: DiagnosesP
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-          <div className="bg-white rounded-[2.5rem] p-10 max-w-xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded p-10 max-w-xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setModalOpen(false)}
               disabled={isSaving}
@@ -348,7 +348,7 @@ export function DiagnosesPanel({ visitId, consultationId, disabled }: DiagnosesP
                   value={form.diagnosis_name}
                   onChange={(e) => setForm({ ...form, diagnosis_name: e.target.value })}
                   placeholder="e.g. Type 2 Diabetes Mellitus"
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                 />
               </div>
               <div className="grid grid-cols-2 gap-5">
@@ -363,7 +363,7 @@ export function DiagnosesPanel({ visitId, consultationId, disabled }: DiagnosesP
                       setForm({ ...form, diagnosis_code: e.target.value.toUpperCase() })
                     }
                     placeholder="E11"
-                    className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+                    className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
                   />
                 </div>
                 <div className="space-y-2">
@@ -373,7 +373,7 @@ export function DiagnosesPanel({ visitId, consultationId, disabled }: DiagnosesP
                   <select
                     value={form.diagnosis_type}
                     onChange={(e) => setForm({ ...form, diagnosis_type: e.target.value })}
-                    className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                    className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                   >
                     {DIAGNOSIS_TYPES.map((t) => (
                       <option key={t} value={t}>
@@ -391,7 +391,7 @@ export function DiagnosesPanel({ visitId, consultationId, disabled }: DiagnosesP
                   value={form.diagnosis_note}
                   onChange={(e) => setForm({ ...form, diagnosis_note: e.target.value })}
                   placeholder="Reasoning, supporting evidence, severity, onset..."
-                  className="input-field h-28 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                  className="input-field h-28 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
                 />
               </div>
             </div>

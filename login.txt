@@ -29,3 +29,6 @@ https://geneology-frontend.vercel.app/login
 
 admin@genealogy.com
 AdminPassword123
+
+
+

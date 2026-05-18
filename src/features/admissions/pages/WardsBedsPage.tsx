@@ -279,14 +279,14 @@ export function WardsBedsPage() {
         <div className="flex items-center gap-3">
           <Link
             to="/admissions"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <BedIcon className="h-4 w-4" />
             <span className="text-sm font-bold">Admissions</span>
           </Link>
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
@@ -302,11 +302,10 @@ export function WardsBedsPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -341,7 +340,7 @@ export function WardsBedsPage() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
           >
             <option value="">All Ward Types</option>
             {WARD_TYPES.map((t) => (
@@ -439,11 +438,10 @@ export function WardsBedsPage() {
                     key={t}
                     type="button"
                     onClick={() => setForm({ ...form, ward_type: t })}
-                    className={`p-2.5 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
-                      form.ward_type === t
+                    className={`p-2.5 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${form.ward_type === t
                         ? "bg-primary-500 text-white border-primary-500 shadow-md"
-                        : "bg-white border-secondary-100 text-secondary-600 hover:border-primary-300"
-                    }`}
+                        : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-300"
+                      }`}
                   >
                     {t}
                   </button>
@@ -458,7 +456,7 @@ export function WardsBedsPage() {
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="What this ward is used for, capacity notes, restrictions..."
-                className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </div>
           </div>
@@ -504,7 +502,7 @@ export function WardsBedsPage() {
           ) : (
             <>
               {/* Header info */}
-              <div className="p-5 rounded-2xl bg-secondary-50 border border-secondary-100 mb-5 flex items-center justify-between flex-wrap gap-2">
+              <div className="p-5 rounded-2xl bg-secondary-50 border border-secondary-400 mb-5 flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3">
                   <Hash className="h-4 w-4 text-secondary-400" />
                   <span className="font-mono font-bold text-sm text-secondary-700">
@@ -513,9 +511,8 @@ export function WardsBedsPage() {
                 </div>
                 {detailSummary.ward_type && (
                   <span
-                    className={`px-3 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest ${
-                      wardTypeStyles[detailSummary.ward_type] ?? wardTypeStyles.OTHER
-                    }`}
+                    className={`px-3 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest ${wardTypeStyles[detailSummary.ward_type] ?? wardTypeStyles.OTHER
+                      }`}
                   >
                     {detailSummary.ward_type}
                   </span>
@@ -569,7 +566,7 @@ export function WardsBedsPage() {
               </div>
 
               {/* Occupancy bar */}
-              <div className="rounded-2xl bg-secondary-50 border border-secondary-100 p-5">
+              <div className="rounded-2xl bg-secondary-50 border border-secondary-400 p-5">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
                     Occupancy
@@ -684,7 +681,7 @@ function WardCard({
   const typeClass = wardTypeStyles[typeKey] ?? wardTypeStyles.OTHER;
 
   return (
-    <div className="glass-card rounded-[2rem] p-7 bg-white border border-secondary-100 hover:border-primary-300 hover:shadow-xl hover:shadow-primary-500/5 transition-all">
+    <div className="glass-card rounded-[2rem] p-7 bg-white border border-secondary-400 hover:border-primary-300 hover:shadow-xl hover:shadow-primary-500/5 transition-all">
       <div className="flex items-start justify-between mb-5">
         <div className="h-14 w-14 rounded-[1.25rem] bg-slate-900 text-white flex items-center justify-center shadow-md">
           <Hospital className="h-7 w-7" />
@@ -879,9 +876,8 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className={`input-field h-12 bg-secondary-50 border-secondary-100 w-full ${
-          mono ? "font-mono" : ""
-        } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+        className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${mono ? "font-mono" : ""
+          } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
       />
       {hint && (
         <p className="text-[9px] font-bold uppercase tracking-widest text-secondary-400">{hint}</p>

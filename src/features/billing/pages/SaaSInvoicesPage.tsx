@@ -28,9 +28,9 @@ export function SaaSInvoicesPage() {
       case "OVERDUE":
         return "bg-rose-50 text-rose-600 border-rose-100";
       case "DRAFT":
-        return "bg-secondary-50 text-secondary-600 border-secondary-100";
+        return "bg-secondary-50 text-secondary-600 border-secondary-400";
       default:
-        return "bg-secondary-50 text-secondary-600 border-secondary-100";
+        return "bg-secondary-50 text-secondary-600 border-secondary-400";
     }
   };
 
@@ -55,7 +55,7 @@ export function SaaSInvoicesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Quick Stats */}
-        <div className="glass-card rounded-[2rem] p-8 border border-secondary-100/50 bg-white/40 shadow-premium col-span-1 lg:col-span-3 flex flex-wrap gap-12">
+        <div className="glass-card rounded-[2rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium col-span-1 lg:col-span-3 flex flex-wrap gap-12">
           <div>
             <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-[0.2em] mb-2">Current Plan</p>
             <h4 className="text-2xl font-black text-secondary-900 flex items-center gap-2">
@@ -87,7 +87,7 @@ export function SaaSInvoicesPage() {
             </button>
           </div>
 
-          <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+          <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
@@ -152,8 +152,8 @@ export function SaaSInvoicesPage() {
                     <tr>
                       <td colSpan={5} className="px-8 py-20 text-center">
                         <div className="max-w-xs mx-auto space-y-4">
-                           <FileText className="h-12 w-12 mx-auto text-secondary-100" />
-                           <p className="text-secondary-500 font-bold">No invoice history found.</p>
+                          <FileText className="h-12 w-12 mx-auto text-secondary-100" />
+                          <p className="text-secondary-500 font-bold">No invoice history found.</p>
                         </div>
                       </td>
                     </tr>

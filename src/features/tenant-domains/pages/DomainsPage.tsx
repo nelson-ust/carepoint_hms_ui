@@ -167,7 +167,7 @@ export function DomainsPage() {
                   value={tenantSearch}
                   onChange={(e) => setTenantSearch(e.target.value)}
                   placeholder="Search tenants..."
-                  className="w-full bg-white/70 border border-secondary-100 rounded-xl pl-11 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary-500/40 transition-all"
+                  className="w-full bg-white/70 border border-secondary-400 rounded-xl pl-11 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary-500/40 transition-all"
                 />
               </div>
 
@@ -189,29 +189,26 @@ export function DomainsPage() {
                       <button
                         key={t.id}
                         onClick={() => setActiveTenantId(String(t.id))}
-                        className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                          isActive
+                        className={`w-full text-left p-4 rounded-2xl border transition-all ${isActive
                             ? "bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/20"
-                            : "bg-white border-secondary-100 hover:border-primary-200"
-                        }`}
+                            : "bg-white border-secondary-400 hover:border-primary-200"
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-1.5 gap-2">
                           <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${
-                              isActive
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${isActive
                                 ? "bg-white/20 text-white"
                                 : "bg-secondary-100 text-secondary-500"
-                            }`}
+                              }`}
                           >
                             <Hash className="h-2.5 w-2.5" />
                             {t.code}
                           </span>
                           <span
-                            className={`px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-widest ${
-                              isActive
+                            className={`px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-widest ${isActive
                                 ? "bg-white/20 text-white border-white/30"
                                 : statusStyles[statusKey] ?? statusStyles.PENDING
-                            }`}
+                              }`}
                           >
                             {statusKey}
                           </span>
@@ -228,7 +225,7 @@ export function DomainsPage() {
 
         <div className={`${isSaaSAdmin ? "lg:col-span-8" : "lg:col-span-12"} space-y-6`}>
           {effectiveTenantId === 0 ? (
-            <div className="glass-card rounded-[3rem] p-16 text-center bg-white/60 border border-secondary-100">
+            <div className="glass-card rounded-[3rem] p-16 text-center bg-white/60 border border-secondary-400">
               <Building2 className="h-16 w-16 mx-auto text-secondary-100 mb-6" />
               <h4 className="text-xl font-bold text-secondary-900">No Tenant Selected</h4>
               <p className="text-secondary-500 mt-2 max-w-xs mx-auto">
@@ -239,7 +236,7 @@ export function DomainsPage() {
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
               {/* Help/DNS Panel */}
               <div className="xl:col-span-1 space-y-6">
-                <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 bg-white/40">
+                <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40">
                   <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-6 flex items-center gap-2">
                     <Info className="h-4 w-4 text-primary-500" />
                     DNS Config
@@ -277,9 +274,8 @@ export function DomainsPage() {
                     className="p-2 hover:bg-secondary-100 rounded-xl transition-all"
                   >
                     <RefreshCw
-                      className={`h-4 w-4 text-secondary-400 ${
-                        isLoading ? "animate-spin" : ""
-                      }`}
+                      className={`h-4 w-4 text-secondary-400 ${isLoading ? "animate-spin" : ""
+                        }`}
                     />
                   </button>
                 </div>
@@ -296,16 +292,15 @@ export function DomainsPage() {
                     domains.map((domain) => (
                       <div
                         key={domain.id}
-                        className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 bg-white/40 hover:bg-white/60 transition-all group"
+                        className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 hover:bg-white/60 transition-all group"
                       >
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                           <div className="flex items-center gap-5">
                             <div
-                              className={`h-14 w-14 rounded-2xl flex items-center justify-center shadow-lg ${
-                                domain.is_verified
+                              className={`h-14 w-14 rounded-2xl flex items-center justify-center shadow-lg ${domain.is_verified
                                   ? "bg-secondary-900 text-white shadow-secondary-900/10"
                                   : "bg-secondary-100 text-secondary-400 shadow-none"
-                              }`}
+                                }`}
                             >
                               <Globe className="h-7 w-7" />
                             </div>
@@ -322,11 +317,10 @@ export function DomainsPage() {
                               </div>
                               <div className="flex items-center gap-4 mt-2">
                                 <span
-                                  className={`flex items-center gap-1.5 text-[10px] font-bold ${
-                                    domain.is_verified
+                                  className={`flex items-center gap-1.5 text-[10px] font-bold ${domain.is_verified
                                       ? "text-emerald-600"
                                       : "text-amber-500"
-                                  }`}
+                                    }`}
                                 >
                                   {domain.is_verified ? (
                                     <ShieldCheck className="h-3 w-3" />
@@ -336,11 +330,10 @@ export function DomainsPage() {
                                   {domain.is_verified ? "Verified" : "Pending Verification"}
                                 </span>
                                 <span
-                                  className={`flex items-center gap-1.5 text-[10px] font-bold ${
-                                    domain.ssl_enabled
+                                  className={`flex items-center gap-1.5 text-[10px] font-bold ${domain.ssl_enabled
                                       ? "text-blue-600"
                                       : "text-secondary-400"
-                                  }`}
+                                    }`}
                                 >
                                   <Lock className="h-3 w-3" />
                                   {domain.ssl_enabled ? "SSL Active" : "No SSL"}
@@ -367,7 +360,7 @@ export function DomainsPage() {
                       </div>
                     ))
                   ) : (
-                    <div className="py-24 text-center bg-white/20 rounded-[3rem] border-2 border-dashed border-secondary-100">
+                    <div className="py-24 text-center bg-white/20 rounded-[3rem] border-2 border-dashed border-secondary-400">
                       <Globe className="h-16 w-16 mx-auto text-secondary-100 mb-6" />
                       <h4 className="text-xl font-bold text-secondary-900">
                         No Custom Domains

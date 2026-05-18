@@ -531,13 +531,13 @@ export function AdmissionsPage() {
         <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
           <button
             onClick={openFromVisit}
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <ArrowRightLeft className="h-4 w-4" />
             <span className="text-sm font-bold">From Visit</span>
@@ -554,11 +554,10 @@ export function AdmissionsPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
           <span className="text-sm font-bold">{feedback.message}</span>
@@ -590,7 +589,7 @@ export function AdmissionsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
           >
             {STATUS_FILTERS.map((s) => (
               <option key={s.value} value={s.value}>
@@ -605,7 +604,7 @@ export function AdmissionsPage() {
             <select
               value={wardFilter}
               onChange={(e) => setWardFilter(e.target.value)}
-              className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+              className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
             >
               <option value="">All Wards</option>
               {wards.map((w) => (
@@ -619,7 +618,7 @@ export function AdmissionsPage() {
       </div>
 
       {/* Table */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -845,7 +844,7 @@ export function AdmissionsPage() {
                     value={patientQuery}
                     onChange={(e) => setPatientQuery(e.target.value)}
                     placeholder="Search by name or hospital number..."
-                    className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                    className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                   />
                   {searchingPatients && (
                     <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
@@ -853,7 +852,7 @@ export function AdmissionsPage() {
                     </p>
                   )}
                   {patientResults.length > 0 && (
-                    <div className="max-h-48 overflow-y-auto rounded-xl border border-secondary-100 bg-white divide-y divide-secondary-100">
+                    <div className="max-h-48 overflow-y-auto rounded-xl border border-secondary-400 bg-white divide-y divide-secondary-100">
                       {patientResults.map((p) => (
                         <button
                           key={p.id}
@@ -889,7 +888,7 @@ export function AdmissionsPage() {
                   value={admitForm.visit_id}
                   onChange={(e) => setAdmitForm({ ...admitForm, visit_id: e.target.value })}
                   placeholder="e.g. 12"
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
                 />
               </FieldLabel>
               <StaffPicker
@@ -923,7 +922,7 @@ export function AdmissionsPage() {
                   setAdmitForm({ ...admitForm, admission_reason: e.target.value })
                 }
                 placeholder="Clinical reason for admission..."
-                className="input-field h-20 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </FieldLabel>
 
@@ -935,7 +934,7 @@ export function AdmissionsPage() {
                   onChange={(e) =>
                     setAdmitForm({ ...admitForm, admitted_at: e.target.value })
                   }
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono text-xs"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono text-xs"
                 />
               </FieldLabel>
               <FieldLabel label="Expected Discharge">
@@ -945,7 +944,7 @@ export function AdmissionsPage() {
                   onChange={(e) =>
                     setAdmitForm({ ...admitForm, expected_discharge_at: e.target.value })
                   }
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono text-xs"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono text-xs"
                 />
               </FieldLabel>
             </div>
@@ -987,7 +986,7 @@ export function AdmissionsPage() {
                   setFromVisitForm({ ...fromVisitForm, visit_id: e.target.value })
                 }
                 placeholder="e.g. 1245"
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
               />
             </FieldLabel>
             <div className="grid sm:grid-cols-2 gap-4">
@@ -1022,7 +1021,7 @@ export function AdmissionsPage() {
                   setFromVisitForm({ ...fromVisitForm, admission_reason: e.target.value })
                 }
                 placeholder="Reason for converting this visit..."
-                className="input-field h-20 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </FieldLabel>
             <FieldLabel label="Expected Discharge">
@@ -1035,7 +1034,7 @@ export function AdmissionsPage() {
                     expected_discharge_at: e.target.value,
                   })
                 }
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono text-xs"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono text-xs"
               />
             </FieldLabel>
             <FieldLabel label="Route To Service Point ID (Optional)">
@@ -1049,7 +1048,7 @@ export function AdmissionsPage() {
                   })
                 }
                 placeholder="SDP id"
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
               />
             </FieldLabel>
             <ToggleSwitch
@@ -1107,7 +1106,7 @@ export function AdmissionsPage() {
                   setTransferForm({ ...transferForm, reason: e.target.value })
                 }
                 placeholder="Why is this patient being moved?"
-                className="input-field h-20 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </FieldLabel>
           </div>
@@ -1139,11 +1138,10 @@ export function AdmissionsPage() {
                     key={s}
                     type="button"
                     onClick={() => setStatusForm({ ...statusForm, new_status: s })}
-                    className={`p-3 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
-                      statusForm.new_status === s
+                    className={`p-3 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${statusForm.new_status === s
                         ? "bg-primary-500 text-white border-primary-500 shadow-md"
-                        : "bg-white border-secondary-100 text-secondary-600 hover:border-primary-300"
-                    }`}
+                        : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-300"
+                      }`}
                   >
                     {s.replace("_", " ")}
                   </button>
@@ -1155,7 +1153,7 @@ export function AdmissionsPage() {
                 value={statusForm.reason}
                 onChange={(e) => setStatusForm({ ...statusForm, reason: e.target.value })}
                 placeholder="Note for the audit log..."
-                className="input-field h-20 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </FieldLabel>
           </div>
@@ -1187,7 +1185,7 @@ export function AdmissionsPage() {
                 onChange={(e) =>
                   setBedDaysForm({ ...bedDaysForm, through_date: e.target.value })
                 }
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
               />
             </FieldLabel>
             {bedDaysReceipt && (
@@ -1257,7 +1255,7 @@ function ContextStrip({
   bedNumber: (id: number) => string;
 }) {
   return (
-    <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-100">
+    <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-400">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <BedIcon className="h-4 w-4 text-secondary-500" />
@@ -1319,7 +1317,7 @@ function WardPicker({
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+          className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
         >
           <option value="">Pick a ward...</option>
           {wards.map((w) => (
@@ -1334,7 +1332,7 @@ function WardPicker({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Ward ID"
-          className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+          className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
         />
       )}
     </FieldLabel>
@@ -1369,7 +1367,7 @@ function BedPicker({
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+          className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
         >
           <option value="">Pick a bed...</option>
           {filtered.map((b) => (
@@ -1385,7 +1383,7 @@ function BedPicker({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Bed ID"
-          className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+          className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
         />
       )}
     </FieldLabel>
@@ -1408,7 +1406,7 @@ function StaffPicker({
       <select
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-        className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+        className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
       >
         <option value="">— None —</option>
         {staffList.map((s) => (
@@ -1437,11 +1435,10 @@ function ToggleSwitch({
     <button
       type="button"
       onClick={() => onChange(!value)}
-      className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
-        value
+      className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${value
           ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-          : "bg-secondary-50 border-secondary-100 text-secondary-500"
-      }`}
+          : "bg-secondary-50 border-secondary-400 text-secondary-500"
+        }`}
     >
       <div className="text-left flex items-center gap-3">
         <Coins className={`h-4 w-4 ${value ? "text-emerald-600" : "text-secondary-400"}`} />
@@ -1451,14 +1448,12 @@ function ToggleSwitch({
         </div>
       </div>
       <div
-        className={`h-6 w-12 rounded-full p-0.5 transition-all ${
-          value ? "bg-emerald-500" : "bg-secondary-200"
-        }`}
+        className={`h-6 w-12 rounded-full p-0.5 transition-all ${value ? "bg-emerald-500" : "bg-secondary-200"
+          }`}
       >
         <div
-          className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
-            value ? "translate-x-6" : ""
-          }`}
+          className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${value ? "translate-x-6" : ""
+            }`}
         />
       </div>
     </button>

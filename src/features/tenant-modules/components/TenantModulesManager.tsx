@@ -88,7 +88,7 @@ export function TenantModulesManager({ tenantId, showHeader = true }: Props) {
     const tenantMap = new Map(tenantModules.map((m) => [m.code || m.module_code || "", m]));
     const seen = new Set<string>();
     const out: RowState[] = [];
-    
+
     for (const c of catalog) {
       const tm = tenantMap.get(c.code);
       seen.add(c.code);
@@ -243,7 +243,7 @@ export function TenantModulesManager({ tenantId, showHeader = true }: Props) {
             <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.25em] mt-1">Configure Workspace Features</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={load} className="btn-secondary p-3 rounded-xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500" title="Refresh">
+            <button onClick={load} className="btn-secondary p-3 rounded-xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500" title="Refresh">
               <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
             </button>
             {dirtyRows.length > 0 && (
@@ -271,13 +271,13 @@ export function TenantModulesManager({ tenantId, showHeader = true }: Props) {
         {categories.length > 0 && (
           <div className="relative">
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="appearance-none bg-white/80 border border-secondary-100 rounded-xl pl-10 pr-6 py-3 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40">
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="appearance-none bg-white/80 border border-secondary-400 rounded-xl pl-10 pr-6 py-3 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40">
               <option value="">All Categories</option>
               {categories.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         )}
-        <button onClick={() => setEnabledOnly((v) => !v)} className={`flex items-center gap-2 px-4 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${enabledOnly ? "bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20" : "bg-white/80 text-secondary-600 border-secondary-100"}`}>
+        <button onClick={() => setEnabledOnly((v) => !v)} className={`flex items-center gap-2 px-4 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${enabledOnly ? "bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20" : "bg-white/80 text-secondary-600 border-secondary-400"}`}>
           <Sparkles className="h-3.5 w-3.5" />
           Enabled Only
         </button>
@@ -312,7 +312,7 @@ export function TenantModulesManager({ tenantId, showHeader = true }: Props) {
               {toggleModal.row?.isEnabled ? 'Disable Module?' : 'Enable & Unlock Module?'}
             </h3>
             <p className="text-sm text-secondary-500 font-medium px-4">
-              {toggleModal.row?.isEnabled 
+              {toggleModal.row?.isEnabled
                 ? `Are you sure you want to disable ${toggleModal.row?.name}? This feature will be hidden from the tenant workspace immediately.`
                 : `You are about to unlock ${toggleModal.row?.name}. This will make the module available for the hospital staff.`}
             </p>
@@ -335,7 +335,7 @@ export function TenantModulesManager({ tenantId, showHeader = true }: Props) {
           <div className="space-y-2">
             <h3 className="text-2xl font-black text-secondary-900 tracking-tight">Reset Module Settings?</h3>
             <p className="text-sm text-secondary-500 font-medium px-4">
-              Are you sure you want to reset <span className="font-bold text-secondary-900">{resetModal.row?.name}</span>? 
+              Are you sure you want to reset <span className="font-bold text-secondary-900">{resetModal.row?.name}</span>?
               This will remove the current tenant override and revert to the global catalog default.
             </p>
           </div>
@@ -367,11 +367,11 @@ export function TenantModulesManager({ tenantId, showHeader = true }: Props) {
 
 function ModuleRow({ row, saving, resetting, onToggle, onSave, onReset }: { row: RowState; saving: boolean; resetting: boolean; onToggle: () => void; onSave: () => void; onReset: () => void; }) {
   return (
-    <div className={`flex items-center justify-between gap-4 p-4 rounded-2xl border transition-all ${row.isDirty ? "bg-amber-50 border-amber-200" : "bg-white border-secondary-100 hover:border-primary-200"}`}>
+    <div className={`flex items-center justify-between gap-4 p-4 rounded-2xl border transition-all ${row.isDirty ? "bg-amber-50 border-amber-200" : "bg-white border-secondary-400 hover:border-primary-200"}`}>
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <button onClick={onToggle} className={`shrink-0 h-7 w-12 rounded-full p-0.5 transition-all relative ${row.isEnabled ? "bg-emerald-500" : "bg-secondary-200"}`} aria-label={row.isEnabled ? "Disable module" : "Enable module"}>
           <div className={`h-6 w-6 rounded-full bg-white shadow transition-transform flex items-center justify-center ${row.isEnabled ? "translate-x-5" : ""}`}>
-             {!row.isEnabled && <Lock className="h-3 w-3 text-secondary-400" />}
+            {!row.isEnabled && <Lock className="h-3 w-3 text-secondary-400" />}
           </div>
         </button>
         <div className="min-w-0">

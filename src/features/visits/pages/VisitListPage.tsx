@@ -83,7 +83,7 @@ export function VisitListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  
+
   const [searchParams] = useSearchParams();
   const patientIdFilter = searchParams.get("patient_id");
   const [filteredPatient, setFilteredPatient] = useState<Patient | null>(null);
@@ -211,7 +211,7 @@ export function VisitListPage() {
         <div className="flex items-center gap-3">
           <Link
             to={routes.visitFlows}
-            className="btn-secondary gap-2 px-6 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-6 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <GitBranch className="h-4 w-4" />
             <span className="text-sm font-bold">Pathways</span>
@@ -245,7 +245,7 @@ export function VisitListPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+                className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
               >
                 {STATUS_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -259,7 +259,7 @@ export function VisitListPage() {
               <select
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
-                className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+                className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
               >
                 {PRIORITY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -270,7 +270,7 @@ export function VisitListPage() {
             </div>
             <button
               onClick={() => loadVisits(filters)}
-              className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+              className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
               title="Refresh"
             >
               <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -279,7 +279,7 @@ export function VisitListPage() {
         </div>
 
         {/* Visits Table */}
-        <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+        <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -320,7 +320,7 @@ export function VisitListPage() {
                     const priorityMeta = priorityStyles[priorityKey] ?? priorityStyles.ROUTINE;
                     const statusKey = (visit.status || "").toUpperCase();
                     const statusClass =
-                      statusStyles[statusKey] ?? "bg-secondary-50 text-secondary-600 border-secondary-100";
+                      statusStyles[statusKey] ?? "bg-secondary-50 text-secondary-600 border-secondary-400";
                     const PriorityIcon = priorityMeta.icon;
                     const sdp = visit.current_service_delivery_point ?? visit.first_service_delivery_point;
                     return (
@@ -341,7 +341,7 @@ export function VisitListPage() {
                           </div>
                         </td>
                         <td className="px-8 py-6">
-                          { (visit.patient || patientCache[visit.patient_id]) ? (
+                          {(visit.patient || patientCache[visit.patient_id]) ? (
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-xs font-bold shadow-md shadow-primary-500/20">
                                 {((visit.patient?.first_name || patientCache[visit.patient_id]?.first_name)?.[0] ?? "?")}
@@ -461,7 +461,7 @@ export function VisitListPage() {
 
           {/* Pagination */}
           {!isLoading && !error && visits.length > 0 && (
-            <div className="px-8 py-6 bg-secondary-50/50 border-t border-secondary-100/50 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="px-8 py-6 bg-secondary-50/50 border-t border-secondary-400/50 flex flex-col sm:flex-row justify-between items-center gap-4">
               <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-[0.2em]">
                 Showing{" "}
                 <span className="text-secondary-900">

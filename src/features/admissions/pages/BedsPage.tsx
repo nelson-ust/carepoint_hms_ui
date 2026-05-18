@@ -323,21 +323,21 @@ export function BedsPage() {
         <div className="flex items-center gap-3">
           <Link
             to="/wards"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <Hospital className="h-4 w-4" />
             <span className="text-sm font-bold">Wards</span>
           </Link>
           <Link
             to="/admissions"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <ClipboardList className="h-4 w-4" />
             <span className="text-sm font-bold">Admissions</span>
           </Link>
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
@@ -353,11 +353,10 @@ export function BedsPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -392,7 +391,7 @@ export function BedsPage() {
           <select
             value={wardFilter}
             onChange={(e) => setWardFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
           >
             <option value="">All Wards</option>
             {wards.map((w) => (
@@ -407,7 +406,7 @@ export function BedsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
           >
             <option value="">All Statuses</option>
             {BED_STATUSES.map((s) => (
@@ -422,7 +421,7 @@ export function BedsPage() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
           >
             <option value="">All Types</option>
             {BED_TYPES.map((t) => (
@@ -546,7 +545,7 @@ export function BedsPage() {
               <select
                 value={form.ward_id}
                 onChange={(e) => setForm({ ...form, ward_id: e.target.value })}
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">Pick a ward...</option>
                 {wards.map((w) => (
@@ -562,7 +561,7 @@ export function BedsPage() {
                 value={form.bed_no}
                 onChange={(e) => setForm({ ...form, bed_no: e.target.value })}
                 placeholder="e.g. BED-A-12"
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full font-mono"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
               />
             </FieldLabel>
             <FieldLabel label="Bed Type">
@@ -572,11 +571,10 @@ export function BedsPage() {
                     key={t}
                     type="button"
                     onClick={() => setForm({ ...form, bed_type: t })}
-                    className={`p-2.5 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
-                      form.bed_type === t
+                    className={`p-2.5 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${form.bed_type === t
                         ? "bg-primary-500 text-white border-primary-500 shadow-md"
-                        : "bg-white border-secondary-100 text-secondary-600 hover:border-primary-300"
-                    }`}
+                        : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-300"
+                      }`}
                   >
                     {t.replace("_", " ")}
                   </button>
@@ -593,11 +591,10 @@ export function BedsPage() {
                       key={s}
                       type="button"
                       onClick={() => setForm({ ...form, bed_status: s })}
-                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
-                        isActive
+                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${isActive
                           ? "bg-slate-900 text-white border-slate-900 shadow-md"
-                          : "bg-white border-secondary-100 text-secondary-600 hover:border-primary-300"
-                      }`}
+                          : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-300"
+                        }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
                       <span className="text-[9px] font-bold uppercase tracking-widest">
@@ -613,7 +610,7 @@ export function BedsPage() {
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 placeholder="Equipment notes, restrictions, accessibility info..."
-                className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </FieldLabel>
           </div>
@@ -659,7 +656,7 @@ export function BedsPage() {
           ) : (
             <>
               {/* Identity strip */}
-              <div className="p-5 rounded-2xl bg-secondary-50 border border-secondary-100 mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="p-5 rounded-2xl bg-secondary-50 border border-secondary-400 mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <Hash className="h-4 w-4 text-secondary-400" />
                   <span className="font-mono font-bold text-sm text-secondary-700">
@@ -669,17 +666,15 @@ export function BedsPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   {detailSummary.bed_type && (
                     <span
-                      className={`px-3 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest ${
-                        typeStyles[detailSummary.bed_type] ?? typeStyles.OTHER
-                      }`}
+                      className={`px-3 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest ${typeStyles[detailSummary.bed_type] ?? typeStyles.OTHER
+                        }`}
                     >
                       {detailSummary.bed_type.replace("_", " ")}
                     </span>
                   )}
                   <span
-                    className={`px-3 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest ${
-                      statusStyles[detailSummary.bed_status] ?? statusStyles.AVAILABLE
-                    }`}
+                    className={`px-3 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest ${statusStyles[detailSummary.bed_status] ?? statusStyles.AVAILABLE
+                      }`}
                   >
                     {detailSummary.bed_status.replace("_", " ")}
                   </span>
@@ -721,11 +716,10 @@ export function BedsPage() {
                   icon={ClipboardList}
                 />
                 <div
-                  className={`p-4 rounded-2xl border flex flex-col items-start ${
-                    detailSummary.has_active_admission
+                  className={`p-4 rounded-2xl border flex flex-col items-start ${detailSummary.has_active_admission
                       ? "bg-rose-50 text-rose-600 border-rose-100"
                       : "bg-emerald-50 text-emerald-600 border-emerald-100"
-                  }`}
+                    }`}
                 >
                   {detailSummary.has_active_admission ? (
                     <Users className="h-4 w-4 mb-2" />
@@ -821,17 +815,16 @@ function BedTile({
   const typeKey = (bed.bed_type || "STANDARD").toUpperCase();
 
   return (
-    <div className="group relative rounded-2xl bg-white border border-secondary-100 hover:border-primary-300 hover:shadow-xl hover:shadow-primary-500/5 transition-all p-4">
+    <div className="group relative rounded-2xl bg-white border border-secondary-400 hover:border-primary-300 hover:shadow-xl hover:shadow-primary-500/5 transition-all p-4">
       <div
-        className={`absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl ${
-          status === "AVAILABLE"
+        className={`absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl ${status === "AVAILABLE"
             ? "bg-emerald-500"
             : status === "OCCUPIED"
               ? "bg-rose-500"
               : status === "RESERVED"
                 ? "bg-amber-500"
                 : "bg-secondary-300"
-        }`}
+          }`}
       />
       <div className="flex items-start justify-between mb-3 mt-1">
         <div className="h-9 w-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-sm">
@@ -873,9 +866,8 @@ function BedTile({
         </div>
         {bed.bed_type && (
           <div
-            className={`inline-flex px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-widest ${
-              typeStyles[typeKey] ?? typeStyles.OTHER
-            }`}
+            className={`inline-flex px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-widest ${typeStyles[typeKey] ?? typeStyles.OTHER
+              }`}
           >
             {bed.bed_type.replace("_", " ")}
           </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Lock, Mail, Building2, ChevronRight, AlertCircle, ShieldCheck, Heart, Sparkles, Eye, EyeOff } from "lucide-react";
 import { routes } from "@/config/routes";
 import { login } from "@/features/auth/api/auth.api";
@@ -10,14 +10,12 @@ import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
 import { resolveTenantCode } from "@/lib/tenant/tenant-resolver";
 import logo from "@/assets/logo.jpeg";
 
-const backgroundImages = [
-  "/nigeria_hospital_reception_1_1778593918777.png",
-  "/nigeria_hospital_doctors_2_1778593934424.png",
-  "/nigeria_hospital_tech_3_1778593950760.png",
-  "/nigeria_hospital_pediatrics_4_1778593966044.png",
-  "/nigeria_hospital_exterior_5_1778593988122.png",
-  "/nigeria_hospital_surgery_6_1778594007242.png",
-  "/nigeria_hospital_consultation_7_1778594026243.png",
+const backgroundGradients = [
+  "from-emerald-950 via-slate-900 to-teal-950",
+  "from-slate-900 via-indigo-950 to-slate-900",
+  "from-teal-950 via-slate-900 to-emerald-900",
+  "from-slate-950 via-cyan-950 to-slate-900",
+  "from-blue-950 via-slate-900 to-indigo-950",
 ];
 
 export function LoginForm() {
@@ -39,7 +37,7 @@ export function LoginForm() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setBgIndex((prev) => (prev + 1) % backgroundImages.length);
+      setBgIndex((prev) => (prev + 1) % backgroundGradients.length);
     }, 6000);
     return () => clearInterval(timer);
   }, []);
@@ -136,16 +134,11 @@ export function LoginForm() {
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-slate-950">
       {/* Background Slideshow */}
-      {backgroundImages.map((src, idx) => (
+      {backgroundGradients.map((grad, idx) => (
         <div
-          key={src}
-          className={`absolute inset-0 z-0 transition-opacity duration-[3000ms] ease-in-out ${idx === bgIndex ? "opacity-40 scale-105" : "opacity-0 scale-100"
-            } transform-gpu`}
-          style={{
-            backgroundImage: `url(${src})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
+          key={grad}
+          className={`absolute inset-0 z-0 transition-opacity duration-[3000ms] ease-in-out bg-gradient-to-br ${grad} ${idx === bgIndex ? "opacity-100" : "opacity-0"
+            }`}
         />
       ))}
 
@@ -156,12 +149,15 @@ export function LoginForm() {
       <div className="relative z-10 w-full max-w-xl p-4 lg:p-8 flex flex-col items-center">
         {/* Branding */}
         <div className="text-center mb-10 group">
-          <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[2.5rem] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] ring-8 ring-white/10 mb-6 transition-transform group-hover:scale-110 duration-500 overflow-hidden p-2">
+          {/* <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[2.5rem] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] ring-8 ring-white/10 mb-6 transition-transform group-hover:scale-110 duration-500 overflow-hidden p-2">
             <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
-          </div>
-          <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tighter font-display">
-            Carepoint<span className="text-emerald-400">.</span>
-          </h1>
+          </div> */}
+          <Link to="/">
+            <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tighter font-display">
+              Carepoint<span className="text-emerald-400">.</span>
+            </h1>
+          </Link>
+
           <p className="mt-3 text-emerald-400/80 font-bold text-[10px] uppercase tracking-[0.4em]">
             Enterprise Health Management
           </p>

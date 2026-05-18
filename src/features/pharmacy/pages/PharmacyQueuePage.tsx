@@ -279,21 +279,21 @@ export function PharmacyQueuePage() {
         <div className="flex items-center gap-3">
           <Link
             to="/inventory/items"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <Boxes className="h-4 w-4" />
             <span className="text-sm font-bold">Stock</span>
           </Link>
           <Link
             to="/drugs"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <Pill className="h-4 w-4" />
             <span className="text-sm font-bold">Drugs Catalogue</span>
           </Link>
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
@@ -302,11 +302,10 @@ export function PharmacyQueuePage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
           <span className="text-sm font-bold">{feedback.message}</span>
@@ -327,18 +326,16 @@ export function PharmacyQueuePage() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
-                tab === t
+              className={`px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${tab === t
                   ? "bg-slate-900 text-white shadow-md"
                   : "bg-white/60 text-secondary-600 hover:bg-white"
-              }`}
+                }`}
             >
               {t === "WORKLIST" ? <ListChecks className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
               {t === "WORKLIST" ? "Prescriptions" : "Stock Alerts"}
               <span
-                className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${
-                  tab === t ? "bg-white/20" : "bg-secondary-100 text-secondary-500"
-                }`}
+                className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${tab === t ? "bg-white/20" : "bg-secondary-100 text-secondary-500"
+                  }`}
               >
                 {t === "WORKLIST" ? prescriptions.length : alerts.length}
               </span>
@@ -496,7 +493,7 @@ export function PharmacyQueuePage() {
           onClose={() => !cancelling && setCancelTarget(null)}
           tone="rose"
         >
-          <div className="mb-5 p-4 rounded-2xl bg-secondary-50 border border-secondary-100">
+          <div className="mb-5 p-4 rounded-2xl bg-secondary-50 border border-secondary-400">
             <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase mb-1">
               {cancelTarget.prescription_no}
             </p>
@@ -508,7 +505,7 @@ export function PharmacyQueuePage() {
             value={cancelReason}
             onChange={(e) => setCancelReason(e.target.value)}
             placeholder="Why is this prescription being cancelled?"
-            className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3 mb-6"
+            className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3 mb-6"
           />
           <div className="flex gap-4">
             <button
@@ -551,7 +548,7 @@ function PrescriptionCard({
   const canDispense = !["DISPENSED", "CANCELLED"].includes(statusKey);
 
   return (
-    <div className="glass-card rounded-[2rem] p-7 bg-white border border-secondary-100 hover:border-emerald-200 transition-all">
+    <div className="glass-card rounded-[2rem] p-7 bg-white border border-secondary-400 hover:border-emerald-200 transition-all">
       <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="h-12 w-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md">
@@ -624,7 +621,7 @@ function PrescriptionCard({
         {items.map((it: PrescriptionItem) => (
           <div
             key={it.id}
-            className="flex items-start gap-3 p-3 rounded-xl bg-secondary-50/50 border border-secondary-100"
+            className="flex items-start gap-3 p-3 rounded-xl bg-secondary-50/50 border border-secondary-400"
           >
             <div className="h-9 w-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <Pill className="h-4 w-4" />
@@ -711,7 +708,7 @@ function DispenseModal({
           </div>
         </div>
 
-        <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-100">
+        <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-400">
           <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase mb-1">
             {prescription.prescription_no}
           </p>
@@ -738,7 +735,7 @@ function DispenseModal({
               <select
                 value={storeId}
                 onChange={(e) => onStoreIdChange(e.target.value)}
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">— No store linkage —</option>
                 {stores.map((s) => (
@@ -755,7 +752,7 @@ function DispenseModal({
               <select
                 value={staffId ?? ""}
                 onChange={(e) => onStaffIdChange(e.target.value ? Number(e.target.value) : null)}
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">Pick pharmacist...</option>
                 {staffList.map((s) => (
@@ -778,7 +775,7 @@ function DispenseModal({
               return (
                 <div
                   key={it.id}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-secondary-50 border border-secondary-100"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-secondary-50 border border-secondary-400"
                 >
                   <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                     <Pill className="h-5 w-5" />
@@ -814,7 +811,7 @@ function DispenseModal({
               value={note}
               onChange={(e) => onNoteChange(e.target.value)}
               placeholder="Counselling notes, substitution rationale..."
-              className="input-field h-20 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+              className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
             />
           </div>
         </div>
@@ -865,9 +862,8 @@ function Modal({
         </button>
         <div className="flex items-center gap-5 mb-8">
           <div
-            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${
-              tone === "rose" ? "bg-rose-500 shadow-rose-500/20" : "bg-emerald-500 shadow-emerald-500/20"
-            }`}
+            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${tone === "rose" ? "bg-rose-500 shadow-rose-500/20" : "bg-emerald-500 shadow-emerald-500/20"
+              }`}
           >
             {tone === "rose" ? <X className="h-6 w-6" /> : <Pill className="h-6 w-6" />}
           </div>

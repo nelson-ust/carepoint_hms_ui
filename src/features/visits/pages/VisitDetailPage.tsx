@@ -58,7 +58,7 @@ const statusStyles: Record<string, string> = {
   ACTIVE: "bg-primary-50 text-primary-600 border-primary-100",
   COMPLETED: "bg-emerald-50 text-emerald-600 border-emerald-100",
   CANCELLED: "bg-rose-50 text-rose-600 border-rose-100",
-  PENDING: "bg-secondary-50 text-secondary-600 border-secondary-100",
+  PENDING: "bg-secondary-50 text-secondary-600 border-secondary-400",
   SKIPPED: "bg-secondary-100 text-secondary-500 border-secondary-200",
 };
 
@@ -290,7 +290,7 @@ export function VisitDetailPage() {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
-        <div className="h-16 w-16 border-4 border-primary-500 border-t-transparent rounded-[2rem] animate-spin shadow-2xl shadow-primary-500/20" />
+        <div className="h-16 w-16 border-4 border-primary-500 border-t-transparent rounded animate-spin shadow-2xl shadow-primary-500/20" />
         <p className="text-sm font-black text-secondary-400 uppercase tracking-[0.3em] animate-pulse">
           Loading Visit Lifecycle...
         </p>
@@ -301,7 +301,7 @@ export function VisitDetailPage() {
   if (error || !visit) {
     return (
       <div className="max-w-2xl mx-auto py-20 text-center space-y-8 animate-fade-in">
-        <div className="h-24 w-24 bg-rose-50 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner">
+        <div className="h-24 w-24 bg-rose-50 rounded flex items-center justify-center mx-auto shadow-inner">
           <AlertCircle className="h-12 w-12 text-rose-500" />
         </div>
         <div>
@@ -341,28 +341,28 @@ export function VisitDetailPage() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={loadAll}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary p-4 rounded bg-white/80 border-secondary-400"
             title="Refresh"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
           <button
             onClick={openEdit}
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded bg-white/80 border-secondary-400"
           >
             <Edit3 className="h-4 w-4" />
             <span className="text-sm font-bold">Edit</span>
           </button>
           <Link
             to={`${routes.consultation}/${visit.id}`}
-            className="btn-primary gap-2 px-6 py-3 rounded-2xl bg-slate-900 hover:bg-black shadow-lg"
+            className="btn-primary gap-2 px-6 py-3 rounded bg-slate-900 hover:bg-black shadow-lg"
           >
             <Stethoscope className="h-4 w-4" />
             <span className="text-sm font-bold">Open Consultation</span>
           </Link>
           <Link
             to={routes.visitReroute.replace(":visitId", String(visit.id))}
-            className="btn-primary gap-2 px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-500/20"
+            className="btn-primary gap-2 px-6 py-3 rounded bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-500/20"
           >
             <ArrowRight className="h-4 w-4" />
             <span className="text-sm font-bold">Reroute</span>
@@ -371,7 +371,7 @@ export function VisitDetailPage() {
             <button
               onClick={handleCheckOut}
               disabled={isCheckingOut}
-              className="btn-primary gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+              className="btn-primary gap-2 px-6 py-3 rounded bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
             >
               <LogOut className="h-4 w-4" />
               <span className="text-sm font-bold">
@@ -382,7 +382,7 @@ export function VisitDetailPage() {
           <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className="p-4 rounded-2xl bg-white/80 border border-rose-100 text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-50"
+            className="p-4 rounded bg-white/80 border border-rose-100 text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-50"
             title="Delete visit"
           >
             <Trash2 className="h-4 w-4" />
@@ -393,9 +393,9 @@ export function VisitDetailPage() {
       <div className="grid gap-10 lg:grid-cols-12">
         {/* LEFT: Patient + Visit Summary */}
         <div className="lg:col-span-4 space-y-8">
-          <div className="glass-card rounded-[2.5rem] p-10 border border-secondary-100 shadow-premium bg-white/60 backdrop-blur-xl">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="h-12 w-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg">
+          <div className="glass-card rounded border border-secondary-400 shadow-premium bg-white/60 backdrop-blur-xl">
+            {/* <div className="flex items-center gap-4 mb-8">
+              <div className="h-12 w-12 rounded bg-slate-900 text-white flex items-center justify-center shadow-lg">
                 <User className="h-6 w-6" />
               </div>
               <div>
@@ -404,14 +404,14 @@ export function VisitDetailPage() {
                   Identity & Encounter Context
                 </p>
               </div>
-            </div>
+            </div> */}
 
             {visit.patient ? (
               <div className="space-y-6">
-                <div className="relative p-7 rounded-[2rem] bg-slate-900 text-white shadow-2xl overflow-hidden">
+                <div className="relative p-7 rounded  text-white shadow-2xl overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
                   <div className="flex flex-col items-center text-center space-y-5">
-                    <div className="h-20 w-20 rounded-[2rem] bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-2xl font-black shadow-2xl">
+                    <div className="h-20 w-20 rounded bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-2xl font-black shadow-2xl">
                       {visit.patient.first_name?.[0]}
                       {visit.patient.last_name?.[0]}
                     </div>
@@ -425,14 +425,14 @@ export function VisitDetailPage() {
                     </div>
                   </div>
                   <div className="mt-7 space-y-3">
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded">
+                      <span className="text-[10px] font-bold uppercase tracking-widest">
                         Gender
                       </span>
                       <span className="text-xs font-black uppercase">{visit.patient.gender}</span>
                     </div>
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded">
+                      <span className="text-[10px] font-bold uppercase tracking-widest">
                         Phone
                       </span>
                       <span className="text-xs font-black">{visit.patient.phone_number}</span>
@@ -446,9 +446,9 @@ export function VisitDetailPage() {
           </div>
 
           {/* Visit Summary */}
-          <div className="glass-card rounded-[2.5rem] p-10 border border-secondary-100 shadow-premium bg-white/60 backdrop-blur-xl space-y-6">
+          <div className="glass-card rounded p-10 border border-secondary-400 shadow-premium bg-white/60 backdrop-blur-xl space-y-6">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-2xl bg-primary-600 text-white flex items-center justify-center shadow-lg">
+              <div className="h-12 w-12 rounded bg-primary-600 text-white flex items-center justify-center shadow-lg">
                 <Activity className="h-6 w-6" />
               </div>
               <div>
@@ -460,31 +460,29 @@ export function VisitDetailPage() {
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-secondary-50 border border-secondary-100">
+              <div className="flex items-center justify-between p-4 rounded bg-secondary-50 border border-secondary-400">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
                   Status
                 </span>
                 <span
-                  className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${
-                    statusStyles[statusKey] ?? statusStyles.PENDING
-                  }`}
+                  className={`px-3 py-1.5 rounded border text-[10px] font-bold uppercase tracking-widest ${statusStyles[statusKey] ?? statusStyles.PENDING
+                    }`}
                 >
                   {statusKey}
                 </span>
               </div>
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-secondary-50 border border-secondary-100">
+              <div className="flex items-center justify-between p-4 rounded bg-secondary-50 border border-secondary-400">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
                   Priority
                 </span>
                 <span
-                  className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest ${
-                    priorityStyles[priorityKey] ?? priorityStyles.ROUTINE
-                  }`}
+                  className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest ${priorityStyles[priorityKey] ?? priorityStyles.ROUTINE
+                    }`}
                 >
                   {priorityKey}
                 </span>
               </div>
-              <div className="p-4 rounded-2xl bg-secondary-50 border border-secondary-100 space-y-2">
+              <div className="p-4 rounded bg-secondary-50 border border-secondary-400 space-y-2">
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-secondary-400">
                   <Building2 className="h-3.5 w-3.5" />
                   Current Service Point
@@ -500,7 +498,7 @@ export function VisitDetailPage() {
                   <p className="text-sm text-secondary-400 font-bold">Unassigned</p>
                 )}
               </div>
-              <div className="p-4 rounded-2xl bg-secondary-50 border border-secondary-100 space-y-2">
+              <div className="p-4 rounded bg-secondary-50 border border-secondary-400 space-y-2">
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-secondary-400">
                   <Calendar className="h-3.5 w-3.5" />
                   Visit Date
@@ -510,7 +508,7 @@ export function VisitDetailPage() {
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-4 rounded-2xl bg-secondary-50 border border-secondary-100 space-y-2">
+                <div className="p-4 rounded bg-secondary-50 border border-secondary-400 space-y-2">
                   <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-secondary-400">
                     <Clock className="h-3.5 w-3.5" /> Check-In
                   </div>
@@ -518,7 +516,7 @@ export function VisitDetailPage() {
                     {formatDateTime(visit.check_in_time)}
                   </p>
                 </div>
-                <div className="p-4 rounded-2xl bg-secondary-50 border border-secondary-100 space-y-2">
+                <div className="p-4 rounded bg-secondary-50 border border-secondary-400 space-y-2">
                   <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-secondary-400">
                     <Clock className="h-3.5 w-3.5" /> Check-Out
                   </div>
@@ -528,7 +526,7 @@ export function VisitDetailPage() {
                 </div>
               </div>
               {visit.visit_reason && (
-                <div className="p-5 rounded-2xl bg-amber-50 border border-amber-100 space-y-2">
+                <div className="p-5 rounded bg-amber-50 border border-amber-100 space-y-2">
                   <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-amber-600">
                     <FileText className="h-3.5 w-3.5" /> Clinical Indication
                   </div>
@@ -538,7 +536,7 @@ export function VisitDetailPage() {
                 </div>
               )}
               {visit.referred_from && (
-                <div className="p-4 rounded-2xl bg-secondary-50 border border-secondary-100 flex items-center justify-between">
+                <div className="p-4 rounded bg-secondary-50 border border-secondary-400 flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
                     Referred From
                   </span>
@@ -554,10 +552,10 @@ export function VisitDetailPage() {
         {/* RIGHT: Flow Timeline + Vitals + Tickets */}
         <div className="lg:col-span-8 space-y-8">
           {/* Flow Steps */}
-          <div className="glass-card rounded-[3rem] p-10 md:p-12 border border-secondary-100 bg-white/80 shadow-premium">
-            <div className="flex items-center justify-between border-b border-secondary-100 pb-8 mb-10">
+          <div className="glass-card rounded p-10 md:p-12 border border-secondary-400 bg-white/80 shadow-premium">
+            <div className="flex items-center justify-between border-b border-secondary-400 pb-8 mb-10">
               <div className="flex items-center gap-5">
-                <div className="h-14 w-14 rounded-[1.75rem] bg-slate-900 text-white flex items-center justify-center shadow-2xl">
+                <div className="h-14 w-14 rounded bg-slate-900 text-white flex items-center justify-center shadow-2xl">
                   <History className="h-7 w-7" />
                 </div>
                 <div>
@@ -567,14 +565,14 @@ export function VisitDetailPage() {
                   </p>
                 </div>
               </div>
-              <span className="px-4 py-2 rounded-2xl bg-secondary-100 text-secondary-600 text-[10px] font-bold uppercase tracking-widest">
+              <span className="px-4 py-2 rounded bg-secondary-100 text-secondary-600 text-[10px] font-bold uppercase tracking-widest">
                 {sortedFlowSteps.length} {sortedFlowSteps.length === 1 ? "Step" : "Steps"}
               </span>
             </div>
 
             {sortedFlowSteps.length === 0 ? (
               <div className="py-16 text-center space-y-3">
-                <div className="h-16 w-16 mx-auto bg-secondary-50 rounded-3xl flex items-center justify-center">
+                <div className="h-16 w-16 mx-auto bg-secondary-50 rounded flex items-center justify-center">
                   <ChevronRight className="h-8 w-8 text-secondary-300" />
                 </div>
                 <p className="text-secondary-500 font-bold">
@@ -592,12 +590,12 @@ export function VisitDetailPage() {
                     const ringColor = step.is_current
                       ? "bg-primary-600 text-white ring-4 ring-primary-100"
                       : isCompleted
-                      ? "bg-emerald-500 text-white"
-                      : "bg-secondary-100 text-secondary-500";
+                        ? "bg-emerald-500 text-white"
+                        : "bg-secondary-100 text-secondary-500";
                     return (
                       <div key={step.id} className="flex items-start gap-8 relative">
                         <div
-                          className={`h-20 w-20 rounded-[2rem] flex items-center justify-center shadow-lg z-10 shrink-0 ${ringColor}`}
+                          className={`h-20 w-20 rounded flex items-center justify-center shadow-lg z-10 shrink-0 ${ringColor}`}
                         >
                           {isCompleted ? (
                             <CheckCircle2 className="h-7 w-7" />
@@ -607,7 +605,7 @@ export function VisitDetailPage() {
                             <Clock className="h-7 w-7" />
                           )}
                         </div>
-                        <div className="flex-1 p-6 rounded-[2rem] bg-secondary-50 border border-secondary-100">
+                        <div className="flex-1 p-6 rounded bg-secondary-50 border border-secondary-400">
                           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                             <div>
                               <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400 mb-1">
@@ -620,22 +618,22 @@ export function VisitDetailPage() {
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                               <span
-                                className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${stepClass}`}
+                                className={`px-3 py-1.5 rounded border text-[10px] font-bold uppercase tracking-widest ${stepClass}`}
                               >
                                 {stepStatus}
                               </span>
                               {step.is_required && (
-                                <span className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 text-[10px] font-bold uppercase tracking-widest">
+                                <span className="px-3 py-1.5 rounded bg-rose-50 text-rose-600 border border-rose-100 text-[10px] font-bold uppercase tracking-widest">
                                   Required
                                 </span>
                               )}
                               {step.is_skipped && (
-                                <span className="px-3 py-1.5 rounded-xl bg-secondary-100 text-secondary-500 text-[10px] font-bold uppercase tracking-widest">
+                                <span className="px-3 py-1.5 rounded bg-secondary-100 text-secondary-500 text-[10px] font-bold uppercase tracking-widest">
                                   Skipped
                                 </span>
                               )}
                               {step.is_current && (
-                                <span className="px-3 py-1.5 rounded-xl bg-primary-50 text-primary-600 border border-primary-100 text-[10px] font-bold uppercase tracking-widest">
+                                <span className="px-3 py-1.5 rounded bg-primary-50 text-primary-600 border border-primary-100 text-[10px] font-bold uppercase tracking-widest">
                                   Current
                                 </span>
                               )}
@@ -653,7 +651,7 @@ export function VisitDetailPage() {
                             </div>
                           </div>
                           {step.notes && (
-                            <p className="mt-4 text-xs text-secondary-600 italic bg-white rounded-2xl p-4 border border-secondary-100">
+                            <p className="mt-4 text-xs text-secondary-600 italic bg-white rounded p-4 border border-secondary-400">
                               {step.notes}
                             </p>
                           )}
@@ -667,10 +665,10 @@ export function VisitDetailPage() {
           </div>
 
           {/* Vital Signs */}
-          <div className="glass-card rounded-[3rem] p-10 md:p-12 border border-secondary-100 bg-white/80 shadow-premium">
-            <div className="flex items-center justify-between border-b border-secondary-100 pb-8 mb-10">
+          <div className="glass-card rounded p-10 md:p-12 border border-secondary-400 bg-white/80 shadow-premium">
+            <div className="flex items-center justify-between border-b border-secondary-400 pb-8 mb-10">
               <div className="flex items-center gap-5">
-                <div className="h-14 w-14 rounded-[1.75rem] bg-rose-500 text-white flex items-center justify-center shadow-2xl">
+                <div className="h-14 w-14 rounded bg-rose-500 text-white flex items-center justify-center shadow-2xl">
                   <Heart className="h-7 w-7" />
                 </div>
                 <div>
@@ -686,7 +684,7 @@ export function VisitDetailPage() {
                   setVitalsError(null);
                   setVitalsOpen(true);
                 }}
-                className="btn-primary gap-2 px-5 py-3 rounded-2xl bg-slate-900 hover:bg-black shadow-lg"
+                className="btn-primary gap-2 px-5 py-3 rounded bg-slate-900 hover:bg-black shadow-lg"
               >
                 <Plus className="h-4 w-4" />
                 <span className="text-sm font-bold">Record Vitals</span>
@@ -758,7 +756,7 @@ export function VisitDetailPage() {
               </div>
             ) : (
               <div className="py-12 text-center space-y-3 mb-6">
-                <div className="h-16 w-16 mx-auto bg-rose-50 rounded-3xl flex items-center justify-center">
+                <div className="h-16 w-16 mx-auto bg-rose-50 rounded flex items-center justify-center">
                   <Heart className="h-8 w-8 text-rose-300" />
                 </div>
                 <p className="text-secondary-500 font-bold">
@@ -772,7 +770,7 @@ export function VisitDetailPage() {
                 <h4 className="text-[11px] font-bold uppercase tracking-[0.25em] text-secondary-500">
                   Historical Records ({sortedVitals.length})
                 </h4>
-                <div className="overflow-x-auto rounded-2xl border border-secondary-100">
+                <div className="overflow-x-auto rounded border border-secondary-400">
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="bg-secondary-50">
@@ -824,10 +822,10 @@ export function VisitDetailPage() {
           <DiagnosesPanel visitId={visit.id} disabled />
 
           {/* Queue Tickets */}
-          <div className="glass-card rounded-[3rem] p-10 md:p-12 border border-secondary-100 bg-white/80 shadow-premium">
-            <div className="flex items-center justify-between border-b border-secondary-100 pb-8 mb-10">
+          <div className="glass-card rounded p-10 md:p-12 border border-secondary-400 bg-white/80 shadow-premium">
+            <div className="flex items-center justify-between border-b border-secondary-400 pb-8 mb-10">
               <div className="flex items-center gap-5">
-                <div className="h-14 w-14 rounded-[1.75rem] bg-amber-500 text-white flex items-center justify-center shadow-2xl">
+                <div className="h-14 w-14 rounded bg-amber-500 text-white flex items-center justify-center shadow-2xl">
                   <MapPin className="h-7 w-7" />
                 </div>
                 <div>
@@ -837,14 +835,14 @@ export function VisitDetailPage() {
                   </p>
                 </div>
               </div>
-              <span className="px-4 py-2 rounded-2xl bg-secondary-100 text-secondary-600 text-[10px] font-bold uppercase tracking-widest">
+              <span className="px-4 py-2 rounded bg-secondary-100 text-secondary-600 text-[10px] font-bold uppercase tracking-widest">
                 {visit.queue_tickets?.length ?? 0} Tickets
               </span>
             </div>
 
             {!visit.queue_tickets || visit.queue_tickets.length === 0 ? (
               <div className="py-12 text-center space-y-3">
-                <div className="h-16 w-16 mx-auto bg-amber-50 rounded-3xl flex items-center justify-center">
+                <div className="h-16 w-16 mx-auto bg-amber-50 rounded flex items-center justify-center">
                   <MapPin className="h-8 w-8 text-amber-300" />
                 </div>
                 <p className="text-secondary-500 font-bold">
@@ -860,14 +858,14 @@ export function VisitDetailPage() {
                   return (
                     <div
                       key={ticket.id}
-                      className="p-6 rounded-2xl bg-secondary-50 border border-secondary-100 hover:border-primary-200 transition-all"
+                      className="p-6 rounded bg-secondary-50 border border-secondary-400 hover:border-primary-200 transition-all"
                     >
                       <div className="flex items-center justify-between mb-3">
                         <span className="text-[10px] font-mono font-bold text-secondary-400 uppercase tracking-tight">
                           Ticket #{ticket.queue_number}
                         </span>
                         <span
-                          className={`px-3 py-1 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${tStatusClass}`}
+                          className={`px-3 py-1 rounded border text-[10px] font-bold uppercase tracking-widest ${tStatusClass}`}
                         >
                           {tStatus}
                         </span>
@@ -891,15 +889,15 @@ export function VisitDetailPage() {
       {/* Edit Modal */}
       {isEditOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-          <div className="bg-white rounded-[2.5rem] p-10 max-w-xl w-full shadow-2xl relative animate-slide-up">
+          <div className="bg-white border border-white rounded p-10 max-w-xl w-full shadow-2xl relative animate-slide-up shadow-2xl">
             <button
               onClick={() => setEditOpen(false)}
-              className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"
+              className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded transition-all"
             >
               <X className="h-5 w-5 text-secondary-400" />
             </button>
             <div className="flex items-center gap-5 mb-8">
-              <div className="h-14 w-14 rounded-2xl bg-primary-600 text-white flex items-center justify-center shadow-xl shadow-primary-500/20">
+              <div className="h-14 w-14 rounded bg-primary-600 text-white flex items-center justify-center shadow-xl shadow-primary-500/20">
                 <Edit3 className="h-6 w-6" />
               </div>
               <div>
@@ -911,7 +909,7 @@ export function VisitDetailPage() {
             </div>
 
             {saveError && (
-              <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
+              <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded flex items-center gap-3">
                 <AlertCircle className="h-5 w-5" />
                 <span className="text-sm font-bold">{saveError}</span>
               </div>
@@ -925,7 +923,7 @@ export function VisitDetailPage() {
                 <select
                   value={editForm.status}
                   onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                 >
                   {STATUS_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>
@@ -941,7 +939,7 @@ export function VisitDetailPage() {
                 <select
                   value={editForm.priority}
                   onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                 >
                   {PRIORITY_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>
@@ -959,7 +957,7 @@ export function VisitDetailPage() {
                   value={editForm.referred_from}
                   onChange={(e) => setEditForm({ ...editForm, referred_from: e.target.value })}
                   placeholder="Referring facility or department"
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                 />
               </div>
               <div className="space-y-2">
@@ -969,7 +967,7 @@ export function VisitDetailPage() {
                 <textarea
                   value={editForm.visit_reason}
                   onChange={(e) => setEditForm({ ...editForm, visit_reason: e.target.value })}
-                  className="input-field h-28 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                  className="input-field h-28 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
                   placeholder="Reason for this clinical encounter"
                 />
               </div>
@@ -977,7 +975,7 @@ export function VisitDetailPage() {
               <div className="pt-4 flex gap-4">
                 <button
                   onClick={() => setEditOpen(false)}
-                  className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
+                  className="flex-1 btn-secondary py-4 rounded font-bold"
                   disabled={isSaving}
                 >
                   Cancel
@@ -985,7 +983,7 @@ export function VisitDetailPage() {
                 <button
                   onClick={handleSaveEdit}
                   disabled={isSaving}
-                  className="flex-[2] btn-primary py-4 rounded-2xl font-black tracking-tight shadow-xl shadow-primary-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="flex-[2] btn-primary py-4 rounded font-black tracking-tight shadow-xl shadow-primary-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   <Save className="h-4 w-4" />
                   {isSaving ? "Saving..." : "Save Changes"}
@@ -999,15 +997,15 @@ export function VisitDetailPage() {
       {/* Vitals Modal */}
       {isVitalsOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-          <div className="bg-white rounded-[2.5rem] p-10 max-w-2xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded p-10 max-w-2xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setVitalsOpen(false)}
-              className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"
+              className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded transition-all"
             >
               <X className="h-5 w-5 text-secondary-400" />
             </button>
             <div className="flex items-center gap-5 mb-8">
-              <div className="h-14 w-14 rounded-2xl bg-rose-500 text-white flex items-center justify-center shadow-xl shadow-rose-500/20">
+              <div className="h-14 w-14 rounded bg-rose-500 text-white flex items-center justify-center shadow-xl shadow-rose-500/20">
                 <Heart className="h-6 w-6" />
               </div>
               <div>
@@ -1019,7 +1017,7 @@ export function VisitDetailPage() {
             </div>
 
             {vitalsError && (
-              <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
+              <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded flex items-center gap-3">
                 <AlertCircle className="h-5 w-5" />
                 <span className="text-sm font-bold">{vitalsError}</span>
               </div>
@@ -1085,7 +1083,7 @@ export function VisitDetailPage() {
             <div className="pt-8 flex gap-4">
               <button
                 onClick={() => setVitalsOpen(false)}
-                className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
+                className="flex-1 btn-secondary py-4 rounded font-bold"
                 disabled={isSavingVitals}
               >
                 Cancel
@@ -1093,7 +1091,7 @@ export function VisitDetailPage() {
               <button
                 onClick={handleSaveVitals}
                 disabled={isSavingVitals}
-                className="flex-[2] btn-primary py-4 rounded-2xl font-black tracking-tight bg-rose-500 hover:bg-rose-600 shadow-xl shadow-rose-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
+                className="flex-[2] btn-primary py-4 rounded font-black tracking-tight bg-rose-500 hover:bg-rose-600 shadow-xl shadow-rose-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
                 {isSavingVitals ? "Saving..." : "Record Vitals"}
@@ -1128,7 +1126,7 @@ type VitalCardProps = {
 function VitalCard({ icon: Icon, label, value, unit, tone }: VitalCardProps) {
   const display = value === null || value === undefined || value === "" ? "—" : value;
   return (
-    <div className={`p-5 rounded-2xl border ${toneStyles[tone]}`}>
+    <div className={`p-5 rounded border ${toneStyles[tone]}`}>
       <div className="flex items-center gap-2 mb-3">
         <Icon className="h-4 w-4" />
         <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
@@ -1162,7 +1160,7 @@ function VitalsField({ label, value, onChange, placeholder }: VitalsFieldProps) 
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+        className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
       />
     </div>
   );

@@ -42,7 +42,7 @@ export function TimesheetsPage() {
          case 'APPROVED': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
          case 'SUBMITTED': return 'bg-primary-50 text-primary-600 border-primary-100';
          case 'REJECTED': return 'bg-rose-50 text-rose-600 border-rose-100';
-         default: return 'bg-secondary-50 text-secondary-400 border-secondary-100';
+         default: return 'bg-secondary-50 text-secondary-400 border-secondary-400';
       }
    };
 
@@ -54,7 +54,7 @@ export function TimesheetsPage() {
                description="Review and approve hours worked, overtime, and night shifts across the facility."
             />
             <div className="flex gap-3">
-               <button onClick={load} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 transition-all hover:rotate-180 duration-500">
+               <button onClick={load} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 transition-all hover:rotate-180 duration-500">
                   <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                </button>
                <button className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
@@ -67,7 +67,7 @@ export function TimesheetsPage() {
          <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
             {/* Time Stats */}
             <div className="lg:col-span-1 space-y-6">
-               <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 bg-white/40 shadow-premium">
+               <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
                   <div className="h-16 w-16 rounded-2xl bg-primary-500 text-white flex items-center justify-center mb-6 shadow-lg shadow-primary-500/20">
                      <Clock className="h-8 w-8" />
                   </div>
@@ -84,7 +84,7 @@ export function TimesheetsPage() {
                         <span className="text-sm font-bold text-secondary-700">Pending</span>
                         <span className="text-xl font-black text-amber-500">12</span>
                      </div>
-                     <div className="pt-6 border-t border-secondary-100">
+                     <div className="pt-6 border-t border-secondary-400">
                         <button className="w-full btn-secondary py-3 text-[10px] font-black uppercase tracking-widest">
                            Export for Payroll
                         </button>
@@ -113,7 +113,7 @@ export function TimesheetsPage() {
                   </div>
                )}
 
-               <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+               <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
                   <table className="w-full text-left">
                      <thead>
                         <tr className="bg-secondary-900/5">

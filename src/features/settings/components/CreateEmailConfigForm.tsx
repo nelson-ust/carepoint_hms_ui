@@ -25,7 +25,7 @@ interface CreateEmailConfigFormProps {
 
 export function CreateEmailConfigForm({ onSuccess, onCancel }: CreateEmailConfigFormProps) {
   const { mutate, isPending } = useCreateEmailConfig();
-  
+
   const {
     register,
     handleSubmit,
@@ -113,7 +113,7 @@ export function CreateEmailConfigForm({ onSuccess, onCancel }: CreateEmailConfig
         </div>
       </div>
 
-      <div className="flex gap-4 pt-6 border-t border-secondary-100">
+      <div className="flex gap-4 pt-6 border-t border-secondary-400">
         <button
           type="button"
           onClick={onCancel}

@@ -2,7 +2,7 @@ import { Outlet } from "react-router-dom";
 
 export function AuthLayout() {
   return (
-    <main className="min-h-screen bg-slate-50 relative overflow-hidden flex items-center justify-center px-4">
+    <main className="min-h-screen bg-slate-50 relative overflow-hidden flex items-center justify-center">
       {/* Background patterns */}
       <div className="absolute inset-0 z-0">
         <div className="absolute -top-[10%] -left-[10%] h-[40%] w-[40%] rounded-full bg-emerald-500/5 blur-[120px]" />

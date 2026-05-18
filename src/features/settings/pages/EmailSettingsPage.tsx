@@ -23,7 +23,7 @@ export function EmailSettingsPage() {
   const { data, isLoading, error, refetch } = useEmailConfigs();
   const deleteMutation = useDeleteEmailConfig();
   const testMutation = useTestEmailConfig();
-  
+
   const configs = data?.items || [];
 
   return (
@@ -33,55 +33,55 @@ export function EmailSettingsPage() {
           title="Email Configuration"
           description="Configure SMTP servers and email providers for automated system notifications."
         />
-        <button 
-           onClick={() => setIsModalOpen(true)}
-           className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20"
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20"
         >
           <Plus className="h-5 w-5" />
           <span className="font-bold">Add Configuration</span>
         </button>
       </div>
 
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         title="Add Email Provider"
         size="lg"
       >
-        <CreateEmailConfigForm 
+        <CreateEmailConfigForm
           onSuccess={() => {
             setIsModalOpen(false);
             refetch();
-          }} 
-          onCancel={() => setIsModalOpen(false)} 
+          }}
+          onCancel={() => setIsModalOpen(false)}
         />
       </Modal>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         {/* Info Card */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 bg-white/40">
-             <div className="h-12 w-12 rounded-2xl bg-secondary-900/5 flex items-center justify-center mb-6">
-                <SettingsIcon className="h-6 w-6 text-secondary-900" />
-             </div>
-             <h4 className="text-lg font-bold text-secondary-900 mb-2">Notification Hub</h4>
-             <p className="text-sm text-secondary-500 leading-relaxed">
-                Settings configured here affect all outgoing emails including patient reminders, 
-                billing notifications, and staff invitations.
-             </p>
+          <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40">
+            <div className="h-12 w-12 rounded-2xl bg-secondary-900/5 flex items-center justify-center mb-6">
+              <SettingsIcon className="h-6 w-6 text-secondary-900" />
+            </div>
+            <h4 className="text-lg font-bold text-secondary-900 mb-2">Notification Hub</h4>
+            <p className="text-sm text-secondary-500 leading-relaxed">
+              Settings configured here affect all outgoing emails including patient reminders,
+              billing notifications, and staff invitations.
+            </p>
           </div>
 
           <div className="glass-card rounded-[2.5rem] p-8 border border-primary-100 bg-primary-50/20">
-             <div className="flex items-start gap-4">
-                <Shield className="h-6 w-6 text-primary-500 shrink-0" />
-                <div>
-                   <h4 className="text-sm font-bold text-secondary-900 mb-1">Security Hint</h4>
-                   <p className="text-xs text-secondary-500 leading-relaxed">
-                      Always use TLS (Port 587 or 465) for secure transmissions. 
-                      Plain SMTP (Port 25) is not recommended.
-                   </p>
-                </div>
-             </div>
+            <div className="flex items-start gap-4">
+              <Shield className="h-6 w-6 text-primary-500 shrink-0" />
+              <div>
+                <h4 className="text-sm font-bold text-secondary-900 mb-1">Security Hint</h4>
+                <p className="text-xs text-secondary-500 leading-relaxed">
+                  Always use TLS (Port 587 or 465) for secure transmissions.
+                  Plain SMTP (Port 25) is not recommended.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -104,9 +104,9 @@ export function EmailSettingsPage() {
               ))
             ) : configs.length > 0 ? (
               configs.map((config) => (
-                <div 
+                <div
                   key={config.id}
-                  className="glass-card rounded-[2rem] p-6 border border-secondary-100/50 bg-white/40 hover:bg-white/60 transition-all group"
+                  className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40 hover:bg-white/60 transition-all group"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-5">
@@ -117,9 +117,9 @@ export function EmailSettingsPage() {
                         <div className="flex items-center gap-3">
                           <h4 className="font-bold text-secondary-900">{config.provider_name}</h4>
                           {config.is_active && (
-                             <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-600 text-[10px] font-bold border border-emerald-100">
-                                ACTIVE
-                             </span>
+                            <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-600 text-[10px] font-bold border border-emerald-100">
+                              ACTIVE
+                            </span>
                           )}
                         </div>
                         <p className="text-xs text-secondary-500 mt-1 font-medium">
@@ -127,26 +127,26 @@ export function EmailSettingsPage() {
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
-                       <button 
+                      <button
                         onClick={() => testMutation.mutate(config.id)}
                         disabled={testMutation.isPending}
                         className="btn-secondary py-2 px-4 rounded-xl text-[10px] font-bold"
-                       >
-                          Test Connection
-                       </button>
-                       <div className="relative">
-                          <button className="p-2.5 hover:bg-secondary-100 rounded-xl transition-all">
-                            <MoreHorizontal className="h-5 w-5 text-secondary-400" />
-                          </button>
-                       </div>
+                      >
+                        Test Connection
+                      </button>
+                      <div className="relative">
+                        <button className="p-2.5 hover:bg-secondary-100 rounded-xl transition-all">
+                          <MoreHorizontal className="h-5 w-5 text-secondary-400" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="py-20 text-center bg-white/20 rounded-[2.5rem] border-2 border-dashed border-secondary-100">
+              <div className="py-20 text-center bg-white/20 rounded-[2.5rem] border-2 border-dashed border-secondary-400">
                 <AlertCircle className="h-12 w-12 mx-auto text-secondary-100 mb-4" />
                 <p className="text-secondary-500 font-bold">No email providers configured yet.</p>
               </div>

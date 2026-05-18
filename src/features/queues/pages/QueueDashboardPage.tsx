@@ -180,7 +180,7 @@ export function QueueDashboardPage() {
       console.error("Failed to load worklist", err);
       setError(
         err?.response?.data?.message ||
-          "Unable to load the worklist. Make sure your account is assigned to a service point.",
+        "Unable to load the worklist. Make sure your account is assigned to a service point.",
       );
     } finally {
       if (!silent) setIsLoading(false);
@@ -377,24 +377,22 @@ export function QueueDashboardPage() {
           description="Live worklist orchestration: call, serve, route, and transfer tickets across service points."
         />
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="inline-flex rounded-2xl bg-white/80 border border-secondary-100 overflow-hidden">
+          <div className="inline-flex rounded-2xl bg-white/80 border border-secondary-400 overflow-hidden">
             <button
               onClick={() => setScope("my")}
-              className={`px-5 py-3 text-xs font-bold uppercase tracking-widest transition-all ${
-                scope === "my"
+              className={`px-5 py-3 text-xs font-bold uppercase tracking-widest transition-all ${scope === "my"
                   ? "bg-slate-900 text-white"
                   : "text-secondary-600 hover:bg-secondary-50"
-              }`}
+                }`}
             >
               My Worklist
             </button>
             <button
               onClick={() => setScope("sdp")}
-              className={`px-5 py-3 text-xs font-bold uppercase tracking-widest transition-all ${
-                scope === "sdp"
+              className={`px-5 py-3 text-xs font-bold uppercase tracking-widest transition-all ${scope === "sdp"
                   ? "bg-slate-900 text-white"
                   : "text-secondary-600 hover:bg-secondary-50"
-              }`}
+                }`}
             >
               By Service Point
             </button>
@@ -407,7 +405,7 @@ export function QueueDashboardPage() {
                 onChange={(e) =>
                   setSelectedSdpId(e.target.value ? Number(e.target.value) : null)
                 }
-                className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-3 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+                className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-3 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
               >
                 <option value="">Pick a service point</option>
                 {sdps.map((s) => (
@@ -420,7 +418,7 @@ export function QueueDashboardPage() {
           )}
           <button
             onClick={() => loadWorklist()}
-            className="btn-secondary p-3 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-3 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
             title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -431,11 +429,10 @@ export function QueueDashboardPage() {
       {/* Feedback Toast */}
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -603,7 +600,7 @@ export function QueueDashboardPage() {
                     return (
                       <div
                         key={ticket.id}
-                        className="flex items-center gap-3 p-3 rounded-2xl bg-white/60 border border-secondary-100"
+                        className="flex items-center gap-3 p-3 rounded-2xl bg-white/60 border border-secondary-400"
                       >
                         <div className="h-10 w-10 rounded-xl bg-secondary-50 text-secondary-400 flex items-center justify-center text-xs font-mono font-bold">
                           {ticket.queue_number}
@@ -669,7 +666,7 @@ function WaitingCard({ ticket, pendingId, onCall, onCancel, onTransfer }: Waitin
   const [menuOpen, setMenuOpen] = useState(false);
   const isPending = pendingId === ticket.id;
   return (
-    <div className="glass-card rounded-[2rem] p-6 bg-white/70 border border-secondary-100 hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/5 transition-all relative">
+    <div className="glass-card rounded-[2rem] p-6 bg-white/70 border border-secondary-400 hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/5 transition-all relative">
       <div className="flex items-center gap-5">
         <div className="h-16 w-16 rounded-[1.5rem] bg-amber-50 border border-amber-100 flex flex-col items-center justify-center shrink-0">
           <span className="text-[8px] font-bold text-amber-600 uppercase tracking-widest">Pos</span>
@@ -726,7 +723,7 @@ function WaitingCard({ ticket, pendingId, onCall, onCancel, onTransfer }: Waitin
               <MoreHorizontal className="h-4 w-4 text-secondary-500" />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-12 z-20 w-44 bg-white rounded-2xl shadow-xl border border-secondary-100 py-2 animate-fade-in">
+              <div className="absolute right-0 top-12 z-20 w-44 bg-white rounded-2xl shadow-xl border border-secondary-400 py-2 animate-fade-in">
                 <MenuItem icon={Shuffle} label="Transfer" onClick={onTransfer} />
                 <MenuItem icon={Ban} label="Cancel" onClick={onCancel} tone="rose" />
               </div>
@@ -775,11 +772,10 @@ function ServingCard({
             {ticket.queue_number}
           </span>
           <span
-            className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest border ${
-              isCalled
+            className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest border ${isCalled
                 ? "bg-primary-500/20 text-primary-200 border-primary-500/30"
                 : "bg-emerald-500/20 text-emerald-200 border-emerald-500/30"
-            }`}
+              }`}
           >
             {status}
           </span>
@@ -925,11 +921,10 @@ function MenuItem({
         e.preventDefault();
         onClick();
       }}
-      className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-left transition-colors ${
-        tone === "rose"
+      className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-left transition-colors ${tone === "rose"
           ? "text-rose-600 hover:bg-rose-50"
           : "text-secondary-700 hover:bg-secondary-50"
-      }`}
+        }`}
     >
       <Icon className="h-3.5 w-3.5" />
       {label}
@@ -1085,9 +1080,8 @@ function ActionModal({
         </button>
         <div className="flex items-center gap-5 mb-8">
           <div
-            className={`h-14 w-14 rounded-2xl flex items-center justify-center shadow-xl ${
-              statToneStyles[meta.tone]
-            }`}
+            className={`h-14 w-14 rounded-2xl flex items-center justify-center shadow-xl ${statToneStyles[meta.tone]
+              }`}
           >
             <Icon className="h-6 w-6" />
           </div>
@@ -1100,7 +1094,7 @@ function ActionModal({
         </div>
 
         {/* Ticket summary */}
-        <div className="mb-6 p-5 rounded-2xl bg-secondary-50 border border-secondary-100 flex items-center gap-4">
+        <div className="mb-6 p-5 rounded-2xl bg-secondary-50 border border-secondary-400 flex items-center gap-4">
           <div className="h-12 w-12 rounded-xl bg-slate-900 text-white flex items-center justify-center text-sm font-mono font-bold">
             {ticket.queue_number}
           </div>
@@ -1135,7 +1129,7 @@ function ActionModal({
                 onChange={(e) =>
                   onTransferTargetChange(e.target.value ? Number(e.target.value) : null)
                 }
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">Select destination...</option>
                 {sdps.map((s) => (
@@ -1156,7 +1150,7 @@ function ActionModal({
                 value={reason}
                 onChange={(e) => onReasonChange(e.target.value)}
                 placeholder="Why is this ticket being cancelled?"
-                className="input-field h-32 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-32 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </div>
           ) : showNote ? (
@@ -1174,7 +1168,7 @@ function ActionModal({
                     ? "Why is this ticket being transferred?"
                     : "Add a note for this action..."
                 }
-                className="input-field h-28 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-28 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </div>
           ) : null}
@@ -1191,15 +1185,14 @@ function ActionModal({
           <button
             onClick={onSubmit}
             disabled={pending}
-            className={`flex-[2] py-4 rounded-2xl font-black tracking-tight shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 transition-all ${
-              meta.tone === "rose"
+            className={`flex-[2] py-4 rounded-2xl font-black tracking-tight shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 transition-all ${meta.tone === "rose"
                 ? "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20"
                 : meta.tone === "amber"
-                ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20"
-                : meta.tone === "emerald"
-                ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20"
-                : "bg-primary-600 hover:bg-primary-700 text-white shadow-primary-500/20"
-            }`}
+                  ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20"
+                  : meta.tone === "emerald"
+                    ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20"
+                    : "bg-primary-600 hover:bg-primary-700 text-white shadow-primary-500/20"
+              }`}
           >
             <Save className="h-4 w-4" />
             {pending ? "Working..." : meta.cta}

@@ -75,7 +75,7 @@ export function Topbar() {
         {/* Right: Tenant, Notifications, User */}
         <div className="flex items-center gap-4">
           {/* Workspace Switcher / Info */}
-          <div className="hidden sm:flex flex-col items-end mr-4 pr-4 border-r border-secondary-200 dark:border-white/10">
+          <div className="hidden sm:flex flex-col items-end mr-4 pr-4 border-r border-secondary-200 dark:border-white/50">
             <span className="text-[10px] uppercase tracking-widest font-bold text-secondary-400">
               Active Workspace
             </span>

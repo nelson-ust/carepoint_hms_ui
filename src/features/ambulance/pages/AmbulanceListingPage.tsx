@@ -36,7 +36,7 @@ export function AmbulanceListingPage() {
       case "OUT_OF_SERVICE":
         return "bg-rose-50 text-rose-600 border-rose-100";
       default:
-        return "bg-secondary-50 text-secondary-600 border-secondary-100";
+        return "bg-secondary-50 text-secondary-600 border-secondary-400";
     }
   };
 
@@ -47,27 +47,27 @@ export function AmbulanceListingPage() {
           title="Ambulance Fleet"
           description="Manage emergency response vehicles, driver certifications, and readiness status."
         />
-        <button 
-           onClick={() => setIsModalOpen(true)}
-           className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20"
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20"
         >
           <Plus className="h-5 w-5" />
           <span className="font-bold">Register Ambulance</span>
         </button>
       </div>
 
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         title="Register New Ambulance"
         size="lg"
       >
-        <RegisterAmbulanceForm 
+        <RegisterAmbulanceForm
           onSuccess={() => {
             setIsModalOpen(false);
             refetch();
-          }} 
-          onCancel={() => setIsModalOpen(false)} 
+          }}
+          onCancel={() => setIsModalOpen(false)}
         />
       </Modal>
 
@@ -86,11 +86,11 @@ export function AmbulanceListingPage() {
             />
           </div>
           <div className="flex gap-3 w-full md:w-auto">
-            <button className="btn-secondary flex-1 md:flex-none gap-2 px-6 py-4 rounded-2xl bg-white/80 border-secondary-100">
+            <button className="btn-secondary flex-1 md:flex-none gap-2 px-6 py-4 rounded-2xl bg-white/80 border-secondary-400">
               <Filter className="h-4 w-4" />
               <span className="text-sm font-bold">Filters</span>
             </button>
-            <button onClick={() => refetch()} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500">
+            <button onClick={() => refetch()} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500">
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
           </div>
@@ -112,7 +112,7 @@ export function AmbulanceListingPage() {
               <div
                 key={ambulance.id}
                 onClick={() => navigate(routes.ambulances + "/" + ambulance.id)}
-                className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 shadow-premium bg-white/40 hover:bg-white/60 transition-all group cursor-pointer"
+                className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 shadow-premium bg-white/40 hover:bg-white/60 transition-all group cursor-pointer"
               >
                 <div className="flex justify-between items-start mb-6">
                   <div className="h-14 w-14 rounded-2xl bg-secondary-900/5 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -132,7 +132,7 @@ export function AmbulanceListingPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 py-4 border-t border-secondary-100/50">
+                <div className="grid grid-cols-2 gap-4 py-4 border-t border-secondary-400/50">
                   <div>
                     <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-1">Mileage</p>
                     <p className="text-sm font-bold text-secondary-900">{ambulance.current_mileage.toLocaleString()} KM</p>
@@ -154,9 +154,9 @@ export function AmbulanceListingPage() {
             ))
           ) : (
             <div className="col-span-full py-32 text-center bg-white/20 rounded-[3rem] border-2 border-dashed border-secondary-200">
-               <Truck className="h-16 w-16 mx-auto text-secondary-100 mb-6" />
-               <h3 className="text-xl font-bold text-secondary-900">No Vehicles Registered</h3>
-               <p className="text-secondary-500 mt-2 max-w-sm mx-auto">Start by adding your first ambulance vehicle to the system.</p>
+              <Truck className="h-16 w-16 mx-auto text-secondary-100 mb-6" />
+              <h3 className="text-xl font-bold text-secondary-900">No Vehicles Registered</h3>
+              <p className="text-secondary-500 mt-2 max-w-sm mx-auto">Start by adding your first ambulance vehicle to the system.</p>
             </div>
           )}
         </div>

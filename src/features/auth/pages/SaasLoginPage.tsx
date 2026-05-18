@@ -16,14 +16,12 @@ import { login } from "@/features/auth/api/auth.api";
 import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
 import logo from "@/assets/logo.jpeg";
 
-const backgroundImages = [
-  "/nigeria_hospital_reception_1_1778593918777.png",
-  "/nigeria_hospital_doctors_2_1778593934424.png",
-  "/nigeria_hospital_tech_3_1778593950760.png",
-  "/nigeria_hospital_pediatrics_4_1778593966044.png",
-  "/nigeria_hospital_exterior_5_1778593988122.png",
-  "/nigeria_hospital_surgery_6_1778594007242.png",
-  "/nigeria_hospital_consultation_7_1778594026243.png",
+const backgroundGradients = [
+  "from-emerald-950 via-slate-900 to-teal-950",
+  "from-slate-900 via-indigo-950 to-slate-900",
+  "from-teal-950 via-slate-900 to-emerald-900",
+  "from-slate-950 via-cyan-950 to-slate-900",
+  "from-blue-950 via-slate-900 to-indigo-950",
 ];
 
 export function SaasLoginPage() {
@@ -38,7 +36,7 @@ export function SaasLoginPage() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setBgIndex((prev) => (prev + 1) % backgroundImages.length);
+      setBgIndex((prev) => (prev + 1) % backgroundGradients.length);
     }, 6000);
     return () => clearInterval(timer);
   }, []);
@@ -103,16 +101,11 @@ export function SaasLoginPage() {
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-slate-950">
       {/* Background Slideshow */}
-      {backgroundImages.map((src, idx) => (
+      {backgroundGradients.map((grad, idx) => (
         <div
-          key={src}
-          className={`absolute inset-0 z-0 transition-opacity duration-[3000ms] ease-in-out ${idx === bgIndex ? "opacity-30 scale-105" : "opacity-0 scale-100"
-            } transform-gpu`}
-          style={{
-            backgroundImage: `url(${src})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
+          key={grad}
+          className={`absolute inset-0 z-0 transition-opacity duration-[3000ms] ease-in-out bg-gradient-to-br ${grad} ${idx === bgIndex ? "opacity-100" : "opacity-0"
+            }`}
         />
       ))}
 

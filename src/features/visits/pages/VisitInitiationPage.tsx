@@ -202,7 +202,7 @@ export function VisitInitiationPage() {
       <div className="grid gap-10 lg:grid-cols-12">
         {/* Left: Patient Sidebar */}
         <div className="lg:col-span-4 space-y-8">
-          <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-100 shadow-premium min-h-[600px] flex flex-col bg-white/50 backdrop-blur-xl">
+          <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400 shadow-premium min-h-[600px] flex flex-col bg-white/50 backdrop-blur-xl">
             <div className="flex items-center gap-4 mb-10">
               <div className="h-12 w-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg">
                 <User className="h-6 w-6" />
@@ -220,7 +220,7 @@ export function VisitInitiationPage() {
                   <input
                     type="text"
                     placeholder="Search by ID or Name..."
-                    className="input-field pl-12 bg-white/80 border-secondary-100 h-14 text-sm"
+                    className="input-field pl-12 bg-white/80 border-secondary-400 h-14 text-sm"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -311,7 +311,7 @@ export function VisitInitiationPage() {
           )}
 
           <div className="glass-card rounded-[3rem] p-10 md:p-14 space-y-16 bg-white/80 shadow-premium relative overflow-hidden">
-            <div className="flex items-center gap-6 border-b border-secondary-100 pb-10">
+            <div className="flex items-center gap-6 border-b border-secondary-400 pb-10">
               <div className="h-16 w-16 rounded-[1.75rem] bg-primary-600 text-white flex items-center justify-center shadow-2xl">
                 <ClipboardList className="h-8 w-8" />
               </div>
@@ -339,7 +339,7 @@ export function VisitInitiationPage() {
                         onClick={() => setPriority(opt.value)}
                         className={`flex-1 flex flex-col items-center gap-3 py-6 px-4 rounded-[2rem] transition-all border-2 ${priority === opt.value
                           ? `${opt.color} text-white border-transparent shadow-2xl`
-                          : "bg-white border-secondary-100 text-secondary-400 hover:border-primary-200"
+                          : "bg-white border-secondary-400 text-secondary-400 hover:border-primary-200"
                           }`}
                       >
                         <opt.icon className={`h-6 w-6 ${priority === opt.value ? 'text-white' : 'text-secondary-300'}`} />
@@ -358,7 +358,7 @@ export function VisitInitiationPage() {
                   <select
                     value={selectedSdp || ""}
                     onChange={(e) => setSelectedSdp(Number(e.target.value))}
-                    className="input-field h-16 pl-6 font-black text-sm bg-white/50 border-secondary-100"
+                    className="input-field h-16 pl-6 font-black text-sm bg-white/50 border-secondary-400"
                   >
                     <option value="" disabled>Select Starting Point...</option>
                     {sdps.map(s => (
@@ -381,7 +381,7 @@ export function VisitInitiationPage() {
                       onClick={() => setSelectedTemplate(t.id)}
                       className={`p-6 rounded-[2rem] border-2 text-left transition-all group ${selectedTemplate === t.id
                         ? "bg-slate-900 text-white border-slate-900 shadow-xl"
-                        : "bg-white border-secondary-100 text-secondary-600 hover:border-primary-200"
+                        : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-200"
                         }`}
                     >
                       <h5 className="font-black text-sm mb-2">{t.name}</h5>
@@ -395,7 +395,7 @@ export function VisitInitiationPage() {
                       )}
                     </button>
                   )) : (
-                    <div className="col-span-2 p-8 rounded-[2rem] border-2 border-dashed border-secondary-100 flex flex-col items-center justify-center text-center space-y-3">
+                    <div className="col-span-2 p-8 rounded-[2rem] border-2 border-dashed border-secondary-400 flex flex-col items-center justify-center text-center space-y-3">
                       <GitBranch className="h-8 w-8 text-secondary-200" />
                       <div>
                         <p className="text-sm font-black text-secondary-900">No Pathway Templates Found</p>
@@ -415,13 +415,13 @@ export function VisitInitiationPage() {
                 <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  className="input-field h-32 pt-6 px-8 resize-none bg-white border-secondary-100 text-base font-medium"
+                  className="input-field h-32 pt-6 px-8 resize-none bg-white border-secondary-400 text-base font-medium"
                   placeholder="Summarize the primary rationale for this clinical encounter..."
                 />
               </div>
             </div>
 
-            <div className="pt-12 border-t border-secondary-100 flex flex-col md:flex-row items-center justify-between gap-10">
+            <div className="pt-12 border-t border-secondary-400 flex flex-col md:flex-row items-center justify-between gap-10">
               <div className="flex items-center gap-4 text-secondary-400">
                 <CheckCircle2 className="h-6 w-6 text-emerald-500" />
                 <p className="text-[10px] font-black uppercase tracking-widest">Enterprise Validation Ready</p>

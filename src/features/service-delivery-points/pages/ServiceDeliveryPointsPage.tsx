@@ -231,7 +231,7 @@ export function ServiceDeliveryPointsPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={loadPoints}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
             title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -287,7 +287,7 @@ export function ServiceDeliveryPointsPage() {
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="appearance-none bg-white/80 border border-secondary-100 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
+              className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
             >
               <option value="">All Types</option>
               {SERVICE_POINT_TYPES.map((t) => (
@@ -299,11 +299,10 @@ export function ServiceDeliveryPointsPage() {
           </div>
           <button
             onClick={() => setActiveOnly((v) => !v)}
-            className={`flex items-center gap-2 px-5 py-4 rounded-2xl text-xs font-bold uppercase tracking-widest border transition-all ${
-              activeOnly
+            className={`flex items-center gap-2 px-5 py-4 rounded-2xl text-xs font-bold uppercase tracking-widest border transition-all ${activeOnly
                 ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/20"
-                : "bg-white/80 text-secondary-600 border-secondary-100"
-            }`}
+                : "bg-white/80 text-secondary-600 border-secondary-400"
+              }`}
           >
             {activeOnly ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
             <span>Active Only</span>
@@ -312,7 +311,7 @@ export function ServiceDeliveryPointsPage() {
       </div>
 
       {/* Table */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-100/50 shadow-premium bg-white/40">
+      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -401,21 +400,19 @@ export function ServiceDeliveryPointsPage() {
                     <td className="px-8 py-6">
                       <div className="flex flex-col gap-1.5">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border w-fit ${
-                            point.supports_appointments
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border w-fit ${point.supports_appointments
                               ? "bg-amber-50 text-amber-600 border-amber-100"
-                              : "bg-secondary-50 text-secondary-400 border-secondary-100"
-                          }`}
+                              : "bg-secondary-50 text-secondary-400 border-secondary-400"
+                            }`}
                         >
                           <CalendarCheck className="h-3 w-3" />
                           Appts {point.supports_appointments ? "Yes" : "No"}
                         </span>
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border w-fit ${
-                            point.supports_walk_in
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border w-fit ${point.supports_walk_in
                               ? "bg-rose-50 text-rose-600 border-rose-100"
-                              : "bg-secondary-50 text-secondary-400 border-secondary-100"
-                          }`}
+                              : "bg-secondary-50 text-secondary-400 border-secondary-400"
+                            }`}
                         >
                           <UserCheck className="h-3 w-3" />
                           Walk-In {point.supports_walk_in ? "Yes" : "No"}
@@ -426,11 +423,10 @@ export function ServiceDeliveryPointsPage() {
                       <button
                         onClick={() => handleToggleStatus(point)}
                         disabled={togglingId === point.id}
-                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-50 ${
-                          point.is_active
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-50 ${point.is_active
                             ? "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100"
                             : "bg-secondary-100 text-secondary-500 border-secondary-200 hover:bg-secondary-200"
-                        }`}
+                          }`}
                       >
                         {point.is_active ? (
                           <ToggleRight className="h-3.5 w-3.5" />
@@ -546,7 +542,7 @@ export function ServiceDeliveryPointsPage() {
                 <select
                   value={form.service_point_type}
                   onChange={(e) => setForm({ ...form, service_point_type: e.target.value })}
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                 >
                   {SERVICE_POINT_TYPES.map((t) => (
                     <option key={t} value={t}>
@@ -580,7 +576,7 @@ export function ServiceDeliveryPointsPage() {
                     setForm({ ...form, location_description: e.target.value })
                   }
                   placeholder="Wing B, Ground Floor, Room 12"
-                  className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
                 />
               </div>
             </div>
@@ -681,9 +677,8 @@ function Field({ label, value, onChange, placeholder, required, type = "text", m
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`input-field h-12 bg-secondary-50 border-secondary-100 w-full ${
-          mono ? "font-mono" : ""
-        }`}
+        className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${mono ? "font-mono" : ""
+          }`}
       />
     </div>
   );
@@ -700,11 +695,10 @@ function ToggleSwitch({ label, value, onChange }: ToggleSwitchProps) {
     <button
       type="button"
       onClick={() => onChange(!value)}
-      className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
-        value
+      className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${value
           ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-          : "bg-secondary-50 border-secondary-100 text-secondary-500"
-      }`}
+          : "bg-secondary-50 border-secondary-400 text-secondary-500"
+        }`}
     >
       <span className="text-[11px] font-bold uppercase tracking-widest text-left">{label}</span>
       {value ? (

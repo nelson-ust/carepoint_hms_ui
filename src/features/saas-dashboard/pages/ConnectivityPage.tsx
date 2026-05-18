@@ -49,7 +49,7 @@ export function ConnectivityPage() {
 
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Stats Cards */}
-            <div className="glass-card rounded-[2rem] p-6 border border-secondary-100/50 bg-white/40 shadow-premium">
+            <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40 shadow-premium">
                <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-4">Uptime (30d)</p>
                <h4 className="text-3xl font-black text-emerald-600">{network?.uptime_30d || "0.00%"}</h4>
                <div className="mt-4 flex gap-1">
@@ -58,7 +58,7 @@ export function ConnectivityPage() {
                   ))}
                </div>
             </div>
-            <div className="glass-card rounded-[2rem] p-6 border border-secondary-100/50 bg-white/40 shadow-premium">
+            <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40 shadow-premium">
                <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-4">Avg. Latency</p>
                <h4 className="text-3xl font-black text-secondary-900">{network?.avg_latency_ms || "0"}ms</h4>
                {network?.latency_trend !== undefined && (
@@ -68,12 +68,12 @@ export function ConnectivityPage() {
                   </p>
                )}
             </div>
-            <div className="glass-card rounded-[2rem] p-6 border border-secondary-100/50 bg-white/40 shadow-premium">
+            <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40 shadow-premium">
                <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-4">Total Probes</p>
                <h4 className="text-3xl font-black text-secondary-900">{network?.total_probes_24h.toLocaleString() || "0"}</h4>
                <p className="text-[10px] text-secondary-400 font-bold mt-2">Last 24 hours</p>
             </div>
-            <div className="glass-card rounded-[2rem] p-6 border border-secondary-100/50 bg-white/40 shadow-premium">
+            <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40 shadow-premium">
                <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-4">Global Health</p>
                <div className="flex items-center gap-2">
                   <div className={`h-3 w-3 rounded-full animate-ping ${network?.global_health === 'HEALTHY' ? 'bg-emerald-500' : network?.global_health === 'DEGRADED' ? 'bg-amber-500' : 'bg-rose-500'}`} />
@@ -84,7 +84,7 @@ export function ConnectivityPage() {
          </div>
 
          {/* Core Services Health */}
-         <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 bg-white/40 shadow-premium">
+         <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
             <h3 className="text-lg font-bold text-secondary-900 flex items-center gap-2 mb-8">
                <ShieldCheck className="h-5 w-5 text-primary-500" />
                Core Services Status
@@ -129,7 +129,7 @@ export function ConnectivityPage() {
                   <Signal className="h-5 w-5 text-primary-500" />
                   Regional Performance
                </h3>
-               <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-100/50 bg-white/40 shadow-premium space-y-8">
+               <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium space-y-8">
                   {network?.regional_performance.length ? network.regional_performance.map((r: { region: string; status: string; latency_ms: number; }) => (
                      <div key={r.region} className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
@@ -158,7 +158,7 @@ export function ConnectivityPage() {
                </h3>
                <div className="space-y-4">
                   {network?.recent_probes.length ? network.recent_probes.slice(0, 6).map((probe: { id: string; status: string; timestamp: string | number | Date; latency_ms: number; }) => (
-                     <div key={probe.id} className="glass-card rounded-[2rem] p-5 border border-secondary-100/50 bg-white/40 flex items-center justify-between">
+                     <div key={probe.id} className="glass-card rounded-[2rem] p-5 border border-secondary-400/50 bg-white/40 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                            <CheckCircle2 className={`h-4 w-4 ${probe.status === 'HEALTHY' ? 'text-emerald-500' : 'text-amber-500'}`} />
                            <div>
@@ -169,7 +169,7 @@ export function ConnectivityPage() {
                         <p className="text-[10px] font-black text-secondary-900">{probe.latency_ms}ms</p>
                      </div>
                   )) : (
-                     <div className="p-10 text-center border-2 border-dashed border-secondary-100 rounded-3xl">
+                     <div className="p-10 text-center border-2 border-dashed border-secondary-400 rounded-3xl">
                         <p className="text-xs text-secondary-400 font-bold italic">No recent probes recorded</p>
                      </div>
                   )}

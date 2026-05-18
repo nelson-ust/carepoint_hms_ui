@@ -1,11 +1,11 @@
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useState, useEffect } from "react";
-import { 
-  ArrowRight, 
-  Activity, 
-  Clock, 
-  ShieldCheck, 
-  Stethoscope, 
+import {
+  ArrowRight,
+  Activity,
+  Clock,
+  ShieldCheck,
+  Stethoscope,
   AlertCircle,
   ChevronRight,
   ClipboardList,
@@ -114,8 +114,8 @@ export function VisitReRoutePage() {
   return (
     <div className="max-w-6xl mx-auto space-y-12 animate-fade-in pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-        <PageHeader 
-          title="Clinical Rerouting" 
+        <PageHeader
+          title="Clinical Rerouting"
           description="Transition patients between service delivery points to continue their care lifecycle."
         />
         <div className="flex items-center gap-4 bg-secondary-900/5 px-6 py-3 rounded-2xl border border-secondary-900/10">
@@ -127,7 +127,7 @@ export function VisitReRoutePage() {
       <div className="grid gap-10 lg:grid-cols-12">
         {/* Left: Active Status */}
         <div className="lg:col-span-5 space-y-8">
-          <div className="glass-card rounded-[3rem] p-10 border border-secondary-100 shadow-premium bg-white/50 backdrop-blur-2xl">
+          <div className="glass-card rounded-[3rem] p-10 border border-secondary-400 shadow-premium bg-white/50 backdrop-blur-2xl">
             <div className="flex items-center gap-5 mb-12">
               <div className="h-14 w-14 rounded-2xl bg-primary-600 text-white flex items-center justify-center shadow-xl shadow-primary-500/20">
                 <User className="h-7 w-7" />
@@ -161,7 +161,7 @@ export function VisitReRoutePage() {
                   <Activity className="h-5 w-5 text-emerald-500" />
                   <h6 className="font-black text-sm uppercase tracking-widest">Initial Clinical Reason</h6>
                 </div>
-                <div className="p-6 rounded-3xl bg-secondary-50 border border-secondary-100 italic text-sm text-secondary-600 leading-relaxed shadow-inner">
+                <div className="p-6 rounded-3xl bg-secondary-50 border border-secondary-400 italic text-sm text-secondary-600 leading-relaxed shadow-inner">
                   "{visit.visit_reason || "No clinical indication provided at admission."}"
                 </div>
               </div>
@@ -181,7 +181,7 @@ export function VisitReRoutePage() {
           )}
 
           <div className="glass-card rounded-[3rem] p-12 md:p-14 space-y-14 bg-white/80 shadow-premium relative">
-            <div className="flex items-center gap-6 border-b border-secondary-100 pb-10">
+            <div className="flex items-center gap-6 border-b border-secondary-400 pb-10">
               <div className="h-16 w-16 rounded-[1.75rem] bg-slate-900 text-white flex items-center justify-center shadow-2xl">
                 <MoveHorizontal className="h-8 w-8" />
               </div>
@@ -202,11 +202,10 @@ export function VisitReRoutePage() {
                     <button
                       key={s.id}
                       onClick={() => setSelectedSdp(s.id)}
-                      className={`flex items-center justify-between p-6 rounded-[1.5rem] border-2 transition-all duration-300 group ${
-                        selectedSdp === s.id 
-                        ? "bg-secondary-900 border-secondary-900 text-white shadow-2xl shadow-primary-500/10 scale-105" 
-                        : "bg-white border-secondary-100 text-secondary-600 hover:border-primary-200"
-                      }`}
+                      className={`flex items-center justify-between p-6 rounded-[1.5rem] border-2 transition-all duration-300 group ${selectedSdp === s.id
+                          ? "bg-secondary-900 border-secondary-900 text-white shadow-2xl shadow-primary-500/10 scale-105"
+                          : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-200"
+                        }`}
                     >
                       <div className="flex items-center gap-4">
                         <div className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${selectedSdp === s.id ? "bg-white/10" : "bg-secondary-50"}`}>
@@ -228,10 +227,10 @@ export function VisitReRoutePage() {
                   <FileText className="h-4 w-4 text-emerald-500" />
                   Transition Rationale
                 </label>
-                <textarea 
+                <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  className="input-field h-40 pt-6 px-8 bg-white/50 border-secondary-100 text-base font-medium placeholder:text-secondary-300 resize-none rounded-[2rem]" 
+                  className="input-field h-40 pt-6 px-8 bg-white/50 border-secondary-400 text-base font-medium placeholder:text-secondary-300 resize-none rounded-[2rem]"
                   placeholder="Summarize the reason for rerouting (e.g., Clinical referral, Lab investigations completed...)"
                 />
               </div>
@@ -242,7 +241,7 @@ export function VisitReRoutePage() {
                 <ShieldCheck className="h-6 w-6 text-emerald-500" />
                 <p className="text-[11px] font-bold uppercase tracking-widest leading-none">Security Cleared</p>
               </div>
-              <button 
+              <button
                 onClick={handleReroute}
                 disabled={!selectedSdp || isSubmitting}
                 className="w-full md:w-auto btn-primary bg-primary-600 hover:bg-primary-700 px-16 py-6 rounded-[2rem] font-black text-sm tracking-tight shadow-2xl shadow-primary-500/20 flex items-center justify-center gap-5 group disabled:opacity-30 transition-all active:scale-95"

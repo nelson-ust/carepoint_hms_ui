@@ -156,8 +156,8 @@ export function VisitFlowManagementPage() {
 
   const sortedSteps = useMemo(() => {
     if (!activeTemplate) return [] as TemplateStep[];
-    const items = Array.isArray(activeTemplate.associated_visit_flow_templates_steps) 
-      ? activeTemplate.associated_visit_flow_templates_steps 
+    const items = Array.isArray(activeTemplate.associated_visit_flow_templates_steps)
+      ? activeTemplate.associated_visit_flow_templates_steps
       : [];
     return [...items].sort((a, b) => a.step_order - b.step_order);
   }, [activeTemplate]);
@@ -430,13 +430,13 @@ export function VisitFlowManagementPage() {
         <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-100 hover:rotate-180 transition-transform duration-500"
+            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
           <button
             onClick={openCombined}
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-100"
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
           >
             <Wand2 className="h-4 w-4" />
             <span className="text-sm font-bold">Pathway Wizard</span>
@@ -453,11 +453,10 @@ export function VisitFlowManagementPage() {
 
       {feedback && (
         <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${
-            feedback.tone === "success"
+          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
               ? "bg-emerald-50 text-emerald-700 border-emerald-100"
               : "bg-rose-50 text-rose-700 border-rose-100"
-          }`}
+            }`}
         >
           {feedback.tone === "success" ? (
             <CheckCircle2 className="h-5 w-5" />
@@ -489,7 +488,7 @@ export function VisitFlowManagementPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search templates..."
-                className="w-full bg-white/70 border border-secondary-100 rounded-xl pl-11 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary-500/40 transition-all"
+                className="w-full bg-white/70 border border-secondary-400 rounded-xl pl-11 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary-500/40 transition-all"
               />
             </div>
 
@@ -528,35 +527,32 @@ export function VisitFlowManagementPage() {
             ) : (
               <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
                 {filteredTemplates.map((t) => {
-                  const stepCount = Array.isArray(t.associated_visit_flow_templates_steps) 
-                    ? t.associated_visit_flow_templates_steps.length 
+                  const stepCount = Array.isArray(t.associated_visit_flow_templates_steps)
+                    ? t.associated_visit_flow_templates_steps.length
                     : 0;
                   const isActive = t.id === activeTemplateId;
                   return (
                     <button
                       key={t.id}
                       onClick={() => setActiveTemplateId(t.id)}
-                      className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                        isActive
+                      className={`w-full text-left p-4 rounded-2xl border transition-all ${isActive
                           ? "bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/20"
-                          : "bg-white border-secondary-100 hover:border-primary-200"
-                      }`}
+                          : "bg-white border-secondary-400 hover:border-primary-200"
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${
-                            isActive
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${isActive
                               ? "bg-white/20 text-white"
                               : "bg-secondary-100 text-secondary-500"
-                          }`}
+                            }`}
                         >
                           <Hash className="h-2.5 w-2.5" />
                           {t.code}
                         </span>
                         <span
-                          className={`text-[10px] font-bold uppercase tracking-widest ${
-                            isActive ? "text-white/70" : "text-secondary-400"
-                          }`}
+                          className={`text-[10px] font-bold uppercase tracking-widest ${isActive ? "text-white/70" : "text-secondary-400"
+                            }`}
                         >
                           {stepCount} step{stepCount === 1 ? "" : "s"}
                         </span>
@@ -564,9 +560,8 @@ export function VisitFlowManagementPage() {
                       <p className="text-sm font-black">{t.name}</p>
                       {t.description && (
                         <p
-                          className={`text-[11px] mt-1 line-clamp-2 ${
-                            isActive ? "text-white/70" : "text-secondary-500"
-                          }`}
+                          className={`text-[11px] mt-1 line-clamp-2 ${isActive ? "text-white/70" : "text-secondary-500"
+                            }`}
                         >
                           {t.description}
                         </p>
@@ -714,7 +709,7 @@ export function VisitFlowManagementPage() {
                               </span>
                               <span className="text-2xl font-black">{step.step_order}</span>
                             </div>
-                            <div className="flex-1 p-6 rounded-[2rem] bg-white border border-secondary-100 hover:border-primary-300 transition-all">
+                            <div className="flex-1 p-6 rounded-[2rem] bg-white border border-secondary-400 hover:border-primary-300 transition-all">
                               <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
                                 <div className="flex items-center gap-3 flex-wrap">
                                   <div className="h-10 w-10 rounded-xl bg-secondary-100 text-secondary-600 flex items-center justify-center">
@@ -785,7 +780,7 @@ export function VisitFlowManagementPage() {
                                 </p>
                               )}
                               {step.notes && (
-                                <p className="text-[11px] text-secondary-600 mt-3 italic bg-secondary-50 rounded-xl px-3 py-2 border border-secondary-100">
+                                <p className="text-[11px] text-secondary-600 mt-3 italic bg-secondary-50 rounded-xl px-3 py-2 border border-secondary-400">
                                   {step.notes}
                                 </p>
                               )}
@@ -835,7 +830,7 @@ export function VisitFlowManagementPage() {
                   setTemplateForm({ ...templateForm, description: e.target.value })
                 }
                 placeholder="Briefly describe the clinical workflow..."
-                className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </FieldLabel>
           </div>
@@ -864,7 +859,7 @@ export function VisitFlowManagementPage() {
                 onChange={(e) =>
                   setStepForm({ ...stepForm, service_delivery_point_id: e.target.value })
                 }
-                className="input-field h-12 bg-secondary-50 border-secondary-100 w-full"
+                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
                 <option value="">Pick a service point...</option>
                 {sdps.map((s) => (
@@ -893,7 +888,7 @@ export function VisitFlowManagementPage() {
                 value={stepForm.notes}
                 onChange={(e) => setStepForm({ ...stepForm, notes: e.target.value })}
                 placeholder="Operating notes for the staff at this stage..."
-                className="input-field h-20 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </FieldLabel>
           </div>
@@ -996,7 +991,7 @@ export function VisitFlowManagementPage() {
                   setCombinedTemplate({ ...combinedTemplate, description: e.target.value })
                 }
                 placeholder="What this pathway is for..."
-                className="input-field h-20 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </FieldLabel>
             <div className="space-y-3">
@@ -1019,7 +1014,7 @@ export function VisitFlowManagementPage() {
               {combinedSteps.map((s, idx) => (
                 <div
                   key={idx}
-                  className="rounded-2xl border border-secondary-100 p-4 bg-secondary-50/50 space-y-3 relative"
+                  className="rounded-2xl border border-secondary-400 p-4 bg-secondary-50/50 space-y-3 relative"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
@@ -1045,7 +1040,7 @@ export function VisitFlowManagementPage() {
                         ),
                       )
                     }
-                    className="input-field h-11 bg-white border-secondary-100 w-full text-xs"
+                    className="input-field h-11 bg-white border-secondary-400 w-full text-xs"
                   >
                     <option value="">Pick a service point...</option>
                     {sdps.map((sdp) => (
@@ -1064,11 +1059,10 @@ export function VisitFlowManagementPage() {
                           ),
                         )
                       }
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border ${
-                        s.is_required
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border ${s.is_required
                           ? "bg-rose-50 border-rose-200 text-rose-600"
                           : "bg-secondary-100 border-secondary-200 text-secondary-500"
-                      }`}
+                        }`}
                     >
                       <ShieldAlert className="h-3 w-3" />
                       {s.is_required ? "Required" : "Optional"}
@@ -1084,7 +1078,7 @@ export function VisitFlowManagementPage() {
                         )
                       }
                       placeholder="Notes for staff at this stage..."
-                      className="flex-1 input-field h-11 bg-white border-secondary-100 text-xs"
+                      className="flex-1 input-field h-11 bg-white border-secondary-400 text-xs"
                     />
                   </div>
                 </div>
@@ -1160,9 +1154,8 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className={`input-field h-12 bg-secondary-50 border-secondary-100 w-full ${
-          mono ? "font-mono" : ""
-        } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+        className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${mono ? "font-mono" : ""
+          } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
       />
       {hint && (
         <p className="text-[9px] font-bold uppercase tracking-widest text-secondary-400">
@@ -1188,11 +1181,10 @@ function ToggleSwitch({
     <button
       type="button"
       onClick={() => onChange(!value)}
-      className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
-        value
+      className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${value
           ? "bg-rose-50 border-rose-200 text-rose-700"
-          : "bg-secondary-50 border-secondary-100 text-secondary-500"
-      }`}
+          : "bg-secondary-50 border-secondary-400 text-secondary-500"
+        }`}
     >
       <div className="text-left flex items-center gap-3">
         <ShieldAlert
@@ -1204,14 +1196,12 @@ function ToggleSwitch({
         </div>
       </div>
       <div
-        className={`h-6 w-12 rounded-full p-0.5 transition-all ${
-          value ? "bg-rose-500" : "bg-secondary-200"
-        }`}
+        className={`h-6 w-12 rounded-full p-0.5 transition-all ${value ? "bg-rose-500" : "bg-secondary-200"
+          }`}
       >
         <div
-          className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
-            value ? "translate-x-6" : ""
-          }`}
+          className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${value ? "translate-x-6" : ""
+            }`}
         />
       </div>
     </button>

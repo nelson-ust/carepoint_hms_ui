@@ -1,3 +1,6 @@
+// C:\Users\NELSON ATTAH\Desktop\carepoint\carepoint_hms_ui\src\features\landing\pages\LandingPage.tsx
+// 
+
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
@@ -90,7 +93,7 @@ export function LandingPage() {
       `}</style>
 
       {/* ============== STICKY NAV ============== */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/70 dark:bg-secondary-950/70 border-b border-secondary-100 dark:border-white/5">
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/70 dark:bg-secondary-950/70 border-b border-secondary-400 dark:border-white/50">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 h-20 flex items-center justify-between">
           <button
             onClick={() => handleAnchor("home")}
@@ -113,8 +116,8 @@ export function LandingPage() {
                 key={link.id}
                 onClick={() => handleAnchor(link.id)}
                 className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${activeSection === link.id
-                    ? "bg-primary-500 text-white shadow-md shadow-primary-500/20"
-                    : "text-secondary-500 hover:text-secondary-900 dark:hover:text-white"
+                  ? "bg-primary-500 text-white shadow-md shadow-primary-500/20"
+                  : "text-secondary-500 hover:text-secondary-900 dark:hover:text-white"
                   }`}
               >
                 {link.label}
@@ -139,7 +142,7 @@ export function LandingPage() {
             </button>
             <Link
               to={routes.tenantRegister}
-              className="hidden md:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-secondary-200 dark:border-white/10 text-xs font-bold uppercase tracking-widest text-secondary-700 dark:text-secondary-200 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-300 transition-all"
+              className="hidden md:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-secondary-200 dark:border-white/50 text-xs font-bold uppercase tracking-widest text-secondary-700 dark:text-secondary-200 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-300 transition-all"
             >
               Register Hospital
             </Link>
@@ -161,15 +164,15 @@ export function LandingPage() {
         </div>
         {/* Mobile drawer */}
         {mobileNavOpen && (
-          <div className="lg:hidden border-t border-secondary-100 dark:border-white/5 bg-white dark:bg-secondary-950 animate-fade-in">
+          <div className="lg:hidden border-t border-secondary-400 dark:border-white/50 bg-white dark:bg-secondary-950 animate-fade-in">
             <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col gap-1">
               {NAV_LINKS.map((link) => (
                 <button
                   key={link.id}
                   onClick={() => handleAnchor(link.id)}
                   className={`text-left px-4 py-3 rounded-xl text-sm font-bold ${activeSection === link.id
-                      ? "bg-primary-500 text-white"
-                      : "text-secondary-600 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-white/5"
+                    ? "bg-primary-500 text-white"
+                    : "text-secondary-600 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-white/5"
                     }`}
                 >
                   {link.label}
@@ -183,7 +186,7 @@ export function LandingPage() {
               </Link>
               <Link
                 to={routes.saasLogin}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-secondary-200 dark:border-white/10 text-secondary-700 dark:text-secondary-200 text-xs font-bold uppercase tracking-widest"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-secondary-200 dark:border-white/50 text-secondary-700 dark:text-secondary-200 text-xs font-bold uppercase tracking-widest"
               >
                 SaaS Login
               </Link>
@@ -226,7 +229,7 @@ export function LandingPage() {
               </Link>
               <Link
                 to={routes.saasLogin}
-                className="inline-flex items-center gap-2 px-7 py-4 rounded-2xl bg-white dark:bg-secondary-900 border border-secondary-200 dark:border-white/10 text-secondary-900 dark:text-secondary-100 text-sm font-black uppercase tracking-widest hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-300 transition-all"
+                className="inline-flex items-center gap-2 px-7 py-4 rounded-2xl bg-white dark:bg-secondary-900 border border-secondary-200 dark:border-white/50 text-secondary-900 dark:text-secondary-100 text-sm font-black uppercase tracking-widest hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-300 transition-all"
               >
                 <ShieldCheck className="h-4 w-4" />
                 SaaS Login
@@ -250,7 +253,7 @@ export function LandingPage() {
               ].map((s) => (
                 <div
                   key={s.v}
-                  className="rounded-2xl border border-secondary-200/60 dark:border-white/5 bg-white/60 dark:bg-secondary-900/60 backdrop-blur p-4"
+                  className="rounded-2xl border border-secondary-200/60 dark:border-white/50 bg-white/60 dark:bg-secondary-900/60 backdrop-blur p-4"
                 >
                   <dt className="text-2xl font-black text-secondary-900 dark:text-white">
                     {s.k}
@@ -286,7 +289,7 @@ export function LandingPage() {
       </section>
 
       {/* ============== MODULES ============== */}
-      <section id="modules" className="relative min-h-screen py-20 md:py-28 bg-secondary-50/60 dark:bg-secondary-900/40 border-y border-secondary-100 dark:border-white/5">
+      <section id="modules" className="relative min-h-screen py-20 md:py-28 bg-secondary-50/60 dark:bg-secondary-900/40 border-y border-secondary-400 dark:border-white/50">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <SectionHeader
             tag="Available Modules"
@@ -341,7 +344,7 @@ export function LandingPage() {
       {/* ============== CTA / FOOTER ============== */}
       <section
         id="contact"
-        className="relative py-20 md:py-28 border-t border-secondary-100 dark:border-white/5"
+        className="relative py-20 md:py-28 border-t border-secondary-400 dark:border-white/50"
       >
         <div className="max-w-5xl mx-auto px-6 lg:px-8 text-center space-y-8">
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary-500/20 bg-primary-500/10 text-primary-700 dark:text-primary-300 text-[10px] font-bold uppercase tracking-[0.25em]">
@@ -365,9 +368,19 @@ export function LandingPage() {
               Register Your Hospital
               <ArrowRight className="h-4 w-4" />
             </Link>
+
+            <Link
+              to={routes.login}
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-white dark:bg-secondary-900 border border-secondary-200 dark:border-white/50 text-secondary-900 dark:text-secondary-100 text-sm font-black uppercase tracking-widest hover:border-primary-500 transition-all"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Tenant Login
+            </Link>
+
+
             <Link
               to={routes.saasLogin}
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-white dark:bg-secondary-900 border border-secondary-200 dark:border-white/10 text-secondary-900 dark:text-secondary-100 text-sm font-black uppercase tracking-widest hover:border-primary-500 transition-all"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-white dark:bg-secondary-900 border border-secondary-200 dark:border-white/50 text-secondary-900 dark:text-secondary-100 text-sm font-black uppercase tracking-widest hover:border-primary-500 transition-all"
             >
               <ShieldCheck className="h-4 w-4" />
               SaaS Login
@@ -379,10 +392,10 @@ export function LandingPage() {
           </p>
         </div>
 
-        <footer className="mt-20 border-t border-secondary-100 dark:border-white/5 pt-10 pb-8">
+        <footer className="mt-20 border-t border-secondary-400 dark:border-white/50 pt-10 pb-8">
           <div className="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-[11px] text-secondary-400 font-bold uppercase tracking-[0.2em]">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-white flex items-center justify-center border border-secondary-200 dark:border-white/10 overflow-hidden p-1">
+              <div className="h-10 w-10 rounded-lg bg-white flex items-center justify-center border border-secondary-200 dark:border-white/50 overflow-hidden p-1">
                 <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
               </div>
               <span>Carepoint HMS · © 2026</span>
@@ -420,8 +433,8 @@ function SectionHeader({
     <div className={`max-w-3xl mx-auto text-center mb-14 ${inverted ? "text-white" : ""}`}>
       <span
         className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-[0.25em] mb-5 ${inverted
-            ? "border-white/15 bg-white/10 text-primary-300"
-            : "border-primary-500/20 bg-primary-500/10 text-primary-700 dark:text-primary-300"
+          ? "border-white/15 bg-white/10 text-primary-300"
+          : "border-primary-500/20 bg-primary-500/10 text-primary-700 dark:text-primary-300"
           }`}
       >
         {tag}
@@ -457,7 +470,7 @@ const toneStyles: Record<FeatureItem["tone"], string> = {
 
 function FeatureCard({ title, description, icon: Icon, tone }: FeatureItem) {
   return (
-    <div className="group relative rounded-[2rem] p-7 bg-white dark:bg-secondary-900 border border-secondary-100 dark:border-white/5 hover:border-primary-500/30 hover:-translate-y-1 transition-all shadow-sm hover:shadow-xl hover:shadow-primary-500/5">
+    <div className="group relative rounded-[2rem] p-7 bg-white dark:bg-secondary-900 border border-secondary-400 dark:border-white/50 hover:border-primary-500/30 hover:-translate-y-1 transition-all shadow-sm hover:shadow-xl hover:shadow-primary-500/5">
       <div
         className={`h-14 w-14 rounded-2xl bg-gradient-to-br ${toneStyles[tone]} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform`}
       >
@@ -479,7 +492,7 @@ type ModuleItem = {
 
 function ModuleCard({ label, icon: Icon }: ModuleItem) {
   return (
-    <div className="group rounded-2xl p-5 bg-white dark:bg-secondary-900/60 border border-secondary-100 dark:border-white/5 hover:border-primary-500/40 transition-all flex items-center gap-4">
+    <div className="group rounded-2xl p-5 bg-white dark:bg-secondary-900/60 border border-secondary-400 dark:border-white/50 hover:border-primary-500/40 transition-all flex items-center gap-4">
       <div className="h-11 w-11 rounded-xl bg-primary-500/10 text-primary-600 flex items-center justify-center group-hover:bg-primary-500 group-hover:text-white transition-all shrink-0">
         <Icon className="h-5 w-5" />
       </div>
@@ -510,7 +523,7 @@ function JourneyStep({
 }) {
   const Icon = step.icon;
   return (
-    <div className="relative rounded-[2rem] p-7 bg-white dark:bg-secondary-900 border border-secondary-100 dark:border-white/5 hover:border-primary-500/40 transition-all">
+    <div className="relative rounded-[2rem] p-7 bg-white dark:bg-secondary-900 border border-secondary-400 dark:border-white/50 hover:border-primary-500/40 transition-all">
       <div className="flex items-center justify-between mb-4">
         <div className="h-12 w-12 rounded-2xl bg-primary-500 text-white flex items-center justify-center shadow-lg shadow-primary-500/20">
           <Icon className="h-6 w-6" />
@@ -529,7 +542,7 @@ function JourneyStep({
 
 function SecurityCard({ title, description, icon: Icon }: FeatureItem) {
   return (
-    <div className="rounded-[2rem] p-7 bg-white/5 backdrop-blur border border-white/10 hover:border-primary-500/40 transition-all">
+    <div className="rounded-[2rem] p-7 bg-white/5 backdrop-blur border border-secondary-400 dark:border-white/50 hover:border-primary-500/40 transition-all">
       <div className="h-14 w-14 rounded-2xl bg-primary-500/15 text-primary-300 flex items-center justify-center mb-5">
         <Icon className="h-7 w-7" />
       </div>

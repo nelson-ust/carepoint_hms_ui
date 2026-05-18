@@ -124,12 +124,12 @@ html.dark .bg-secondary-100 {
   background-color: rgba(255, 255, 255, 0.07) !important;
 }
 
-html.dark .border-secondary-100,
+html.dark .border-secondary-400,
 html.dark .border-secondary-200 {
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-html.dark .border-secondary-100\/50,
+html.dark .border-secondary-400\/50,
 html.dark .divide-secondary-100\/50 > :not([hidden]) ~ :not([hidden]),
 html.dark .divide-secondary-100 > :not([hidden]) ~ :not([hidden]) {
   border-color: rgba(255, 255, 255, 0.06) !important;

@@ -199,7 +199,7 @@ export function PrescriptionsPanel({
 
   return (
     <div className="glass-card rounded-[2.5rem] p-10 md:p-12 space-y-6">
-      <div className="flex items-center justify-between border-b border-secondary-100 pb-6">
+      <div className="flex items-center justify-between border-b border-secondary-400 pb-6">
         <div className="flex items-center gap-4">
           <div className="h-12 w-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20">
             <Pill className="h-6 w-6" />
@@ -274,7 +274,7 @@ export function PrescriptionsPanel({
             return (
               <div
                 key={p.id}
-                className="rounded-2xl bg-white border border-secondary-100 p-5 hover:border-emerald-200 transition-all"
+                className="rounded-2xl bg-white border border-secondary-400 p-5 hover:border-emerald-200 transition-all"
               >
                 <div className="flex items-start justify-between gap-4 flex-wrap mb-3">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -307,7 +307,7 @@ export function PrescriptionsPanel({
                 </div>
 
                 {p.note && (
-                  <p className="text-xs text-secondary-600 italic bg-secondary-50 border border-secondary-100 rounded-xl p-3 mb-3">
+                  <p className="text-xs text-secondary-600 italic bg-secondary-50 border border-secondary-400 rounded-xl p-3 mb-3">
                     {p.note}
                   </p>
                 )}
@@ -323,7 +323,7 @@ export function PrescriptionsPanel({
                       return (
                         <div
                           key={it.id}
-                          className="flex items-start gap-3 p-3 rounded-xl bg-secondary-50/50 border border-secondary-100"
+                          className="flex items-start gap-3 p-3 rounded-xl bg-secondary-50/50 border border-secondary-400"
                         >
                           <div className="h-9 w-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                             <Pill className="h-4 w-4" />
@@ -383,7 +383,7 @@ export function PrescriptionsPanel({
                 value={draftNote}
                 onChange={(e) => setDraftNote(e.target.value)}
                 placeholder="Notes for the pharmacist or context for the prescription..."
-                className="input-field h-20 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </div>
 
@@ -403,7 +403,7 @@ export function PrescriptionsPanel({
               {draftItems.map((it, idx) => (
                 <div
                   key={idx}
-                  className="rounded-2xl border border-secondary-100 p-4 bg-secondary-50/50 space-y-3 relative"
+                  className="rounded-2xl border border-secondary-400 p-4 bg-secondary-50/50 space-y-3 relative"
                 >
                   {draftItems.length > 1 && (
                     <button
@@ -420,7 +420,7 @@ export function PrescriptionsPanel({
                     <select
                       value={it.drug_id}
                       onChange={(e) => updateDraftItem(idx, { drug_id: e.target.value })}
-                      className="input-field h-11 bg-white border-secondary-100 w-full"
+                      className="input-field h-11 bg-white border-secondary-400 w-full"
                     >
                       <option value="">Pick a drug...</option>
                       {drugs.map((d) => (
@@ -436,12 +436,12 @@ export function PrescriptionsPanel({
                       value={it.dose}
                       onChange={(e) => updateDraftItem(idx, { dose: e.target.value })}
                       placeholder="Dose (e.g. 500mg) *"
-                      className="input-field h-11 bg-white border-secondary-100 w-full text-xs"
+                      className="input-field h-11 bg-white border-secondary-400 w-full text-xs"
                     />
                     <select
                       value={it.route}
                       onChange={(e) => updateDraftItem(idx, { route: e.target.value })}
-                      className="input-field h-11 bg-white border-secondary-100 w-full text-xs"
+                      className="input-field h-11 bg-white border-secondary-400 w-full text-xs"
                     >
                       {ROUTES.map((r) => (
                         <option key={r} value={r}>
@@ -454,21 +454,21 @@ export function PrescriptionsPanel({
                       value={it.frequency}
                       onChange={(e) => updateDraftItem(idx, { frequency: e.target.value })}
                       placeholder="Frequency (TDS, BD)"
-                      className="input-field h-11 bg-white border-secondary-100 w-full text-xs"
+                      className="input-field h-11 bg-white border-secondary-400 w-full text-xs"
                     />
                     <input
                       type="text"
                       value={it.duration}
                       onChange={(e) => updateDraftItem(idx, { duration: e.target.value })}
                       placeholder="Duration (5 days)"
-                      className="input-field h-11 bg-white border-secondary-100 w-full text-xs"
+                      className="input-field h-11 bg-white border-secondary-400 w-full text-xs"
                     />
                     <input
                       type="number"
                       value={it.quantity}
                       onChange={(e) => updateDraftItem(idx, { quantity: e.target.value })}
                       placeholder="Quantity"
-                      className="input-field h-11 bg-white border-secondary-100 w-full text-xs col-span-2 font-mono"
+                      className="input-field h-11 bg-white border-secondary-400 w-full text-xs col-span-2 font-mono"
                     />
                   </div>
                   <input
@@ -476,7 +476,7 @@ export function PrescriptionsPanel({
                     value={it.instructions}
                     onChange={(e) => updateDraftItem(idx, { instructions: e.target.value })}
                     placeholder="Instructions (after meals, with water...)"
-                    className="input-field h-11 bg-white border-secondary-100 w-full text-xs"
+                    className="input-field h-11 bg-white border-secondary-400 w-full text-xs"
                   />
                 </div>
               ))}
@@ -517,7 +517,7 @@ export function PrescriptionsPanel({
           icon={Ban}
           tone="rose"
         >
-          <div className="mb-5 p-4 rounded-2xl bg-secondary-50 border border-secondary-100">
+          <div className="mb-5 p-4 rounded-2xl bg-secondary-50 border border-secondary-400">
             <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase mb-1">
               {cancelTarget.prescription_no}
             </p>
@@ -533,7 +533,7 @@ export function PrescriptionsPanel({
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               placeholder="Why is this prescription being cancelled?"
-              className="input-field h-24 bg-secondary-50 border-secondary-100 w-full resize-none py-3"
+              className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
             />
           </div>
           <div className="flex gap-4">
@@ -585,11 +585,10 @@ function Modal({
         </button>
         <div className="flex items-center gap-5 mb-8">
           <div
-            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${
-              tone === "rose"
+            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${tone === "rose"
                 ? "bg-rose-500 shadow-rose-500/20"
                 : "bg-emerald-500 shadow-emerald-500/20"
-            }`}
+              }`}
           >
             <Icon className="h-6 w-6" />
           </div>

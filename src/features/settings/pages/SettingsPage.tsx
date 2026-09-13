@@ -31,7 +31,7 @@ export function SettingsPage() {
       {
          title: "Organization & Security",
          items: [
-            { icon: Building2, label: "Hospital Profile", desc: "Manage facility details and branding", path: "#" },
+            { icon: Building2, label: "Hospital Profile", desc: "Manage facility details and branding", path: routes.settingsBranding },
             { icon: Shield, label: "Access Control", desc: "RBAC roles and system permissions", path: routes.staff },
             { icon: Lock, label: "Security & 2FA", desc: "Enforce multi-factor auth and session policies", path: "#" },
          ]

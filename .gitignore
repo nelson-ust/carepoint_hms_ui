@@ -67,3 +67,6 @@ desktop.ini
 
 # Optional: TypeScript
 tsconfig.tsbuildinfo
+
+# Cleanup (2026-07-16)
+.env

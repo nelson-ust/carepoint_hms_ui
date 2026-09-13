@@ -1,17 +1,40 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   CarePoint HMS — Design System
+   Futuristic dark-glass theme. Dark is the flagship mode; light stays fully
+   supported. Surfaces are driven by CSS variables so components and the
+   legacy utility overrides stay in sync.
+   ========================================================================== */
+
 @layer base {
   :root {
     --brand-navy: 15 23 42;
     --brand-emerald: 16 185 129;
+
+    /* Surface tokens (light) */
+    --surface-page: 248 250 252;        /* secondary-50  */
+    --surface-raised: 255 255 255;      /* white         */
+    --surface-overlay: 255 255 255;
+    --border-subtle: 226 232 240;       /* secondary-200 */
+    --text-strong: 15 23 42;
+    --text-muted: 100 116 139;
+
     color-scheme: light;
   }
 
   html.dark {
+    --surface-page: 2 6 23;             /* secondary-950 */
+    --surface-raised: 15 23 42;         /* secondary-900 */
+    --surface-overlay: 15 23 42;
+    --border-subtle: 255 255 255;       /* used at low alpha */
+    --text-strong: 248 250 252;
+    --text-muted: 148 163 184;
+
     color-scheme: dark;
   }
 
@@ -40,17 +63,64 @@
   html.dark hr {
     @apply border-white/10;
   }
+
+  /* Refined scrollbars — thin, glassy, theme-aware */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.35);
+    border-radius: 9999px;
+  }
+  html.dark *::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.25);
+  }
 }
 
 @layer components {
+  /* --- Surfaces ---------------------------------------------------------- */
+
   .glass-card {
-    @apply bg-white/80 backdrop-blur-xl border border-white/40 shadow-glass;
+    @apply bg-white/80 backdrop-blur-xl border border-white/40 shadow-glass rounded-[2rem];
   }
 
   html.dark .glass-card {
     @apply bg-secondary-900/60 border-white/10;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
   }
+
+  /* Elevated glass panel with a faint gradient sheen — hero cards, modals */
+  .glass-panel {
+    @apply glass-card relative overflow-hidden;
+  }
+  .glass-panel::before {
+    content: "";
+    @apply absolute inset-0 pointer-events-none opacity-0 transition-opacity duration-500;
+    background: linear-gradient(120deg, transparent 35%, rgba(16, 185, 129, 0.06) 50%, transparent 65%);
+  }
+  .glass-panel:hover::before {
+    @apply opacity-100;
+  }
+
+  /* Full-page ambient background (aurora + grid) for layouts */
+  .ambient-bg {
+    background-image: theme('backgroundImage.aurora-light'), theme('backgroundImage.grid-slate');
+    background-size: auto, 32px 32px;
+  }
+  html.dark .ambient-bg {
+    background-image: theme('backgroundImage.aurora-dark'), theme('backgroundImage.grid-slate');
+    background-size: auto, 32px 32px;
+  }
+
+  /* --- Controls ----------------------------------------------------------- */
 
   .input-field {
     @apply w-full rounded-2xl border border-secondary-200 bg-white px-4 py-3 text-sm transition-all duration-300
@@ -66,13 +136,13 @@
   }
 
   .btn-primary {
-    @apply flex items-center justify-center rounded-2xl bg-primary-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary-500/20 transition-all duration-300
-           hover:bg-primary-600 hover:shadow-primary-500/30 hover:-translate-y-0.5
+    @apply flex items-center justify-center gap-2 rounded-2xl bg-gradient-primary px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary-500/25 transition-all duration-300
+           hover:shadow-glow hover:-translate-y-0.5
            active:scale-95 disabled:opacity-60 disabled:pointer-events-none;
   }
 
   .btn-secondary {
-    @apply flex items-center justify-center rounded-2xl border border-secondary-200 bg-white px-6 py-3 text-sm font-bold text-secondary-700 transition-all duration-300
+    @apply flex items-center justify-center gap-2 rounded-2xl border border-secondary-200 bg-white px-6 py-3 text-sm font-bold text-secondary-700 transition-all duration-300
            hover:bg-secondary-50 hover:border-secondary-300 hover:-translate-y-0.5
            active:scale-95 disabled:opacity-60;
   }
@@ -82,8 +152,75 @@
            hover:bg-secondary-800 hover:border-white/20;
   }
 
+  .btn-ghost {
+    @apply flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all duration-200
+           hover:bg-secondary-100 hover:text-secondary-900
+           active:scale-95 disabled:opacity-60;
+    color: #64748b;
+  }
+  html.dark .btn-ghost {
+    @apply hover:bg-white/5 hover:text-secondary-100;
+    color: #94a3b8;
+  }
+
+  .btn-danger {
+    @apply flex items-center justify-center gap-2 rounded-2xl bg-rose-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-rose-500/25 transition-all duration-300
+           hover:bg-rose-600 hover:shadow-glow-rose hover:-translate-y-0.5
+           active:scale-95 disabled:opacity-60 disabled:pointer-events-none;
+  }
+
   .sidebar-link {
     @apply flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all duration-200;
+  }
+
+  /* --- Data display -------------------------------------------------------- */
+
+  /* Standard table shell: wrap a <table> in .table-shell inside a .glass-card */
+  .table-shell {
+    @apply w-full text-left text-sm;
+  }
+  .table-shell thead th {
+    @apply px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em];
+    color: #94a3b8;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  html.dark .table-shell thead th {
+    color: #64748b;
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+  }
+  .table-shell tbody td {
+    @apply px-6 py-4;
+    color: #334155;
+    border-bottom: 1px solid rgba(241, 245, 249, 0.7);
+  }
+  html.dark .table-shell tbody td {
+    color: #cbd5e1;
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+  }
+  .table-shell tbody tr {
+    @apply transition-colors duration-150;
+  }
+  .table-shell tbody tr:hover {
+    @apply bg-primary-500/[0.04];
+  }
+  .table-shell tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  /* Status pill — combine with tint utilities, e.g. `pill bg-emerald-500/10 text-emerald-600` */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest;
+  }
+
+  /* Monospaced data accent (IDs, codes, amounts) */
+  .data-mono {
+    @apply font-mono text-[13px] tracking-tight;
+  }
+
+  /* Gradient headline accent */
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(120deg, #10B981 0%, #22d3ee 100%);
   }
 
   .scrollbar-hide::-webkit-scrollbar {
@@ -93,6 +230,21 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Shimmer placeholder for skeletons */
+  .skeleton-shimmer {
+    @apply relative overflow-hidden;
+  }
+  .skeleton-shimmer::after {
+    content: "";
+    @apply absolute inset-0 animate-shimmer;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    background-size: 200% 100%;
+  }
+  html.dark .skeleton-shimmer::after {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+    background-size: 200% 100%;
+  }
 }
 
 /* ==========================================================================
@@ -100,8 +252,10 @@
    --------------------------------------------------------------------------
    The codebase mixes Tailwind utilities (bg-white, bg-secondary-50, …) with
    custom `.glass-card` / `.input-field` components. Adding a `dark:` variant
-   to every callsite would touch ~50 files; instead we override the most
-   common surface utilities globally when `html.dark` is active.
+   to every callsite would touch ~80 files; instead we override the most
+   common surface utilities globally when `html.dark` is active. New code
+   should use the shared components / component classes above instead of
+   relying on this block.
    ========================================================================== */
 
 html.dark .bg-white,
@@ -116,75 +270,102 @@ html.dark .bg-white\/90 {
 
 html.dark .bg-secondary-50,
 html.dark .bg-secondary-50\/30,
-html.dark .bg-secondary-50\/50 {
+html.dark .bg-secondary-50\/50,
+html.dark .bg-slate-50,
+html.dark .bg-slate-50\/50 {
   background-color: rgba(255, 255, 255, 0.04) !important;
 }
 
-html.dark .bg-secondary-100 {
+html.dark .bg-secondary-100,
+html.dark .bg-slate-100 {
   background-color: rgba(255, 255, 255, 0.07) !important;
 }
 
+html.dark .bg-slate-200 {
+  background-color: rgba(255, 255, 255, 0.10) !important;
+}
+
 html.dark .border-secondary-400,
-html.dark .border-secondary-200 {
+html.dark .border-secondary-200,
+html.dark .border-secondary-300,
+html.dark .border-slate-200,
+html.dark .border-slate-300 {
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
+html.dark .border-secondary-100,
 html.dark .border-secondary-400\/50,
 html.dark .divide-secondary-100\/50 > :not([hidden]) ~ :not([hidden]),
-html.dark .divide-secondary-100 > :not([hidden]) ~ :not([hidden]) {
+html.dark .divide-secondary-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
   border-color: rgba(255, 255, 255, 0.06) !important;
 }
 
 /* Subtle text-color softening for dark mode */
-html.dark .text-secondary-900 {
+html.dark .text-secondary-900,
+html.dark .text-slate-900 {
   color: rgb(241 245 249) !important;
 }
 html.dark .text-secondary-700,
-html.dark .text-secondary-800 {
+html.dark .text-secondary-800,
+html.dark .text-slate-700,
+html.dark .text-slate-800 {
   color: rgb(203 213 225) !important;
 }
-html.dark .text-secondary-600 {
+html.dark .text-secondary-600,
+html.dark .text-slate-600 {
   color: rgb(148 163 184) !important;
 }
-html.dark .text-secondary-500 {
+html.dark .text-secondary-500,
+html.dark .text-slate-500 {
   color: rgb(148 163 184) !important;
 }
-html.dark .text-secondary-400 {
+html.dark .text-secondary-400,
+html.dark .text-slate-400 {
   color: rgb(100 116 139) !important;
 }
 
 /* Tinted soft backgrounds (status pills) get muted slightly so colour-text remains legible */
-html.dark .bg-primary-50 {
-  background-color: rgba(16, 185, 129, 0.12) !important;
-}
-html.dark .bg-emerald-50 {
-  background-color: rgba(16, 185, 129, 0.12) !important;
-}
-html.dark .bg-amber-50 {
-  background-color: rgba(245, 158, 11, 0.12) !important;
-}
-html.dark .bg-rose-50 {
-  background-color: rgba(244, 63, 94, 0.12) !important;
-}
+html.dark .bg-primary-50   { background-color: rgba(16, 185, 129, 0.12) !important; }
+html.dark .bg-emerald-50   { background-color: rgba(16, 185, 129, 0.12) !important; }
+html.dark .bg-amber-50     { background-color: rgba(245, 158, 11, 0.12) !important; }
+html.dark .bg-rose-50      { background-color: rgba(244, 63, 94, 0.12) !important; }
+html.dark .bg-sky-50       { background-color: rgba(14, 165, 233, 0.12) !important; }
+html.dark .bg-blue-50      { background-color: rgba(59, 130, 246, 0.12) !important; }
+html.dark .bg-indigo-50    { background-color: rgba(99, 102, 241, 0.12) !important; }
+html.dark .bg-violet-50,
+html.dark .bg-purple-50    { background-color: rgba(167, 139, 250, 0.12) !important; }
+html.dark .bg-cyan-50      { background-color: rgba(34, 211, 238, 0.12) !important; }
+html.dark .bg-teal-50      { background-color: rgba(20, 184, 166, 0.12) !important; }
+html.dark .bg-orange-50    { background-color: rgba(249, 115, 22, 0.12) !important; }
+html.dark .bg-red-50       { background-color: rgba(239, 68, 68, 0.12) !important; }
+html.dark .bg-green-50     { background-color: rgba(34, 197, 94, 0.12) !important; }
+html.dark .bg-yellow-50    { background-color: rgba(234, 179, 8, 0.12) !important; }
 
-html.dark .border-primary-100 {
-  border-color: rgba(16, 185, 129, 0.25) !important;
-}
-html.dark .border-emerald-100 {
-  border-color: rgba(16, 185, 129, 0.25) !important;
-}
-html.dark .border-amber-100 {
-  border-color: rgba(245, 158, 11, 0.25) !important;
-}
-html.dark .border-rose-100 {
-  border-color: rgba(244, 63, 94, 0.25) !important;
-}
+html.dark .border-primary-100 { border-color: rgba(16, 185, 129, 0.25) !important; }
+html.dark .border-emerald-100 { border-color: rgba(16, 185, 129, 0.25) !important; }
+html.dark .border-amber-100   { border-color: rgba(245, 158, 11, 0.25) !important; }
+html.dark .border-rose-100    { border-color: rgba(244, 63, 94, 0.25) !important; }
+html.dark .border-sky-100     { border-color: rgba(14, 165, 233, 0.25) !important; }
+html.dark .border-blue-100    { border-color: rgba(59, 130, 246, 0.25) !important; }
+html.dark .border-indigo-100  { border-color: rgba(99, 102, 241, 0.25) !important; }
+html.dark .border-cyan-100    { border-color: rgba(34, 211, 238, 0.25) !important; }
 
 /* Soft tinted text remains readable */
 html.dark .text-primary-600 { color: rgb(110 231 183) !important; }
 html.dark .text-emerald-600 { color: rgb(110 231 183) !important; }
 html.dark .text-amber-600   { color: rgb(252 211 77)  !important; }
 html.dark .text-rose-600    { color: rgb(253 164 175) !important; }
+html.dark .text-sky-600     { color: rgb(125 211 252) !important; }
+html.dark .text-blue-600    { color: rgb(147 197 253) !important; }
+html.dark .text-indigo-600  { color: rgb(165 180 252) !important; }
+html.dark .text-violet-600,
+html.dark .text-purple-600  { color: rgb(196 181 253) !important; }
+html.dark .text-cyan-600    { color: rgb(103 232 249) !important; }
+html.dark .text-teal-600    { color: rgb(94 234 212)  !important; }
+html.dark .text-orange-600  { color: rgb(253 186 116) !important; }
+html.dark .text-red-600     { color: rgb(252 165 165) !important; }
+html.dark .text-green-600   { color: rgb(134 239 172) !important; }
 
 /* Page chrome */
 html.dark .bg-brand-gray {
@@ -193,4 +374,17 @@ html.dark .bg-brand-gray {
 
 html.dark .ring-secondary-900\/5 {
   --tw-ring-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+
+/* -- Print: request pages export cleanly to paper / Save-as-PDF -- */
+@media print {
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background: #fff !important;
+  }
+  @page {
+    margin: 12mm;
+  }
 }

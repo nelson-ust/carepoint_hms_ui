@@ -14,6 +14,7 @@ export const ambulanceKeys = {
   details: () => [...ambulanceKeys.all, "detail"] as const,
   detail: (id: number) => [...ambulanceKeys.details(), id] as const,
   readiness: (id: number) => [...ambulanceKeys.detail(id), "readiness"] as const,
+  stats: () => [...ambulanceKeys.all, "stats"] as const,
   drivers: () => [...ambulanceKeys.all, "drivers"] as const,
   equipment: (ambulanceId: number) => [...ambulanceKeys.detail(ambulanceId), "equipment"] as const,
   maintenance: (ambulanceId: number) => [...ambulanceKeys.detail(ambulanceId), "maintenance"] as const,
@@ -39,6 +40,13 @@ export function useAmbulanceReadiness(id: number) {
     queryKey: ambulanceKeys.readiness(id),
     queryFn: () => ambulanceApi.getReadiness(id),
     enabled: !!id,
+  });
+}
+
+export function useAmbulanceFleetStats() {
+  return useQuery({
+    queryKey: ambulanceKeys.stats(),
+    queryFn: () => ambulanceApi.getStats(),
   });
 }
 

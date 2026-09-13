@@ -1,146 +1,94 @@
 import {
-   AreaChart,
-   Area,
-   XAxis,
-   YAxis,
-   CartesianGrid,
    Tooltip,
    ResponsiveContainer,
    BarChart,
    Bar,
+   XAxis,
+   YAxis,
+   CartesianGrid,
    Cell,
 } from "recharts";
-import { Truck, Activity, ShieldCheck, Clock } from "lucide-react";
+import { Truck, ShieldCheck, Users, Wrench, AlertTriangle } from "lucide-react";
+import { MetricCard } from "@/components/charts/MetricCard";
+import { useChartTheme } from "@/components/charts/chart-theme";
+import { useAmbulanceFleetStats } from "../hooks/use-ambulance";
 
-const missionData = [
-   { day: "Mon", count: 12 },
-   { day: "Tue", count: 18 },
-   { day: "Wed", count: 15 },
-   { day: "Thu", count: 22 },
-   { day: "Fri", count: 28 },
-   { day: "Sat", count: 19 },
-   { day: "Sun", count: 14 },
-];
-
-const statusData = [
-   { name: "Available", value: 8, color: "#10B981" },
-   { name: "On Mission", value: 3, color: "#3B82F6" },
-   { name: "Maintenance", value: 1, color: "#F59E0B" },
+/** Human labels + chart theme series index per fleet status. */
+const STATUS_META: { key: string; label: string; seriesIndex: number }[] = [
+   { key: "AVAILABLE", label: "Available", seriesIndex: 0 },
+   { key: "DISPATCHED", label: "Dispatched", seriesIndex: 1 },
+   { key: "IN_TRANSIT", label: "In Transit", seriesIndex: 2 },
+   { key: "UNDER_MAINTENANCE", label: "Under Maintenance", seriesIndex: 3 },
+   { key: "OUT_OF_SERVICE", label: "Out of Service", seriesIndex: 4 },
 ];
 
 export function AmbulanceStats() {
+   const chart = useChartTheme();
+   const { data: stats, isLoading, error } = useAmbulanceFleetStats();
+
+   const byStatus = stats?.by_status ?? {};
+   const statusData = STATUS_META.map((meta) => ({
+      name: meta.label,
+      value: byStatus[meta.key] ?? 0,
+      seriesIndex: meta.seriesIndex,
+   }));
+
    return (
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
          {/* Quick Stats */}
          <div className="lg:col-span-1 space-y-4">
-            <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-secondary-900 text-white flex items-center justify-center shadow-lg shadow-secondary-900/10">
-                     <Truck className="h-6 w-6" />
-                  </div>
-                  <div>
-                     <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Total Fleet</p>
-                     <h4 className="text-2xl font-black text-secondary-900">12</h4>
-                  </div>
-               </div>
-            </div>
-            <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/10">
-                     <ShieldCheck className="h-6 w-6" />
-                  </div>
-                  <div>
-                     <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Ready</p>
-                     <h4 className="text-2xl font-black text-secondary-900">8</h4>
-                  </div>
-               </div>
-            </div>
-            <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-primary-500 text-white flex items-center justify-center shadow-lg shadow-primary-500/10">
-                     <Activity className="h-6 w-6" />
-                  </div>
-                  <div>
-                     <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Avg Response</p>
-                     <h4 className="text-2xl font-black text-secondary-900">8.4m</h4>
-                  </div>
-               </div>
-            </div>
-         </div>
-
-         {/* Mission Chart */}
-         <div className="lg:col-span-2 glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
-            <div className="flex items-center justify-between mb-8">
-               <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest">Mission Volume (7d)</h4>
-               <div className="flex gap-2">
-                  <span className="h-2 w-2 rounded-full bg-primary-500" />
-                  <span className="text-[10px] font-bold text-secondary-400">Emergencies</span>
-               </div>
-            </div>
-            <div className="h-[200px] w-full">
-               <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={missionData}>
-                     <defs>
-                        <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                           <stop offset="5%" stopColor="#0F172A" stopOpacity={0.1} />
-                           <stop offset="95%" stopColor="#0F172A" stopOpacity={0} />
-                        </linearGradient>
-                     </defs>
-                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                     <XAxis
-                        dataKey="day"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 10, fontWeight: 700, fill: '#94A3B8' }}
-                     />
-                     <YAxis hide />
-                     <Tooltip
-                        contentStyle={{
-                           borderRadius: '1rem',
-                           border: 'none',
-                           boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                           fontSize: '12px',
-                           fontWeight: 'bold'
-                        }}
-                     />
-                     <Area
-                        type="monotone"
-                        dataKey="count"
-                        stroke="#0F172A"
-                        strokeWidth={3}
-                        fillOpacity={1}
-                        fill="url(#colorCount)"
-                     />
-                  </AreaChart>
-               </ResponsiveContainer>
-            </div>
+            <MetricCard label="Total Fleet" value={stats?.fleet_total ?? 0} icon={Truck} tone="slate" isLoading={isLoading} />
+            <MetricCard label="Ready" value={stats?.ready_count ?? 0} icon={ShieldCheck} tone="primary" isLoading={isLoading} />
+            <MetricCard label="Drivers" value={stats?.drivers_total ?? 0} icon={Users} tone="cyan" isLoading={isLoading} />
+            <MetricCard label="Open Maintenance" value={stats?.maintenance_open ?? 0} icon={Wrench} tone="amber" isLoading={isLoading} />
          </div>
 
          {/* Fleet Distribution */}
-         <div className="lg:col-span-1 glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium flex flex-col">
-            <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-8 text-center">Fleet Distribution</h4>
-            <div className="h-[150px] w-full mb-6">
-               <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={statusData}>
-                     <Bar dataKey="value" radius={[4, 4, 4, 4]}>
-                        {statusData.map((entry, index) => (
-                           <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                     </Bar>
-                  </BarChart>
-               </ResponsiveContainer>
-            </div>
-            <div className="space-y-3 mt-auto">
-               {statusData.map(item => (
-                  <div key={item.name} className="flex items-center justify-between">
-                     <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: item.color }} />
-                        <span className="text-[10px] font-bold text-secondary-500 uppercase">{item.name}</span>
-                     </div>
-                     <span className="text-xs font-black text-secondary-900">{item.value}</span>
+         <div className="lg:col-span-3 glass-card rounded-[2.5rem] p-8 shadow-premium flex flex-col">
+            <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-8">Fleet Distribution</h4>
+            {isLoading ? (
+               <div className="h-[220px] w-full rounded-2xl bg-secondary-100/30 animate-pulse" />
+            ) : error ? (
+               <div className="h-[220px] w-full flex flex-col items-center justify-center text-center">
+                  <AlertTriangle className="h-8 w-8 text-rose-500 mb-3" />
+                  <p className="text-xs font-bold text-secondary-500">Unable to load fleet statistics.</p>
+               </div>
+            ) : (
+               <>
+                  <div className="h-[220px] w-full mb-6">
+                     <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={statusData}>
+                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
+                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={chart.tick} />
+                           <YAxis hide allowDecimals={false} />
+                           <Tooltip cursor={chart.cursor} contentStyle={chart.tooltip} />
+                           <Bar dataKey="value" radius={[4, 4, 4, 4]}>
+                              {statusData.map((entry) => (
+                                 <Cell
+                                    key={`cell-${entry.name}`}
+                                    fill={chart.series[entry.seriesIndex % chart.series.length]}
+                                 />
+                              ))}
+                           </Bar>
+                        </BarChart>
+                     </ResponsiveContainer>
                   </div>
-               ))}
-            </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-auto">
+                     {statusData.map((item) => (
+                        <div key={item.name} className="flex items-center justify-between">
+                           <div className="flex items-center gap-2">
+                              <div
+                                 className="h-1.5 w-1.5 rounded-full"
+                                 style={{ backgroundColor: chart.series[item.seriesIndex % chart.series.length] }}
+                              />
+                              <span className="text-[10px] font-bold text-secondary-500 uppercase">{item.name}</span>
+                           </div>
+                           <span className="text-xs font-black text-secondary-900">{item.value}</span>
+                        </div>
+                     ))}
+                  </div>
+               </>
+            )}
          </div>
       </div>
    );

@@ -10,6 +10,7 @@ import {
   Calendar,
   CheckCircle2,
   ChevronRight,
+  ChevronsRight,
   Clock,
   Edit3,
   FileText,
@@ -21,27 +22,32 @@ import {
   Plus,
   RefreshCw,
   Save,
+  SkipForward,
   Stethoscope,
+  Scissors,
   Thermometer,
   Trash2,
-  User,
   Wind,
   X,
 } from "lucide-react";
 import { routes } from "@/config/routes";
 import {
+  advanceVisit,
   deleteVisit,
   getVisitDetails,
   getServiceDeliveryPoints,
   updateVisit,
 } from "../api/visits.api";
 import type { ServiceDeliveryPoint, Visit } from "../api/visits.api";
+import { VisitActivityTimeline } from "../components/VisitActivityTimeline";
 import {
   getVitalSignsForVisit,
   recordVitalSign,
 } from "@/features/vital-signs/api/vital-signs.api";
 import type { VitalSign } from "@/features/vital-signs/api/vital-signs.api";
 import { DiagnosesPanel } from "@/features/diagnoses/components/DiagnosesPanel";
+import { VisitBillingPanel } from "@/features/billing/components/VisitBillingPanel";
+import { BookCaseModal } from "@/features/surgery/components/BookCaseModal";
 
 const PRIORITY_OPTIONS = ["ROUTINE", "URGENT", "EMERGENCY"] as const;
 const STATUS_OPTIONS = [
@@ -141,6 +147,8 @@ export function VisitDetailPage() {
 
   const [isCheckingOut, setCheckingOut] = useState(false);
   const [isDeleting, setDeleting] = useState(false);
+  const [isAdvancing, setAdvancing] = useState<"complete" | "skip" | null>(null);
+  const [isBookSurgeryOpen, setBookSurgeryOpen] = useState(false);
 
   const loadAll = async () => {
     if (!visitId || Number.isNaN(visitIdNum)) {
@@ -274,6 +282,27 @@ export function VisitDetailPage() {
     }
   };
 
+  const handleAdvance = async (action: "complete" | "skip") => {
+    if (!visit) return;
+    const verb = action === "skip" ? "skip this stage" : "complete this stage";
+    if (!confirm(`Are you sure you want to ${verb} and move the patient to the next stage?`))
+      return;
+    setAdvancing(action);
+    try {
+      const result = await advanceVisit(visit.id, { action });
+      // Refresh the full lifecycle so the timeline, current stage and queue reflect the move.
+      await loadAll();
+      if (result?.message) {
+        // Lightweight confirmation; the timeline update is the primary feedback.
+        console.info(result.message);
+      }
+    } catch (err: any) {
+      alert(err?.response?.data?.message || "Unable to advance the patient to the next stage.");
+    } finally {
+      setAdvancing(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!visit) return;
     if (!confirm("Delete this visit record? This cannot be undone.")) return;
@@ -360,6 +389,52 @@ export function VisitDetailPage() {
             <Stethoscope className="h-4 w-4" />
             <span className="text-sm font-bold">Open Consultation</span>
           </Link>
+          <button
+            onClick={() => setBookSurgeryOpen(true)}
+            className="btn-primary gap-2 px-6 py-3 rounded bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-500/20"
+            title="Book a surgical case for this patient"
+          >
+            <Scissors className="h-4 w-4" />
+            <span className="text-sm font-bold">Book Surgery</span>
+          </button>
+          <BookCaseModal
+            isOpen={isBookSurgeryOpen}
+            onClose={() => setBookSurgeryOpen(false)}
+            presetPatient={{
+              id: visit.patient_id,
+              label: visit.patient
+                ? `${visit.patient.first_name} ${visit.patient.last_name} · ${visit.patient.hospital_number}`
+                : `Patient #${visit.patient_id}`,
+            }}
+            presetVisitId={visit.id}
+            onBooked={(c) => navigate(routes.surgeryCase.replace(":caseId", String(c.id)))}
+          />
+          {statusKey !== "COMPLETED" && statusKey !== "CANCELLED" && (
+            <>
+              <button
+                onClick={() => handleAdvance("complete")}
+                disabled={isAdvancing !== null}
+                className="btn-primary gap-2 px-6 py-3 rounded bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/20 disabled:opacity-50"
+                title="Complete the current stage and move the patient to the next stage"
+              >
+                <ChevronsRight className="h-4 w-4" />
+                <span className="text-sm font-bold">
+                  {isAdvancing === "complete" ? "Advancing..." : "Advance to Next Stage"}
+                </span>
+              </button>
+              <button
+                onClick={() => handleAdvance("skip")}
+                disabled={isAdvancing !== null}
+                className="btn-primary gap-2 px-4 py-3 rounded bg-white/80 border border-secondary-200 text-secondary-600 hover:bg-secondary-50 disabled:opacity-50"
+                title="Skip the current stage and move to the next"
+              >
+                <SkipForward className="h-4 w-4" />
+                <span className="text-sm font-bold">
+                  {isAdvancing === "skip" ? "Skipping..." : "Skip Stage"}
+                </span>
+              </button>
+            </>
+          )}
           <Link
             to={routes.visitReroute.replace(":visitId", String(visit.id))}
             className="btn-primary gap-2 px-6 py-3 rounded bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-500/20"
@@ -551,6 +626,9 @@ export function VisitDetailPage() {
 
         {/* RIGHT: Flow Timeline + Vitals + Tickets */}
         <div className="lg:col-span-8 space-y-8">
+          {/* Unified activity timeline — every action in the encounter */}
+          {visit?.id ? <VisitActivityTimeline visitId={visit.id} /> : null}
+
           {/* Flow Steps */}
           <div className="glass-card rounded p-10 md:p-12 border border-secondary-400 bg-white/80 shadow-premium">
             <div className="flex items-center justify-between border-b border-secondary-400 pb-8 mb-10">
@@ -820,6 +898,9 @@ export function VisitDetailPage() {
 
           {/* Diagnoses (read-only here — full editing happens in ConsultationPage) */}
           <DiagnosesPanel visitId={visit.id} disabled />
+
+          {/* Visit Billing — charges accrued, partial payments, outstanding balance */}
+          <VisitBillingPanel visitId={visit.id} />
 
           {/* Queue Tickets */}
           <div className="glass-card rounded p-10 md:p-12 border border-secondary-400 bg-white/80 shadow-premium">

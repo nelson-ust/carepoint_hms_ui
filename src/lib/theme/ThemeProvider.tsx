@@ -15,6 +15,12 @@ type ThemeContextValue = {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+  /**
+   * Apply a theme that came from the server (the user's saved profile
+   * preference) WITHOUT persisting it back — used to hydrate on login so the
+   * choice follows the user across devices.
+   */
+  hydrateTheme: (theme: Theme) => void;
   /** True when the user hasn't explicitly chosen — we're following OS preference. */
   isSystem: boolean;
 };
@@ -43,9 +49,15 @@ type ThemeProviderProps = {
   children: ReactNode;
   /** Theme to use when the user has no stored preference. Defaults to OS preference. */
   defaultTheme?: Theme;
+  /**
+   * Called whenever the user explicitly changes the theme (via setTheme /
+   * toggleTheme). Use it to persist the choice to the user's profile. Not
+   * called during hydration from the server.
+   */
+  onPersist?: (theme: Theme) => void;
 };
 
-export function ThemeProvider({ children, defaultTheme }: ThemeProviderProps) {
+export function ThemeProvider({ children, defaultTheme, onPersist }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(() => {
     const stored = readStoredTheme();
     if (stored) return stored;
@@ -70,15 +82,30 @@ export function ThemeProvider({ children, defaultTheme }: ThemeProviderProps) {
     return () => media.removeEventListener("change", onChange);
   }, [isSystem]);
 
-  const setTheme = useCallback((next: Theme) => {
-    localStorageService.set(storageKeys.theme, next);
-    setIsSystem(false);
-    setThemeState(next);
-  }, []);
+  const setTheme = useCallback(
+    (next: Theme) => {
+      localStorageService.set(storageKeys.theme, next);
+      setIsSystem(false);
+      setThemeState(next);
+      onPersist?.(next);
+    },
+    [onPersist],
+  );
 
   const toggleTheme = useCallback(() => {
     setThemeState((prev) => {
       const next: Theme = prev === "dark" ? "light" : "dark";
+      localStorageService.set(storageKeys.theme, next);
+      onPersist?.(next);
+      return next;
+    });
+    setIsSystem(false);
+  }, [onPersist]);
+
+  // Apply a server-provided preference without persisting it back.
+  const hydrateTheme = useCallback((next: Theme) => {
+    setThemeState((prev) => {
+      if (prev === next) return prev;
       localStorageService.set(storageKeys.theme, next);
       return next;
     });
@@ -86,8 +113,8 @@ export function ThemeProvider({ children, defaultTheme }: ThemeProviderProps) {
   }, []);
 
   const value = useMemo<ThemeContextValue>(
-    () => ({ theme, setTheme, toggleTheme, isSystem }),
-    [theme, setTheme, toggleTheme, isSystem],
+    () => ({ theme, setTheme, toggleTheme, hydrateTheme, isSystem }),
+    [theme, setTheme, toggleTheme, hydrateTheme, isSystem],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

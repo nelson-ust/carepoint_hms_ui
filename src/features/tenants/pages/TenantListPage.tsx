@@ -1,12 +1,13 @@
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import {
+import { Wrench,
   AlertCircle,
   Building2,
   CheckCircle2,
   Clock,
   Crown,
+  Database,
   Eye,
   Filter,
   Globe,
@@ -22,9 +23,12 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { TenantProvisioningModal } from "../components/TenantProvisioningModal";
 import {
   approveTenant,
+  getProvisioningStatus,
   listTenants,
+  provisionTenantS3,
   TENANT_STATUSES,
   updateTenantStatus,
 } from "../api/tenants.api";
@@ -58,6 +62,7 @@ export function TenantListPage() {
   const [statusFilter, setStatusFilter] = useState("");
 
   const [actionKind, setActionKind] = useState<ActionKind>(null);
+  const [manageTenant, setManageTenant] = useState<Tenant | null>(null);
   const [actionTarget, setActionTarget] = useState<Tenant | null>(null);
   const [statusForm, setStatusForm] = useState<string>("ACTIVE");
   const [actionPending, setActionPending] = useState(false);
@@ -110,6 +115,26 @@ export function TenantListPage() {
     return { total: totalCount || total, active, pending, suspended };
   }, [tenants, totalCount]);
 
+  const [provisioningS3Id, setProvisioningS3Id] = useState<number | null>(null);
+
+  const handleProvisionS3 = async (t: Tenant) => {
+    setProvisioningS3Id(t.id);
+    try {
+      const res = await provisionTenantS3(t.id);
+      replaceTenant({ ...t, aws_s3_bucket_name: res.bucket_name });
+      showFeedback(
+        "success",
+        res.already_provisioned
+          ? `${t.name} already has bucket ${res.bucket_name}.`
+          : `S3 bucket ${res.bucket_name} provisioned for ${t.name}.`,
+      );
+    } catch (err: any) {
+      showFeedback("error", err?.response?.data?.message || `Failed to provision S3 for ${t.name}.`);
+    } finally {
+      setProvisioningS3Id(null);
+    }
+  };
+
   const replaceTenant = (updated: Tenant) => {
     setTenants((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
   };
@@ -137,17 +162,47 @@ export function TenantListPage() {
     setActionError(null);
   };
 
+  /**
+   * Approve + follow the async provisioning to completion. The backend
+   * returns immediately with status=PROVISIONING and creates the database
+   * on a background thread, so we poll /provisioning-status until the
+   * tenant is provisioned (→ ACTIVE) or the task records a failure
+   * (→ reverted to PENDING with provisioning_error set).
+   */
   const handleApprove = async () => {
     if (!actionTarget) return;
+    const target = actionTarget;
     setActionPending(true);
     setActionError(null);
     try {
-      await approveTenant(actionTarget.id);
-      // Optimistic update — backend may flip status to ACTIVE
-      replaceTenant({ ...actionTarget, status: "ACTIVE" });
-      showFeedback("success", `${actionTarget.name} approved.`);
+      await approveTenant(target.id);
+      replaceTenant({ ...target, status: "PROVISIONING" });
+      showFeedback("success", `${target.name} approved — provisioning database…`);
       setActionKind(null);
       setActionTarget(null);
+
+      // Poll every 3s for up to 3 minutes.
+      let attempts = 0;
+      const timer = window.setInterval(async () => {
+        attempts += 1;
+        try {
+          const ps = await getProvisioningStatus(target.id);
+          if (ps.is_provisioned) {
+            window.clearInterval(timer);
+            replaceTenant({ ...target, status: ps.status, is_provisioned: true, provisioning_error: null });
+            showFeedback("success", `${target.name} is provisioned and ACTIVE.`);
+          } else if (ps.provisioning_error) {
+            window.clearInterval(timer);
+            replaceTenant({ ...target, status: ps.status, provisioning_error: ps.provisioning_error });
+            showFeedback("error", `Provisioning failed for ${target.name}: ${ps.provisioning_error}`);
+          } else if (attempts >= 60) {
+            window.clearInterval(timer);
+            showFeedback("error", `${target.name} is still provisioning — check back shortly.`);
+          }
+        } catch {
+          if (attempts >= 60) window.clearInterval(timer);
+        }
+      }, 3000);
     } catch (err: any) {
       setActionError(err?.response?.data?.message || "Failed to approve tenant.");
     } finally {
@@ -391,6 +446,25 @@ export function TenantListPage() {
                               Approve
                             </button>
                           )}
+                          {t.is_provisioned && !t.aws_s3_bucket_name && (
+                            <button
+                              onClick={() => handleProvisionS3(t)}
+                              disabled={provisioningS3Id === t.id}
+                              title="The workspace exists but no S3 bucket is provisioned yet — create the tenant's own bucket."
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-[10px] font-bold uppercase tracking-widest shadow-md"
+                            >
+                              <Database className={`h-3 w-3 ${provisioningS3Id === t.id ? "animate-pulse" : ""}`} />
+                              {provisioningS3Id === t.id ? "Provisioning…" : "Provision S3"}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setManageTenant(t)}
+                            title="Approval, provisioning steps and infrastructure repair"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-[10px] font-bold uppercase tracking-widest shadow-md"
+                          >
+                            <Wrench className="h-3 w-3" />
+                            Manage
+                          </button>
                           <button
                             onClick={() => openStatus(t)}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold uppercase tracking-widest shadow-md"
@@ -408,6 +482,15 @@ export function TenantListPage() {
           </table>
         </div>
       </div>
+
+      <TenantProvisioningModal
+        tenant={manageTenant}
+        onClose={() => setManageTenant(null)}
+        onChanged={(patch) => {
+          const current = tenants.find((x) => x.id === patch.id);
+          if (current) replaceTenant({ ...current, ...patch });
+        }}
+      />
 
       {actionKind === "approve" && actionTarget && (
         <ModalShell

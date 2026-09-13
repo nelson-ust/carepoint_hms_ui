@@ -1,19 +1,22 @@
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Badge } from "@/components/ui/Badge";
+import { useChartTheme } from "@/components/charts/chart-theme";
 import {
    Gift,
+   Plus,
    Star,
    History,
-   TrendingUp,
    RefreshCw,
-   Search,
-   Filter,
    ArrowUpRight,
    ArrowDownLeft,
-   MoreHorizontal,
    ChevronRight,
 } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { usePatientPoints, useLoyaltyHistory } from "../hooks/use-loyalty";
+import { useDisclosure } from "@/hooks/useDisclosure";
+import { tierForBalance } from "../loyalty-tiers";
+import { PointsActionModal } from "../components/PointsActionModal";
+import { TierBenefitsModal } from "../components/TierBenefitsModal";
 import { format } from "date-fns";
 import {
    AreaChart,
@@ -25,22 +28,47 @@ import {
    ResponsiveContainer,
 } from "recharts";
 
-const loyaltyData = [
-   { month: "Jan", points: 1200 },
-   { month: "Feb", points: 2100 },
-   { month: "Mar", points: 1800 },
-   { month: "Apr", points: 3200 },
-   { month: "May", points: 4500 },
-   { month: "Jun", points: 5200 },
-];
+type LoyaltyChartPoint = { month: string; points: number };
+
+/** Cumulative points balance sampled at the end of each of the last 6 months. */
+function buildAccumulationSeries(
+   history: { points: number; transaction_type: "EARN" | "REDEEM"; created_at: string }[],
+): LoyaltyChartPoint[] {
+   const now = new Date();
+   const months: { label: string; end: Date }[] = [];
+   for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      months.push({
+         label: new Date(now.getFullYear(), now.getMonth() - i, 1).toLocaleString("default", { month: "short" }),
+         end: d, // exclusive upper bound (first day of next month)
+      });
+   }
+   const sorted = [...history].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+   );
+   return months.map(({ label, end }) => {
+      const points = sorted
+         .filter((tx) => new Date(tx.created_at) < end)
+         .reduce((sum, tx) => sum + (tx.transaction_type === "EARN" ? tx.points : -tx.points), 0);
+      return { month: label, points: Math.max(points, 0) };
+   });
+}
 
 export function LoyaltyPage() {
    const { patientId } = useParams<{ patientId: string }>();
-   const id = Number(patientId) || 1; // Fallback to 1 for demo if no ID in URL
+   const id = Number(patientId) || 0;
    const { data: pointsData, isLoading: pointsLoading } = usePatientPoints(id);
    const { data: historyData, isLoading: historyLoading, refetch } = useLoyaltyHistory(id);
+   const chart = useChartTheme();
 
    const history = historyData?.items || [];
+   const loyaltyData = buildAccumulationSeries(history);
+   const balance = pointsData?.total_points ?? 0;
+   const { tier, next } = tierForBalance(balance);
+
+   const award = useDisclosure();
+   const redeem = useDisclosure();
+   const tiers = useDisclosure();
 
    return (
       <div className="space-y-10 animate-fade-in pb-20">
@@ -49,12 +77,20 @@ export function LoyaltyPage() {
                title="Patient Loyalty"
                description="Track and manage patient reward points, redemption history, and membership tiers."
             />
-            <div className="flex gap-3">
-               <button className="btn-secondary gap-3 py-3 px-6">
+            <div className="flex flex-wrap gap-3">
+               <button onClick={tiers.open} className="btn-secondary gap-3 py-3 px-6">
                   <Star className="h-4 w-4 text-amber-500" />
                   <span className="font-bold">Tier Benefits</span>
                </button>
-               <button className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
+               <button onClick={award.open} className="btn-secondary gap-3 py-3 px-6">
+                  <Plus className="h-4 w-4 text-emerald-500" />
+                  <span className="font-bold">Award Points</span>
+               </button>
+               <button
+                  onClick={redeem.open}
+                  disabled={balance <= 0}
+                  className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20 disabled:opacity-50"
+               >
                   <Gift className="h-5 w-5" />
                   <span className="font-bold">Redeem Points</span>
                </button>
@@ -69,53 +105,61 @@ export function LoyaltyPage() {
                </div>
                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-[0.2em] mb-2">Available Balance</p>
                <h4 className="text-5xl font-black text-secondary-900 mb-2">
-                  {pointsLoading ? "..." : pointsData?.total_points.toLocaleString() || "0"}
+                  {pointsLoading ? "..." : balance.toLocaleString()}
                </h4>
                <p className="text-xs font-bold text-secondary-500">Loyalty Points</p>
 
                <div className="w-full h-px bg-amber-100 my-8" />
 
-               <div className="w-full flex justify-between items-center px-4">
+               <button
+                  onClick={tiers.open}
+                  className="w-full flex justify-between items-center px-4 rounded-2xl py-2 transition-colors hover:bg-amber-100/40"
+               >
                   <div className="text-left">
-                     <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-tighter">Current Tier</p>
-                     <p className="text-sm font-black text-secondary-900">Gold Member</p>
+                     <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-tighter">Points Tier</p>
+                     <p className="text-sm font-black text-secondary-900">{pointsLoading ? "…" : tier.name}</p>
+                     <p className="text-[10px] text-secondary-400 font-medium mt-1">
+                        {next
+                           ? `${Math.max(next.min - balance, 0).toLocaleString()} pts to ${next.name} (at ${next.min.toLocaleString()})`
+                           : "Top tier reached"}
+                     </p>
                   </div>
                   <ChevronRight className="h-5 w-5 text-amber-500" />
-               </div>
+               </button>
             </div>
 
             {/* Growth Chart */}
             <div className="lg:col-span-3 glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-6">Points Accumulation</h4>
+               <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-6">Points Accumulation (6 Months)</h4>
+               {historyLoading ? (
+                  <div className="h-[200px] w-full rounded-2xl bg-secondary-100/30 animate-pulse" />
+               ) : history.length === 0 ? (
+                  <div className="h-[200px] w-full flex items-center justify-center">
+                     <p className="text-secondary-400 font-bold text-sm">No loyalty activity recorded yet.</p>
+                  </div>
+               ) : (
                <div className="h-[200px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                      <AreaChart data={loyaltyData}>
                         <defs>
                            <linearGradient id="colorPoints" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.1} />
-                              <stop offset="95%" stopColor="#F59E0B" stopOpacity={0} />
+                              <stop offset="5%" stopColor={chart.areaGradient.from} />
+                              <stop offset="95%" stopColor={chart.areaGradient.to} />
                            </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
                         <XAxis
                            dataKey="month"
                            axisLine={false}
                            tickLine={false}
-                           tick={{ fontSize: 10, fontWeight: 700, fill: '#94A3B8' }}
+                           tick={chart.tick}
                         />
                         <YAxis hide />
-                        <Tooltip
-                           contentStyle={{
-                              borderRadius: '1rem',
-                              border: 'none',
-                              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                              fontSize: '12px'
-                           }}
-                        />
+                        <Tooltip contentStyle={chart.tooltip} />
                         <Area
                            type="monotone"
                            dataKey="points"
-                           stroke="#F59E0B"
+                           stroke={chart.series[0]}
                            strokeWidth={3}
                            fillOpacity={1}
                            fill="url(#colorPoints)"
@@ -123,6 +167,7 @@ export function LoyaltyPage() {
                      </AreaChart>
                   </ResponsiveContainer>
                </div>
+               )}
             </div>
 
             {/* History Section */}
@@ -160,7 +205,7 @@ export function LoyaltyPage() {
                                  <tr key={tx.id} className="hover:bg-primary-50/30 transition-all group">
                                     <td className="px-8 py-6">
                                        <div className="flex items-center gap-4">
-                                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${tx.transaction_type === 'EARN' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                          <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${tx.transaction_type === 'EARN' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' : 'bg-rose-500/10 text-rose-600 dark:text-rose-300'}`}>
                                              {tx.transaction_type === 'EARN' ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownLeft className="h-5 w-5" />}
                                           </div>
                                           <div>
@@ -173,14 +218,12 @@ export function LoyaltyPage() {
                                        {format(new Date(tx.created_at), "MMM d, yyyy")}
                                     </td>
                                     <td className="px-8 py-6">
-                                       <p className={`text-sm font-black ${tx.transaction_type === 'EARN' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                       <p className={`text-sm font-black ${tx.transaction_type === 'EARN' ? 'text-emerald-600 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300'}`}>
                                           {tx.transaction_type === 'EARN' ? '+' : '-'}{tx.points.toLocaleString()}
                                        </p>
                                     </td>
                                     <td className="px-8 py-6 text-right">
-                                       <span className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-[10px] font-bold border border-emerald-100">
-                                          SUCCESS
-                                       </span>
+                                       <Badge variant="soft-success">Success</Badge>
                                     </td>
                                  </tr>
                               ))
@@ -197,6 +240,22 @@ export function LoyaltyPage() {
                </div>
             </div>
          </div>
+
+         <PointsActionModal
+            isOpen={award.isOpen}
+            onClose={award.close}
+            mode="earn"
+            patientId={id}
+            balance={balance}
+         />
+         <PointsActionModal
+            isOpen={redeem.isOpen}
+            onClose={redeem.close}
+            mode="redeem"
+            patientId={id}
+            balance={balance}
+         />
+         <TierBenefitsModal isOpen={tiers.isOpen} onClose={tiers.close} balance={balance} />
       </div>
    );
 }

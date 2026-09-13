@@ -1,16 +1,19 @@
+import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { MetricCard, type MetricTone } from "@/components/charts/MetricCard";
+import { useChartTheme } from "@/components/charts/chart-theme";
+import { routes } from "@/config/routes";
+import { useUnreadPatientMessageCount } from "@/features/portal-messages/hooks/use-portal-messages";
 import {
   Users,
-  Calendar,
   CreditCard,
   Package,
-  ArrowUpRight,
-  ArrowDownRight,
-  Activity,
-  TrendingUp,
   Clock,
-  UserCheck,
-  Stethoscope
+  Stethoscope,
+  UserPlus,
+  Activity,
+  Banknote,
+  MessageSquare,
 } from "lucide-react";
 import {
   BarChart,
@@ -20,23 +23,50 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  AreaChart,
-  Area
 } from "recharts";
 import { useState, useEffect } from "react";
-import { getDashboardOverview, DashboardMetrics } from "../api/tenant-dashboard.api";
+import {
+  getDashboardOverview,
+  getRecentActivity,
+  type TenantOverviewData,
+  type TenantActivityEvent,
+} from "../api/tenant-dashboard.api";
+
+function activityLabel(event: TenantActivityEvent): { title: string; detail: string } {
+  switch (event.type) {
+    case "patient_registered":
+      return { title: "Patient registered", detail: event.label || "New patient record created" };
+    case "visit_started":
+      return { title: "Visit started", detail: event.patient_id ? `Patient #${event.patient_id}` : "New encounter opened" };
+    case "payment_received":
+      return {
+        title: "Payment received",
+        detail: `₦${(event.amount ?? 0).toLocaleString()}${event.method ? ` • ${event.method}` : ""}`,
+      };
+    default:
+      return { title: event.type.replace(/_/g, " "), detail: event.label || "" };
+  }
+}
 
 export function TenantOverviewPage() {
-  const [metrics, setMetrics] = useState<DashboardMetrics["data"] | null>(null);
+  const [overview, setOverview] = useState<TenantOverviewData | null>(null);
+  const [activities, setActivities] = useState<TenantActivityEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const chart = useChartTheme();
+  const { data: unreadMessages = 0, isLoading: messagesLoading } =
+    useUnreadPatientMessageCount();
 
   useEffect(() => {
     async function loadMetrics() {
       try {
-        const response = await getDashboardOverview();
-        if (response.success) {
-          setMetrics(response.data);
+        const [overviewResponse, activityEvents] = await Promise.all([
+          getDashboardOverview(),
+          getRecentActivity(10).catch(() => [] as TenantActivityEvent[]),
+        ]);
+        if (overviewResponse.success) {
+          setOverview(overviewResponse.data);
         }
+        setActivities(activityEvents);
       } catch (err) {
         console.error("Failed to load dashboard metrics", err);
       } finally {
@@ -46,15 +76,31 @@ export function TenantOverviewPage() {
     loadMetrics();
   }, []);
 
-  const stats = [
-    { label: "Active Patients", value: metrics?.total_patients?.toLocaleString() || "0", icon: Users, trend: "+12.5%", color: "primary" },
-    { label: "Daily Consultations", value: metrics?.active_visits?.toString() || "0", icon: Stethoscope, trend: "+5.2%", color: "blue" },
-    { label: "Gross Revenue", value: `₦${metrics?.total_revenue?.toLocaleString() || "0"}`, icon: CreditCard, trend: "+18.4%", color: "primary" },
-    { label: "Inventory Alerts", value: metrics?.pending_appointments?.toString() || "0", icon: Package, trend: "-2", color: "rose" },
+  const inventoryAlerts =
+    (overview?.inventory_alerts?.low_stock_count ?? 0) +
+    (overview?.inventory_alerts?.expiring_soon_count ?? 0);
+
+  const stats: {
+    label: string;
+    value: string;
+    icon: typeof Users;
+    tone: MetricTone;
+  }[] = [
+    { label: "Active Patients", value: (overview?.patients?.total ?? 0).toLocaleString(), icon: Users, tone: "primary" },
+    { label: "Visits Today", value: (overview?.visits?.total_today ?? 0).toString(), icon: Stethoscope, tone: "cyan" },
+    { label: "Collected (MTD)", value: `₦${(overview?.billing?.collected_this_month ?? 0).toLocaleString()}`, icon: CreditCard, tone: "primary" },
+    { label: "Inventory Alerts", value: inventoryAlerts.toString(), icon: Package, tone: "rose" },
   ];
 
-  const recentActivities = metrics?.recent_activities || [];
-
+  const todayChartData = overview
+    ? [
+        { name: "New Patients", count: overview.today.new_patients_today },
+        { name: "Visits", count: overview.today.visits_today },
+        { name: "In Progress", count: overview.visits.in_progress },
+        { name: "Completed", count: overview.visits.completed_today },
+        { name: "Appointments", count: overview.today.appointments_today },
+      ]
+    : [];
 
   return (
     <section className="space-y-10 animate-fade-in">
@@ -63,40 +109,33 @@ export function TenantOverviewPage() {
           title="Facility Intelligence"
           description="Operational insights and real-time performance tracking for your healthcare facility."
         />
-        <div className="flex items-center gap-2 rounded-2xl bg-white border border-secondary-200 p-1.5 shadow-sm">
-          {["Daily", "Weekly", "Monthly"].map((period) => (
-            <button
-              key={period}
-              className={`px-6 py-2 text-xs font-bold rounded-xl transition-all ${period === "Weekly" ? "bg-secondary-900 text-white shadow-premium" : "text-secondary-500 hover:text-secondary-900 hover:bg-secondary-50"
-                }`}
-            >
-              {period}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="glass-card rounded-[2rem] p-8 group transition-all duration-500 hover:translate-y-[-8px] hover:shadow-premium">
-            <div className="flex items-start justify-between">
-              <div className={`p-4 rounded-2xl bg-${stat.color}-500/10 text-${stat.color}-600 group-hover:bg-${stat.color}-500 group-hover:text-white transition-all duration-300`}>
-                <stat.icon className="h-7 w-7" />
-              </div>
-              <div className={`flex items-center gap-1 text-[11px] font-bold ${stat.trend.startsWith('+') ? "text-primary-600 bg-primary-50" : "text-rose-600 bg-rose-50"
-                } px-3 py-1.5 rounded-full ring-1 ring-inset ${stat.trend.startsWith('+') ? "ring-primary-500/20" : "ring-rose-500/20"
-                }`}>
-                {stat.trend.startsWith('+') ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                {stat.trend}
-              </div>
-            </div>
-            <div className="mt-6">
-              <p className="text-sm font-bold text-secondary-500 uppercase tracking-widest">{stat.label}</p>
-              <p className="mt-2 text-4xl font-bold tracking-tight text-secondary-900 font-display">{stat.value}</p>
-            </div>
-          </div>
+          <MetricCard
+            key={stat.label}
+            label={stat.label}
+            value={stat.value}
+            icon={stat.icon}
+            tone={stat.tone}
+            isLoading={isLoading}
+          />
         ))}
+        <Link
+          to={routes.patientMessages}
+          className="rounded-3xl transition-transform hover:-translate-y-0.5"
+          title="View patient messages"
+        >
+          <MetricCard
+            label="Patient Messages"
+            value={unreadMessages.toLocaleString()}
+            icon={MessageSquare}
+            tone="amber"
+            isLoading={messagesLoading}
+          />
+        </Link>
       </div>
 
       {/* Charts & Activity Section */}
@@ -105,55 +144,47 @@ export function TenantOverviewPage() {
           <div className="glass-card rounded-[2rem] p-8 md:p-10">
             <div className="flex items-center justify-between mb-10">
               <div>
-                <h3 className="text-xl font-bold">Patient Admissions</h3>
-                <p className="text-sm text-secondary-500">Weekly breakdown of patient visits and registrations</p>
+                <h3 className="text-xl font-bold">Today's Operations</h3>
+                <p className="text-sm text-secondary-500">Live counts for registrations, visits and appointments today</p>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-primary-500" />
-                  <span className="text-xs font-bold text-secondary-600">Visits</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-secondary-200" />
-                  <span className="text-xs font-bold text-secondary-600">Admissions</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: chart.series[0] }} />
+                <span className="text-xs font-bold text-secondary-600">Count</span>
               </div>
             </div>
             <div className="h-[350px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={metrics?.visit_trends || []}>
-
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 600 }}
-                    dy={10}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 600 }}
-                  />
-                  <Tooltip
-                    cursor={{ fill: '#f8fafc' }}
-                    contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
-                  />
-                  <Bar
-                    dataKey="visits"
-                    fill="#10B981"
-                    radius={[8, 8, 0, 0]}
-                    barSize={40}
-                  />
-                  <Bar
-                    dataKey="patients"
-                    fill="#e2e8f0"
-                    radius={[8, 8, 0, 0]}
-                    barSize={40}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              {isLoading ? (
+                <div className="h-full w-full rounded-2xl bg-secondary-100/30 animate-pulse" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={todayChartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={chart.tick}
+                      dy={10}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={chart.tick}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      cursor={chart.cursor}
+                      contentStyle={chart.tooltip}
+                    />
+                    <Bar
+                      dataKey="count"
+                      fill={chart.series[0]}
+                      radius={[8, 8, 0, 0]}
+                      barSize={40}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>
@@ -162,23 +193,41 @@ export function TenantOverviewPage() {
           <div className="glass-card rounded-[2rem] p-8 md:p-10 flex flex-col h-full">
             <div className="flex items-center justify-between mb-8">
               <h3 className="text-xl font-bold">Recent Stream</h3>
-              <button className="text-xs font-bold text-primary-600 hover:underline">View All</button>
             </div>
             <div className="space-y-6 flex-1 overflow-y-auto pr-2 scrollbar-hide">
-              {recentActivities.map((activity) => (
-                <div key={activity.id} className="flex gap-4 group cursor-pointer">
-                  <div className="h-10 w-10 shrink-0 rounded-xl bg-secondary-50 flex items-center justify-center text-secondary-500 group-hover:bg-primary-50 group-hover:text-primary-600 transition-all">
-                    <Clock className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 min-w-0 border-b border-secondary-400 pb-4">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="text-sm font-bold text-secondary-900 truncate">{activity.user}</p>
-                      <span className="text-[10px] font-bold text-secondary-400 whitespace-nowrap">{activity.time}</span>
+              {activities.length === 0 && !isLoading ? (
+                <p className="text-sm font-medium text-secondary-400">No recent activity.</p>
+              ) : (
+                activities.map((activity, index) => {
+                  const { title, detail } = activityLabel(activity);
+                  const Icon =
+                    activity.type === "patient_registered"
+                      ? UserPlus
+                      : activity.type === "payment_received"
+                        ? Banknote
+                        : activity.type === "visit_started"
+                          ? Activity
+                          : Clock;
+                  return (
+                    <div key={`${activity.type}-${activity.occurred_at}-${index}`} className="flex gap-4 group cursor-pointer">
+                      <div className="h-10 w-10 shrink-0 rounded-xl bg-secondary-50 flex items-center justify-center text-secondary-500 group-hover:bg-primary-50 group-hover:text-primary-600 transition-all dark:bg-white/5 dark:group-hover:bg-primary-500/10 dark:group-hover:text-primary-400">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 min-w-0 border-b border-secondary-400 pb-4 dark:border-white/10">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <p className="text-sm font-bold text-secondary-900 truncate">{title}</p>
+                          <span className="text-[10px] font-bold text-secondary-400 whitespace-nowrap">
+                            {activity.occurred_at
+                              ? new Date(activity.occurred_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                              : ""}
+                          </span>
+                        </div>
+                        <p className="text-xs text-secondary-500 line-clamp-1">{detail}</p>
+                      </div>
                     </div>
-                    <p className="text-xs text-secondary-500 line-clamp-1">{activity.detail}</p>
-                  </div>
-                </div>
-              ))}
+                  );
+                })
+              )}
             </div>
             <button className="btn-secondary w-full mt-8 py-2.5">
               Generate Report
@@ -189,5 +238,3 @@ export function TenantOverviewPage() {
     </section>
   );
 }
-
-

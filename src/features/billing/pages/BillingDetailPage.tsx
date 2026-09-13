@@ -1,219 +1,652 @@
-import { PageHeader } from "@/components/layout/PageHeader";
-import {
-   ArrowLeft,
-   Download,
-   Printer,
-   Mail,
-   MoreHorizontal,
-   CreditCard,
-   Building2,
-   Calendar,
-   User,
-   CheckCircle2,
-   AlertCircle,
-   FileText,
-   ShieldCheck,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  Ban,
+  CreditCard,
+  History,
+  Receipt,
+  RotateCcw,
+} from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardHeader } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
+import { Modal } from "@/components/ui/Modal";
+import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton, CardSkeleton } from "@/components/ui/Skeleton";
+import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
+import { useToast } from "@/components/feedback/ToastProvider";
+import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
+import { useDisclosure } from "@/hooks/useDisclosure";
 import { routes } from "@/config/routes";
+import { membershipApi, formatCardMoney } from "@/features/patients/api/membership.api";
+import {
+  formatMoney,
+  type Invoice,
+  type InvoiceItem,
+  type InvoicePayment,
+} from "../api/billing.api";
+import {
+  useInvoice,
+  useInvoicePayments,
+  useReceivePayment,
+  useVoidInvoice,
+} from "../hooks/use-billing";
+import { InvoiceStatusBadge } from "../components/InvoiceStatusBadge";
+
+const PAYMENT_METHOD_OPTIONS = [
+  { value: "CASH", label: "Cash" },
+  { value: "CARD", label: "Card" },
+  { value: "POS", label: "POS Terminal" },
+  { value: "BANK_TRANSFER", label: "Bank Transfer" },
+  { value: "MOBILE_MONEY", label: "Mobile Money" },
+  { value: "INSURANCE", label: "Insurance" },
+  { value: "LOYALTY", label: "Loyalty" },
+  { value: "WAIVER", label: "Waiver" },
+  { value: "MEMBERSHIP_CARD", label: "Membership Card" },
+  { value: "OTHER", label: "Other" },
+];
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+const PAYMENT_STATUS_VARIANT: Record<string, "soft-success" | "soft-warning" | "soft-danger" | "secondary"> = {
+  SUCCESSFUL: "soft-success",
+  PENDING: "soft-warning",
+  FAILED: "soft-danger",
+  REVERSED: "soft-danger",
+  CANCELLED: "secondary",
+};
+
+function RecordPaymentModal({
+  invoice,
+  isOpen,
+  onClose,
+}: {
+  invoice: Invoice;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const toast = useToast();
+  const receivePayment = useReceivePayment();
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState("CASH");
+  const [note, setNote] = useState("");
+  const [cardId, setCardId] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const isCardMethod = method === "MEMBERSHIP_CARD";
+
+  const cardsQuery = useQuery({
+    queryKey: ["membership-cards", "patient", invoice.patient_id],
+    queryFn: () => membershipApi.forPatient(invoice.patient_id),
+    enabled: isCardMethod && typeof invoice.patient_id === "number",
+  });
+  const cards = cardsQuery.data ?? [];
+  const selectedCard = useMemo(
+    () => cards.find((c) => String(c.id) === cardId),
+    [cards, cardId],
+  );
+  const selectedCardBalance = selectedCard ? Number(selectedCard.balance) : 0;
+
+  const handleClose = () => {
+    setAmount("");
+    setMethod("CASH");
+    setNote("");
+    setCardId("");
+    setError(null);
+    onClose();
+  };
+
+  const handleSubmit = () => {
+    const parsed = Number(amount);
+    if (!parsed || parsed <= 0) {
+      setError("Enter a payment amount greater than zero.");
+      return;
+    }
+    if (isCardMethod) {
+      if (!selectedCard) {
+        setError("Select the membership card to debit.");
+        return;
+      }
+      if (selectedCard.status !== "ACTIVE") {
+        setError(`This card is ${selectedCard.status.toLowerCase()} and cannot be used.`);
+        return;
+      }
+      if (parsed > selectedCardBalance) {
+        setError(`Insufficient card balance (${formatCardMoney(selectedCardBalance)}).`);
+        return;
+      }
+    }
+    setError(null);
+    receivePayment.mutate(
+      {
+        invoice_id: invoice.id,
+        amount: parsed,
+        payment_method: method,
+        membership_card_id: isCardMethod && selectedCard ? selectedCard.id : undefined,
+        note: note.trim() || undefined,
+      },
+      {
+        onSuccess: (payment) => {
+          toast.success("Payment recorded", `Reference ${payment.payment_reference}`);
+          handleClose();
+        },
+        onError: (err: any) => {
+          toast.error(
+            "Failed to record payment",
+            err?.response?.data?.detail?.toString?.() ??
+              err?.response?.data?.message ??
+              err?.message,
+          );
+        },
+      },
+    );
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={`Record Payment — ${invoice.invoice_no}`}
+      size="sm"
+      footer={
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            isLoading={receivePayment.isPending}
+            leftIcon={<CreditCard className="h-4 w-4" />}
+          >
+            Record Payment
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-5">
+        <div className="glass-card p-4">
+          <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
+            Balance Due
+          </p>
+          <p className="data-mono mt-1 text-2xl font-bold text-secondary-900">
+            {formatMoney(invoice.balance_due)}
+          </p>
+        </div>
+        <Input
+          label="Amount"
+          type="number"
+          min={0}
+          step="0.01"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          error={error ?? undefined}
+        />
+        <Select
+          label="Payment Method"
+          options={PAYMENT_METHOD_OPTIONS}
+          value={method}
+          onChange={(e) => setMethod(e.target.value)}
+        />
+        {isCardMethod ? (
+          cardsQuery.isLoading ? (
+            <Skeleton className="h-12 w-full" />
+          ) : cards.length === 0 ? (
+            <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-xs font-bold text-amber-600">
+              This patient has no membership card on file.
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Select
+                label="Membership Card"
+                value={cardId}
+                onChange={(e) => setCardId(e.target.value)}
+                options={[
+                  { value: "", label: "Select a card…" },
+                  ...cards.map((c) => ({
+                    value: String(c.id),
+                    label: `${c.card_number} — ${formatCardMoney(c.balance)}${
+                      c.status !== "ACTIVE" ? ` (${c.status})` : ""
+                    }`,
+                  })),
+                ]}
+              />
+              {selectedCard ? (
+                <p
+                  className={`text-xs font-semibold ${
+                    selectedCardBalance < Number(amount || 0)
+                      ? "text-rose-500"
+                      : "text-secondary-500"
+                  }`}
+                >
+                  Available balance: {formatCardMoney(selectedCardBalance)}
+                </p>
+              ) : null}
+            </div>
+          )
+        ) : null}
+        <Textarea
+          label="Note (optional)"
+          rows={3}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="e.g. POS terminal 2, teller ref…"
+        />
+      </div>
+    </Modal>
+  );
+}
 
 export function BillingDetailPage() {
-   const navigate = useNavigate();
-   const { invoiceId } = useParams<{ invoiceId: string }>();
+  const navigate = useNavigate();
+  const { invoiceId } = useParams<{ invoiceId: string }>();
+  const numericId = invoiceId && /^\d+$/.test(invoiceId) ? Number(invoiceId) : undefined;
 
-   // Mock data for the demonstration
-   const invoice = {
-      id: invoiceId || "INV-2026-0042",
-      date: "May 12, 2026",
-      dueDate: "May 26, 2026",
-      status: "PAID",
-      customer: {
-         name: "Johnathan Smith",
-         id: "PAT-8829",
-         email: "j.smith@email.com",
-         phone: "+1 (555) 012-3456",
-         address: "742 Evergreen Terrace, Springfield"
-      },
-      items: [
-         { id: 1, description: "General Consultation - Senior Physician", qty: 1, price: 150.00 },
-         { id: 2, description: "Full Blood Count (Lab)", qty: 1, price: 45.00 },
-         { id: 3, description: "Amoxicillin 500mg (14 Tabs)", qty: 2, price: 12.50 },
-         { id: 4, description: "Emergency Room Surcharge", qty: 1, price: 250.00 },
-      ],
-      subtotal: 470.00,
-      tax: 37.60,
-      total: 507.60
-   };
+  const invoiceQuery = useInvoice(numericId);
+  const paymentsQuery = useInvoicePayments(numericId);
+  const voidInvoice = useVoidInvoice();
+  const toast = useToast();
 
-   return (
-      <div className="space-y-10 animate-fade-in pb-20">
-         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-4">
-               <button
-                  onClick={() => navigate(routes.billing)}
-                  className="flex items-center gap-2 text-secondary-400 hover:text-secondary-900 font-bold transition-all group"
-               >
-                  <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-                  <span className="text-[10px] uppercase tracking-widest">Back to Invoices</span>
-               </button>
-               <PageHeader
-                  title={`Invoice ${invoice.id}`}
-                  description="Detailed breakdown of clinical charges and payment history."
-               />
-            </div>
-            <div className="flex gap-3">
-               <button className="btn-secondary gap-3 py-3 px-6">
-                  <Printer className="h-4 w-4" />
-                  <span className="font-bold">Print PDF</span>
-               </button>
-               <button className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
-                  <CreditCard className="h-5 w-5" />
-                  <span className="font-bold">Record Payment</span>
-               </button>
-            </div>
-         </div>
+  const paymentModal = useDisclosure();
+  const voidDialog = useDisclosure();
 
-         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            {/* Main Invoice Content */}
-            <div className="lg:col-span-2 space-y-8">
-               <div className="glass-card rounded-[3rem] p-12 border border-secondary-400/50 bg-white/40 shadow-premium relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-12">
-                     <div className={`px-6 py-2 rounded-2xl text-xs font-black border flex items-center gap-2 ${invoice.status === 'PAID' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                        {invoice.status === 'PAID' ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                        {invoice.status}
-                     </div>
-                  </div>
+  const invoice = invoiceQuery.data;
 
-                  {/* Branding & Header */}
-                  <div className="flex items-center gap-4 mb-16">
-                     <div className="h-14 w-14 rounded-2xl bg-secondary-900 flex items-center justify-center">
-                        <Building2 className="h-8 w-8 text-white" />
-                     </div>
-                     <div>
-                        <h2 className="text-xl font-black text-secondary-900 tracking-tight">Carepoint HMS</h2>
-                        <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-[0.2em]">Medical Excellence</p>
-                     </div>
-                  </div>
+  const itemColumns: DataTableColumn<InvoiceItem>[] = [
+    {
+      key: "service_name",
+      header: "Description",
+      render: (item) => (
+        <div>
+          <p className="text-sm font-bold text-secondary-900">{item.service_name}</p>
+          {item.service_code ? (
+            <p className="data-mono mt-0.5 text-xs text-secondary-400">{item.service_code}</p>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: "quantity",
+      header: "Qty",
+      align: "center",
+      render: (item) => <span className="data-mono text-sm">{item.quantity}</span>,
+    },
+    {
+      key: "unit_price",
+      header: "Unit Price",
+      align: "right",
+      render: (item) => <span className="data-mono text-sm">{formatMoney(item.unit_price)}</span>,
+    },
+    {
+      key: "discount_amount",
+      header: "Discount",
+      align: "right",
+      render: (item) => (
+        <span className="data-mono text-sm text-secondary-500">
+          {item.discount_amount > 0 ? `-${formatMoney(item.discount_amount)}` : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "line_total",
+      header: "Line Total",
+      align: "right",
+      render: (item) => (
+        <span className="data-mono text-sm font-bold text-secondary-900">
+          {formatMoney(item.line_total)}
+        </span>
+      ),
+    },
+  ];
 
-                  <div className="grid grid-cols-2 gap-12 mb-16">
-                     <div>
-                        <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-4">Bill To</p>
-                        <h4 className="text-lg font-black text-secondary-900">{invoice.customer.name}</h4>
-                        <p className="text-sm text-secondary-500 font-medium mt-1">{invoice.customer.id}</p>
-                        <div className="mt-4 space-y-1">
-                           <p className="text-xs text-secondary-500">{invoice.customer.email}</p>
-                           <p className="text-xs text-secondary-500">{invoice.customer.phone}</p>
-                        </div>
-                     </div>
-                     <div className="text-right">
-                        <div className="space-y-4">
-                           <div>
-                              <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-1">Date Issued</p>
-                              <p className="text-sm font-black text-secondary-900">{invoice.date}</p>
-                           </div>
-                           <div>
-                              <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-1">Due Date</p>
-                              <p className="text-sm font-black text-secondary-900">{invoice.dueDate}</p>
-                           </div>
-                        </div>
-                     </div>
-                  </div>
+  const paymentColumns: DataTableColumn<InvoicePayment>[] = [
+    {
+      key: "payment_reference",
+      header: "Reference",
+      render: (p) => (
+        <span className="data-mono text-sm font-bold text-secondary-900">
+          {p.payment_reference}
+        </span>
+      ),
+    },
+    {
+      key: "payment_method",
+      header: "Method",
+      render: (p) => (
+        <span className="text-sm text-secondary-600">
+          {(p.payment_method ?? "—").replace(/_/g, " ")}
+        </span>
+      ),
+    },
+    {
+      key: "paid_at",
+      header: "Paid At",
+      render: (p) => (
+        <span className="text-sm text-secondary-600">{formatDateTime(p.paid_at)}</span>
+      ),
+    },
+    {
+      key: "payment_status",
+      header: "Status",
+      render: (p) => (
+        <Badge variant={PAYMENT_STATUS_VARIANT[p.payment_status] ?? "secondary"}>
+          {p.payment_status}
+        </Badge>
+      ),
+    },
+    {
+      key: "amount",
+      header: "Amount",
+      align: "right",
+      render: (p) => (
+        <span className="data-mono text-sm font-bold text-secondary-900">
+          {formatMoney(p.amount, p.currency)}
+        </span>
+      ),
+    },
+  ];
 
-                  {/* Table */}
-                  <div className="mb-16">
-                     <table className="w-full">
-                        <thead>
-                           <tr className="border-b border-secondary-400">
-                              <th className="py-4 text-left text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Description</th>
-                              <th className="py-4 text-center text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Qty</th>
-                              <th className="py-4 text-right text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Price</th>
-                              <th className="py-4 text-right text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Total</th>
-                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-secondary-50">
-                           {invoice.items.map((item) => (
-                              <tr key={item.id} className="group">
-                                 <td className="py-6">
-                                    <p className="text-sm font-bold text-secondary-900">{item.description}</p>
-                                    <p className="text-[10px] text-secondary-400 font-medium mt-0.5">Code: SRV-00{item.id}</p>
-                                 </td>
-                                 <td className="py-6 text-center text-sm font-bold text-secondary-600">{item.qty}</td>
-                                 <td className="py-6 text-right text-sm font-bold text-secondary-600">${item.price.toFixed(2)}</td>
-                                 <td className="py-6 text-right text-sm font-black text-secondary-900">${(item.qty * item.price).toFixed(2)}</td>
-                              </tr>
-                           ))}
-                        </tbody>
-                     </table>
-                  </div>
+  const canReceivePayment =
+    invoice && invoice.balance_due > 0 && ["ISSUED", "PARTIALLY_PAID"].includes(invoice.status);
+  const canVoid = invoice && !["VOIDED", "CANCELLED", "PAID"].includes(invoice.status);
 
-                  {/* Totals */}
-                  <div className="flex justify-end">
-                     <div className="w-64 space-y-4">
-                        <div className="flex justify-between text-sm font-bold text-secondary-500">
-                           <span>Subtotal</span>
-                           <span>${invoice.subtotal.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm font-bold text-secondary-500">
-                           <span>Tax (8%)</span>
-                           <span>${invoice.tax.toFixed(2)}</span>
-                        </div>
-                        <div className="pt-4 border-t border-secondary-400 flex justify-between items-center">
-                           <span className="text-lg font-black text-secondary-900">Total</span>
-                           <span className="text-2xl font-black text-primary-600">${invoice.total.toFixed(2)}</span>
-                        </div>
-                     </div>
-                  </div>
-               </div>
-            </div>
+  const handleVoid = async () => {
+    if (!invoice) return;
+    try {
+      await voidInvoice.mutateAsync({ invoiceId: invoice.id });
+      toast.success("Invoice voided", `Invoice ${invoice.invoice_no} has been voided.`);
+    } catch (err: any) {
+      toast.error(
+        "Failed to void invoice",
+        err?.response?.data?.detail?.toString?.() ?? err?.message,
+      );
+    }
+  };
 
-            {/* Sidebar Info */}
-            <div className="lg:col-span-1 space-y-6">
-               <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
-                  <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-6">Payment Method</h4>
-                  <div className="p-4 rounded-2xl bg-secondary-900/5 flex items-center gap-4 border border-secondary-400">
-                     <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center border border-secondary-400 shadow-sm">
-                        <CreditCard className="h-5 w-5 text-secondary-600" />
-                     </div>
-                     <div>
-                        <p className="text-xs font-bold text-secondary-900">Visa ending in 4429</p>
-                        <p className="text-[10px] text-secondary-500 font-medium uppercase mt-0.5 tracking-tighter">Processed May 12, 14:22</p>
-                     </div>
-                  </div>
-               </div>
-
-               <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
-                  <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-6">Related Documents</h4>
-                  <div className="space-y-3">
-                     <div className="flex items-center justify-between p-3 rounded-xl hover:bg-white/60 transition-all cursor-pointer group">
-                        <div className="flex items-center gap-3">
-                           <FileText className="h-4 w-4 text-primary-500" />
-                           <span className="text-xs font-bold text-secondary-700">Lab Results.pdf</span>
-                        </div>
-                        <Download className="h-3 w-3 text-secondary-400 group-hover:text-primary-500" />
-                     </div>
-                     <div className="flex items-center justify-between p-3 rounded-xl hover:bg-white/60 transition-all cursor-pointer group">
-                        <div className="flex items-center gap-3">
-                           <FileText className="h-4 w-4 text-primary-500" />
-                           <span className="text-xs font-bold text-secondary-700">Prescription.pdf</span>
-                        </div>
-                        <Download className="h-3 w-3 text-secondary-400 group-hover:text-primary-500" />
-                     </div>
-                  </div>
-               </div>
-
-               <div className="glass-card rounded-[2.5rem] p-8 border border-emerald-100 bg-emerald-50/30">
-                  <div className="flex items-start gap-4">
-                     <ShieldCheck className="h-6 w-6 text-emerald-500 shrink-0" />
-                     <div>
-                        <h4 className="text-sm font-bold text-secondary-900 mb-1">Insurance Verified</h4>
-                        <p className="text-xs text-secondary-500 leading-relaxed">
-                           This invoice has been reviewed and approved by the insurance provider (AXA Mansard).
-                        </p>
-                     </div>
-                  </div>
-               </div>
-            </div>
-         </div>
+  if (numericId === undefined) {
+    return (
+      <div className="space-y-8 animate-fade-in">
+        <EmptyState
+          icon={Receipt}
+          title="Invalid invoice reference"
+          description="This link does not point to a valid invoice."
+          action={
+            <Button variant="secondary" onClick={() => navigate(routes.billing)}>
+              Back to Billing
+            </Button>
+          }
+        />
       </div>
-   );
+    );
+  }
+
+  if (invoiceQuery.isLoading) {
+    return (
+      <div className="space-y-8 animate-fade-in">
+        <Skeleton className="h-10 w-72" />
+        <CardSkeleton />
+        <CardSkeleton />
+      </div>
+    );
+  }
+
+  if (invoiceQuery.isError || !invoice) {
+    return (
+      <div className="space-y-8 animate-fade-in">
+        <EmptyState
+          icon={Receipt}
+          title="Invoice not found"
+          description="The invoice could not be loaded. It may have been removed, or you may not have access."
+          action={
+            <div className="flex gap-3">
+              <Button
+                variant="secondary"
+                leftIcon={<RotateCcw className="h-4 w-4" />}
+                onClick={() => invoiceQuery.refetch()}
+              >
+                Retry
+              </Button>
+              <Button variant="ghost" onClick={() => navigate(routes.billing)}>
+                Back to Billing
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8 animate-fade-in">
+      <PageHeader
+        eyebrow={
+          <button
+            type="button"
+            onClick={() => navigate(routes.billing)}
+            className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-secondary-400 transition-colors hover:text-secondary-900 dark:hover:text-secondary-100"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Invoices
+          </button>
+        }
+        title={`Invoice ${invoice.invoice_no}`}
+        description="Detailed breakdown of clinical charges and payment history."
+        actions={
+          <>
+            {canVoid ? (
+              <Button
+                variant="danger"
+                leftIcon={<Ban className="h-4 w-4" />}
+                onClick={voidDialog.open}
+              >
+                Void
+              </Button>
+            ) : null}
+            {canReceivePayment ? (
+              <Button leftIcon={<CreditCard className="h-4 w-4" />} onClick={paymentModal.open}>
+                Record Payment
+              </Button>
+            ) : null}
+          </>
+        }
+      />
+
+      <div className="grid gap-8 lg:grid-cols-3">
+        <div className="space-y-8 lg:col-span-2">
+          <Card padding="none">
+            <div className="flex flex-wrap items-start justify-between gap-4 px-6 pt-6">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
+                  Billed To
+                </p>
+                <p className="mt-1 text-lg font-bold text-secondary-900">
+                  Patient #{invoice.patient_id}
+                </p>
+                {invoice.visit_id ? (
+                  <p className="text-sm text-secondary-500">Visit #{invoice.visit_id}</p>
+                ) : null}
+              </div>
+              <div className="text-right">
+                <InvoiceStatusBadge status={invoice.status} />
+                <p className="mt-3 text-xs text-secondary-400">
+                  Issued {formatDate(invoice.invoice_date)}
+                </p>
+                <p className="text-xs text-secondary-400">Due {formatDate(invoice.due_date)}</p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <DataTable
+                columns={itemColumns}
+                data={invoice.items}
+                rowKey={(item) => item.id}
+                empty={{
+                  icon: Receipt,
+                  title: "No line items",
+                  description: "This invoice has no charge lines.",
+                }}
+              />
+            </div>
+            <div className="flex justify-end border-t border-secondary-100 px-6 py-6 dark:border-white/5">
+              <dl className="w-72 space-y-3">
+                <div className="flex justify-between text-sm font-medium text-secondary-500">
+                  <dt>Subtotal</dt>
+                  <dd className="data-mono">{formatMoney(invoice.subtotal_amount)}</dd>
+                </div>
+                <div className="flex justify-between text-sm font-medium text-secondary-500">
+                  <dt>Discount</dt>
+                  <dd className="data-mono">
+                    {invoice.discount_amount > 0
+                      ? `-${formatMoney(invoice.discount_amount)}`
+                      : formatMoney(0)}
+                  </dd>
+                </div>
+                <div className="flex justify-between text-sm font-medium text-secondary-500">
+                  <dt>Tax</dt>
+                  <dd className="data-mono">{formatMoney(invoice.tax_amount)}</dd>
+                </div>
+                <div className="flex justify-between border-t border-secondary-100 pt-3 text-base font-bold text-secondary-900 dark:border-white/5">
+                  <dt>Total</dt>
+                  <dd className="data-mono">{formatMoney(invoice.total_amount)}</dd>
+                </div>
+                <div className="flex justify-between text-sm font-medium text-emerald-500">
+                  <dt>Paid</dt>
+                  <dd className="data-mono">{formatMoney(invoice.amount_paid)}</dd>
+                </div>
+                <div className="flex justify-between text-base font-bold">
+                  <dt className="text-secondary-900">Balance Due</dt>
+                  <dd
+                    className={
+                      invoice.balance_due > 0
+                        ? "data-mono text-rose-500"
+                        : "data-mono text-emerald-500"
+                    }
+                  >
+                    {formatMoney(invoice.balance_due)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </Card>
+
+          <Card padding="none">
+            <CardHeader
+              title={
+                <span className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-primary-500" />
+                  Payment History
+                </span>
+              }
+              description="All payments received against this invoice."
+              className="px-6 pt-6"
+            />
+            <DataTable
+              columns={paymentColumns}
+              data={paymentsQuery.data}
+              rowKey={(p) => p.id}
+              isLoading={paymentsQuery.isLoading}
+              error={paymentsQuery.isError ? "Failed to load payments." : null}
+              onRetry={() => paymentsQuery.refetch()}
+              skeletonRows={3}
+              empty={{
+                icon: CreditCard,
+                title: "No payments yet",
+                description: "Payments recorded against this invoice will appear here.",
+                action: canReceivePayment ? (
+                  <Button
+                    size="sm"
+                    leftIcon={<CreditCard className="h-3.5 w-3.5" />}
+                    onClick={paymentModal.open}
+                  >
+                    Record Payment
+                  </Button>
+                ) : undefined,
+              }}
+            />
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader title="Summary" />
+            <dl className="space-y-4">
+              <div>
+                <dt className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
+                  Invoice No.
+                </dt>
+                <dd className="data-mono mt-1 text-sm font-bold text-secondary-900">
+                  {invoice.invoice_no}
+                </dd>
+              </div>
+              {invoice.billing_id ? (
+                <div>
+                  <dt className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
+                    Billing Record
+                  </dt>
+                  <dd className="data-mono mt-1 text-sm font-bold text-secondary-900">
+                    #{invoice.billing_id}
+                  </dd>
+                </div>
+              ) : null}
+              <div>
+                <dt className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
+                  Payments Recorded
+                </dt>
+                <dd className="data-mono mt-1 text-sm font-bold text-secondary-900">
+                  {paymentsQuery.data?.length ?? 0}
+                </dd>
+              </div>
+              {invoice.note ? (
+                <div>
+                  <dt className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
+                    Note
+                  </dt>
+                  <dd className="mt-1 text-sm text-secondary-600">{invoice.note}</dd>
+                </div>
+              ) : null}
+            </dl>
+          </Card>
+        </div>
+      </div>
+
+      <RecordPaymentModal
+        invoice={invoice}
+        isOpen={paymentModal.isOpen}
+        onClose={paymentModal.close}
+      />
+
+      <ConfirmDialog
+        isOpen={voidDialog.isOpen}
+        onClose={voidDialog.close}
+        onConfirm={handleVoid}
+        title="Void this invoice?"
+        tone="danger"
+        description={`Invoice ${invoice.invoice_no} will be voided. This cannot be undone.`}
+        confirmLabel="Void Invoice"
+      />
+    </div>
+  );
 }

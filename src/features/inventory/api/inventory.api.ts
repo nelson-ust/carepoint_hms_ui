@@ -1,4 +1,6 @@
 import { apiClient } from "@/lib/api/api-client";
+import { hydrateBlobError } from "@/lib/api/api-error";
+import { fetchAllPaged } from "@/lib/api/paginate";
 import type { PaginatedResponse } from "@/features/visits/api/visits.api";
 import type { Drug } from "@/features/drugs/api/drugs.api";
 
@@ -14,11 +16,12 @@ export type Store = {
   updated_at: string;
 };
 
+// Must match the backend InventoryItemType enum / create-schema validator.
 export const STOCK_ITEM_TYPES = [
   "DRUG",
   "CONSUMABLE",
-  "REAGENT",
   "EQUIPMENT",
+  "SUPPLY",
   "OTHER",
 ] as const;
 
@@ -32,6 +35,7 @@ export type StockItem = {
   unit_of_measure?: string;
   quantity_on_hand: number;
   reorder_level?: number;
+  effective_reorder_level?: number;
   unit_cost?: number;
   expiry_date?: string;
   batch_no?: string;
@@ -136,16 +140,53 @@ export type MovementActionResponse = {
   movement: StockMovement;
 };
 
+// ---------- Normalization helpers ----------
+
+/** The backend serializes Decimal columns (quantities, costs) as strings — coerce to numbers. */
+function toNumber(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function toOptionalNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  return toNumber(value);
+}
+
+function normalizeStockItem(raw: StockItem): StockItem {
+  return {
+    ...raw,
+    quantity_on_hand: toNumber(raw.quantity_on_hand),
+    reorder_level: toOptionalNumber(raw.reorder_level),
+    unit_cost: toOptionalNumber(raw.unit_cost),
+  };
+}
+
+function normalizeMovement(raw: StockMovement): StockMovement {
+  return {
+    ...raw,
+    quantity: toNumber(raw.quantity),
+    balance_after: toNumber(raw.balance_after),
+    stock_item: raw.stock_item ? normalizeStockItem(raw.stock_item) : raw.stock_item,
+  };
+}
+
 // ---------- Stores ----------
 
 export async function listStores(
   params: { skip?: number; limit?: number } = {},
 ): Promise<PaginatedResponse<Store>> {
-  const { skip = 0, limit = 200 } = params;
-  const response = await apiClient.get<PaginatedResponse<Store>>("/inventory/stores", {
-    params: { skip, limit },
+  // Paged in backend-safe chunks so the list loads regardless of the live
+  // backend's limit cap. See lib/api/paginate.ts.
+  return fetchAllPaged<Store>(apiClient, "/inventory/stores", {
+    skip: params.skip,
+    limit: params.limit ?? 200,
+    defaultMessage: "Stores fetched successfully.",
   });
-  return response.data;
 }
 
 export async function getStore(storeId: number): Promise<Store> {
@@ -181,17 +222,84 @@ export async function deleteStore(
 // ---------- Stock Items ----------
 
 export async function listStockItems(
-  params: { skip?: number; limit?: number; store_id?: number } = {},
+  params: {
+    skip?: number;
+    limit?: number;
+    store_id?: number;
+    drug_id?: number;
+    item_type?: string;
+    only_low_stock?: boolean;
+    search?: string;
+  } = {},
 ): Promise<PaginatedResponse<StockItem>> {
-  const { skip = 0, limit = 500, store_id } = params;
-  const response = await apiClient.get<PaginatedResponse<StockItem>>("/inventory/items", {
-    params: { skip, limit, store_id },
+  const { skip, limit = 500, store_id, drug_id, item_type, only_low_stock, search } = params;
+  return fetchAllPaged<StockItem>(apiClient, "/inventory/items", {
+    skip,
+    limit,
+    params: { store_id, drug_id, item_type, only_low_stock, search },
+    mapItem: normalizeStockItem,
+    defaultMessage: "Stock items fetched successfully.",
   });
-  return response.data;
 }
 
 export async function getStockItem(itemId: number): Promise<StockItem> {
   const response = await apiClient.get<StockItem>(`/inventory/items/${itemId}`);
+  return normalizeStockItem(response.data);
+}
+
+// ---------- Bulk import ----------
+
+export type BulkUploadRowError = { row?: number | null; message: string };
+
+export type BulkUploadResult = {
+  success: boolean;
+  message: string;
+  total_rows: number;
+  created: number;
+  failed: number;
+  errors: BulkUploadRowError[];
+};
+
+/** Download the pre-populated .xlsx template and trigger a browser save. */
+export async function downloadStockItemTemplate(): Promise<void> {
+  let response;
+  try {
+    response = await apiClient.get("/inventory/items/template", {
+      responseType: "blob",
+    });
+  } catch (err) {
+    // A blob request hides the server's JSON error — surface the real reason.
+    throw await hydrateBlobError(err);
+  }
+  const blob = response.data as Blob;
+  if (blob.type && blob.type.includes("application/json")) {
+    let parsed: any = undefined;
+    try {
+      parsed = JSON.parse(await blob.text());
+    } catch {
+      /* ignore */
+    }
+    throw { response: { data: parsed } };
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "stock_items_template.xlsx";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Upload a filled template; returns a per-row import summary. */
+export async function bulkUploadStockItems(file: File): Promise<BulkUploadResult> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await apiClient.post<BulkUploadResult>(
+    "/inventory/items/bulk-upload",
+    form,
+    { headers: { "Content-Type": "multipart/form-data" } },
+  );
   return response.data;
 }
 
@@ -225,14 +333,22 @@ export async function deleteStockItem(
 // ---------- Inventory Movements (per inventory_routes.py) ----------
 
 export async function listInventoryMovements(
-  params: { skip?: number; limit?: number; store_id?: number } = {},
+  params: {
+    skip?: number;
+    limit?: number;
+    store_id?: number;
+    stock_item_id?: number;
+    movement_type?: string;
+  } = {},
 ): Promise<PaginatedResponse<StockMovement>> {
-  const { skip = 0, limit = 200, store_id } = params;
-  const response = await apiClient.get<PaginatedResponse<StockMovement>>(
-    "/inventory/movements",
-    { params: { skip, limit, store_id } },
-  );
-  return response.data;
+  const { skip, limit = 200, store_id, stock_item_id, movement_type } = params;
+  return fetchAllPaged<StockMovement>(apiClient, "/inventory/movements", {
+    skip,
+    limit,
+    params: { store_id, stock_item_id, movement_type },
+    mapItem: normalizeMovement,
+    defaultMessage: "Movements fetched successfully.",
+  });
 }
 
 export async function recordInventoryMovement(
@@ -247,5 +363,5 @@ export async function recordInventoryMovement(
 
 export async function getInventoryMovement(movementId: number): Promise<StockMovement> {
   const response = await apiClient.get<StockMovement>(`/inventory/movements/${movementId}`);
-  return response.data;
+  return normalizeMovement(response.data);
 }

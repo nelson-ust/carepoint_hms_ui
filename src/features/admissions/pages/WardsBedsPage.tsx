@@ -20,6 +20,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { apiErrorMessage } from "@/lib/api/api-error";
 import {
   createWard,
   deleteWard,
@@ -131,7 +132,7 @@ export function WardsBedsPage() {
       });
       setSummaryById(map);
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Unable to load wards.");
+      setError(apiErrorMessage(err, "Unable to load wards. Please retry."));
     } finally {
       setIsLoading(false);
     }
@@ -246,7 +247,7 @@ export function WardsBedsPage() {
       }
       setModal({ open: false, editing: null });
     } catch (err: any) {
-      setSaveError(err?.response?.data?.message || "Failed to save ward.");
+      setSaveError(apiErrorMessage(err, "Failed to save ward. Please check the details and retry."));
     } finally {
       setSaving(false);
     }
@@ -263,7 +264,7 @@ export function WardsBedsPage() {
       showFeedback("success", res.message || "Ward deleted.");
       setConfirmDelete(null);
     } catch (err: any) {
-      showFeedback("error", err?.response?.data?.message || "Failed to delete ward.");
+      showFeedback("error", apiErrorMessage(err, "Failed to delete ward."));
     } finally {
       setDeleting(false);
     }

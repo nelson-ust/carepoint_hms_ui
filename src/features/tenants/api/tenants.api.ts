@@ -48,8 +48,10 @@ export type Tenant = {
   id: number;
   name: string;
   code: string;
-  db_connection_string?: string;
   status: string;
+  is_provisioned?: boolean;
+  provisioning_error?: string | null;
+  aws_s3_bucket_name?: string | null;
   domain_url?: string;
   custom_domain?: string;
   billing_email?: string;
@@ -137,6 +139,36 @@ export async function registerTenant(
   return response.data;
 }
 
+export type ProvisioningStep = {
+  step: string;
+  detail?: string | null;
+  status: "COMPLETED" | "IN_PROGRESS" | "FAILED" | "SKIPPED" | string;
+  at?: string | null;
+};
+
+export type ProvisioningStatus = {
+  success: boolean;
+  tenant_id: number;
+  status: string;
+  is_provisioned: boolean;
+  provisioning_error?: string | null;
+  steps?: ProvisioningStep[];
+  aws_s3_bucket_name?: string | null;
+  registered_at?: string | null;
+  company_email?: string | null;
+  contact_person?: string | null;
+  industry?: string | null;
+};
+
+export async function getProvisioningStatus(
+  tenantId: number | string,
+): Promise<ProvisioningStatus> {
+  const response = await apiClient.get<ProvisioningStatus>(
+    `/tenants/${tenantId}/provisioning-status`,
+  );
+  return response.data;
+}
+
 export async function approveTenant(tenantId: number | string): Promise<unknown> {
   const response = await apiClient.post(`/tenants/${tenantId}/approve`);
   return response.data;
@@ -156,5 +188,32 @@ export async function listSubscriptionPlans(): Promise<SubscriptionPlan[]> {
   const response = await apiClient.get<SubscriptionPlan[]>("/saas/plans", {
     headers: { "X-Tenant-Code": "" } // Suppress header for public plans list
   });
+  return response.data;
+}
+
+export type ProvisionS3Result = {
+  success: boolean;
+  already_provisioned: boolean;
+  bucket_name: string;
+  message: string;
+};
+
+/** Provision the tenant's own S3 bucket (idempotent, SaaS admin). */
+export async function provisionTenantS3(tenantId: number | string): Promise<ProvisionS3Result> {
+  const response = await apiClient.post<ProvisionS3Result>(`/tenants/${tenantId}/provision-s3`);
+  return response.data;
+}
+
+export type RepairResult = { success: boolean; message: string };
+
+/** Repair: forward-only schema sync on the tenant DB (idempotent). */
+export async function syncTenantSchema(tenantId: number | string): Promise<RepairResult> {
+  const response = await apiClient.post<RepairResult>(`/tenants/${tenantId}/sync-schema`);
+  return response.data;
+}
+
+/** Repair: re-seed roles/permissions/defaults on the tenant DB (idempotent). */
+export async function syncTenantDefaults(tenantId: number | string): Promise<RepairResult> {
+  const response = await apiClient.post<RepairResult>(`/tenants/${tenantId}/sync-defaults`);
   return response.data;
 }

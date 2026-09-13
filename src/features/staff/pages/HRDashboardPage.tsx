@@ -1,150 +1,389 @@
-import { PageHeader } from "@/components/layout/PageHeader";
+import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-   Users,
-   Wallet,
-   Calendar,
-   Clock,
-   TrendingUp,
-   ArrowUpRight,
-   UserCheck,
-   UserX,
-   CreditCard,
-   Download,
-   Filter,
-   RefreshCw,
-   MoreHorizontal,
+  Calendar,
+  CalendarClock,
+  Clock,
+  UserCheck,
+  Users,
+  Wallet,
 } from "lucide-react";
-import { useState } from "react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardHeader } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { MetricCard } from "@/components/charts/MetricCard";
+import { useChartTheme } from "@/components/charts/chart-theme";
+import { routes } from "@/config/routes";
+import { useAttendance, useHrLeaveRequests } from "@/features/hr/hooks/use-hr";
+import { usePayrollRuns } from "@/features/payroll/hooks/use-payroll";
+import type { PayrollRun } from "@/features/payroll/api/payroll.api";
+import { useStaffNameMap } from "../hooks/use-staff";
+import { useHeadcountReport } from "../hooks/use-hr-dashboard";
 
-const payrollTrend = [
-   { month: "Jan", amount: 45000 },
-   { month: "Feb", amount: 46200 },
-   { month: "Mar", amount: 44800 },
-   { month: "Apr", amount: 48500 },
-   { month: "May", amount: 49100 },
-];
+// ---------- Formatting helpers ----------
+
+const money = new Intl.NumberFormat(undefined, {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const compactMoney = new Intl.NumberFormat(undefined, {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+function fmtTime(value?: string | null): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime())
+    ? value
+    : d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+function monthLabel(value: string): string {
+  const d = new Date(`${value.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(d.getTime())
+    ? value
+    : d.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
+}
+
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+/** Payroll runs that carry real calculated totals (anything past DRAFT, not cancelled). */
+function processedRuns(runs: PayrollRun[]): PayrollRun[] {
+  return runs.filter((r) => r.status !== "DRAFT" && r.status !== "CANCELLED");
+}
+
+// ---------- Page ----------
 
 export function HRDashboardPage() {
-   return (
-      <div className="space-y-10 animate-fade-in pb-20">
-         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <PageHeader
-               title="HR & Payroll Analytics"
-               description="Monitor staff attendance, manage payroll cycles, and track workforce expenditures."
-            />
-            <div className="flex gap-3">
-               <button className="btn-secondary gap-3 py-3 px-6">
-                  <Calendar className="h-4 w-4" />
-                  <span className="font-bold">Attendance Log</span>
-               </button>
-               <button className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
-                  <Wallet className="h-5 w-5" />
-                  <span className="font-bold">Process Payroll</span>
-               </button>
-            </div>
-         </div>
+  const navigate = useNavigate();
+  const todayKey = isoDate(new Date());
 
-         {/* KPI Stats */}
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <div className="flex justify-between items-start mb-4">
-                  <div className="h-12 w-12 rounded-2xl bg-secondary-900 text-white flex items-center justify-center">
-                     <Users className="h-6 w-6" />
-                  </div>
-                  <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">+4 New</span>
-               </div>
-               <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Active Staff</p>
-               <h4 className="text-3xl font-black text-secondary-900 mt-1">158</h4>
-            </div>
+  const headcountQuery = useHeadcountReport();
+  const attendanceQuery = useAttendance({ from_date: todayKey, to_date: todayKey });
+  const pendingLeaveQuery = useHrLeaveRequests({ leave_status: "PENDING" });
+  const runsQuery = usePayrollRuns();
+  const { nameMap, staff, isLoading: staffLoading } = useStaffNameMap();
 
-            <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <div className="flex justify-between items-start mb-4">
-                  <div className="h-12 w-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center">
-                     <UserCheck className="h-6 w-6" />
-                  </div>
-                  <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">94.2%</span>
-               </div>
-               <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Attendance Today</p>
-               <h4 className="text-3xl font-black text-secondary-900 mt-1">149</h4>
-            </div>
+  // --- KPI aggregates ---
 
-            <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <div className="flex justify-between items-start mb-4">
-                  <div className="h-12 w-12 rounded-2xl bg-primary-500 text-white flex items-center justify-center">
-                     <CreditCard className="h-6 w-6" />
-                  </div>
-                  <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-lg">+1.2%</span>
-               </div>
-               <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Monthly Payroll</p>
-               <h4 className="text-3xl font-black text-secondary-900 mt-1">$49.1k</h4>
-            </div>
+  const activeStaff = useMemo(() => {
+    const rows = headcountQuery.data ?? [];
+    if (rows.length > 0) {
+      return rows
+        .filter((r) => r.employment_status?.toUpperCase() === "ACTIVE")
+        .reduce((sum, r) => sum + r.count, 0);
+    }
+    // Fallback when the headcount report has no rows yet.
+    return staff.length;
+  }, [headcountQuery.data, staff]);
 
-            <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <div className="flex justify-between items-start mb-4">
-                  <div className="h-12 w-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center">
-                     <Clock className="h-6 w-6" />
-                  </div>
-                  <span className="text-[10px] font-black text-secondary-400 bg-secondary-50 px-2 py-1 rounded-lg">3 Avg</span>
-               </div>
-               <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Pending Leaves</p>
-               <h4 className="text-3xl font-black text-secondary-900 mt-1">12</h4>
-            </div>
-         </div>
+  const todayAttendance = attendanceQuery.data ?? [];
+  const presentToday = useMemo(
+    () => todayAttendance.filter((r) => !r.is_absent && r.clock_in_at).length,
+    [todayAttendance],
+  );
+  const lateToday = useMemo(
+    () => todayAttendance.filter((r) => r.is_late).length,
+    [todayAttendance],
+  );
 
-         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Payroll Trend */}
-            <div className="lg:col-span-2 glass-card rounded-[3rem] p-10 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <div className="flex items-center justify-between mb-10">
-                  <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest">Payroll Expenditure (5m)</h4>
-                  <button className="text-[10px] font-black text-primary-500 hover:underline">View Detailed Report</button>
-               </div>
-               <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                     <AreaChart data={payrollTrend}>
-                        <defs>
-                           <linearGradient id="colorPay" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#0F172A" stopOpacity={0.1} />
-                              <stop offset="95%" stopColor="#0F172A" stopOpacity={0} />
-                           </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#64748B' }} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#64748B' }} tickFormatter={(v) => `$${v / 1000}k`} />
-                        <Tooltip contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }} />
-                        <Area type="monotone" dataKey="amount" stroke="#0F172A" strokeWidth={4} fillOpacity={1} fill="url(#colorPay)" />
-                     </AreaChart>
-                  </ResponsiveContainer>
-               </div>
-            </div>
+  const pendingLeaves = pendingLeaveQuery.data?.length ?? 0;
 
-            {/* Staff Attendance Sidebar */}
-            <div className="lg:col-span-1 glass-card rounded-[3rem] p-10 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-8">Daily Check-ins</h4>
-               <div className="space-y-4">
-                  {[
-                     { name: 'Dr. Sarah Connor', time: '07:45 AM', status: 'ON_TIME' },
-                     { name: 'John Doe (Nurse)', time: '08:12 AM', status: 'LATE' },
-                     { name: 'Dr. James Howlett', time: '08:00 AM', status: 'ON_TIME' },
-                     { name: 'Admin Clerk #4', time: '08:05 AM', status: 'ON_TIME' },
-                  ].map((staff, i) => (
-                     <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-white/50 border border-secondary-50">
-                        <div className="flex items-center gap-3">
-                           <div className="h-8 w-8 rounded-full bg-secondary-100 flex items-center justify-center text-[10px] font-bold">SC</div>
-                           <div>
-                              <p className="text-xs font-bold text-secondary-900">{staff.name}</p>
-                              <p className="text-[10px] text-secondary-400 font-medium">{staff.time}</p>
-                           </div>
-                        </div>
-                        <span className={`h-2 w-2 rounded-full ${staff.status === 'ON_TIME' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                     </div>
-                  ))}
-               </div>
-               <button className="w-full mt-8 py-4 rounded-2xl bg-secondary-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all">
-                  Full Attendance Sheet
-               </button>
-            </div>
-         </div>
+  const trendRuns = useMemo(() => {
+    const usable = processedRuns(runsQuery.data ?? []);
+    return usable
+      .slice()
+      .sort((a, b) => a.period_start.localeCompare(b.period_start))
+      .slice(-6);
+  }, [runsQuery.data]);
+
+  const latestRun = trendRuns.length > 0 ? trendRuns[trendRuns.length - 1] : undefined;
+
+  const payrollDelta = useMemo(() => {
+    if (trendRuns.length < 2) return undefined;
+    const prev = trendRuns[trendRuns.length - 2].total_net;
+    const curr = trendRuns[trendRuns.length - 1].total_net;
+    if (prev <= 0) return undefined;
+    return ((curr - prev) / prev) * 100;
+  }, [trendRuns]);
+
+  const trendData = useMemo(
+    () =>
+      trendRuns.map((r) => ({
+        month: monthLabel(r.period_start),
+        net: r.total_net,
+        gross: r.total_gross,
+      })),
+    [trendRuns],
+  );
+
+  const checkIns = useMemo(
+    () =>
+      todayAttendance
+        .filter((r) => r.clock_in_at)
+        .slice()
+        .sort((a, b) => (b.clock_in_at ?? "").localeCompare(a.clock_in_at ?? ""))
+        .slice(0, 6),
+    [todayAttendance],
+  );
+
+  return (
+    <div className="space-y-8 animate-fade-in pb-16">
+      <PageHeader
+        title="HR & Payroll Analytics"
+        description="Monitor staff attendance, manage payroll cycles, and track workforce expenditures."
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              leftIcon={<Calendar className="h-4 w-4" />}
+              onClick={() => navigate("/hr/attendance")}
+            >
+              Attendance Log
+            </Button>
+            <Button
+              leftIcon={<Wallet className="h-4 w-4" />}
+              onClick={() => navigate(routes.payroll)}
+            >
+              Payroll Runs
+            </Button>
+          </>
+        }
+      />
+
+      {/* KPI Stats */}
+      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Active Staff"
+          value={activeStaff}
+          icon={Users}
+          tone="slate"
+          isLoading={headcountQuery.isLoading && staffLoading}
+        />
+        <MetricCard
+          label="Checked In Today"
+          value={presentToday}
+          icon={UserCheck}
+          tone="primary"
+          deltaLabel={activeStaff > 0 ? `of ${activeStaff} staff` : undefined}
+          delta={activeStaff > 0 ? (presentToday / activeStaff) * 100 : undefined}
+          isLoading={attendanceQuery.isLoading}
+        />
+        <MetricCard
+          label="Last Payroll (Net)"
+          value={latestRun ? compactMoney.format(latestRun.total_net) : "—"}
+          icon={Wallet}
+          tone="cyan"
+          delta={payrollDelta}
+          deltaLabel={payrollDelta !== undefined ? "vs previous run" : undefined}
+          isLoading={runsQuery.isLoading}
+        />
+        <MetricCard
+          label="Pending Leaves"
+          value={pendingLeaves}
+          icon={CalendarClock}
+          tone="amber"
+          isLoading={pendingLeaveQuery.isLoading}
+        />
       </div>
-   );
+
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* Payroll trend */}
+        <Card className="lg:col-span-2" padding="lg">
+          <CardHeader
+            title="Payroll Expenditure"
+            description="Net payout per processed payroll run."
+            actions={
+              <Button variant="ghost" size="sm" onClick={() => navigate(routes.payroll)}>
+                View Runs
+              </Button>
+            }
+          />
+          {runsQuery.isLoading ? (
+            <Skeleton className="h-[300px] w-full" />
+          ) : runsQuery.isError ? (
+            <EmptyState
+              icon={Wallet}
+              title="Could not load payroll data"
+              description="The payroll trend failed to load."
+              action={
+                <Button size="sm" variant="secondary" onClick={() => runsQuery.refetch()}>
+                  Retry
+                </Button>
+              }
+            />
+          ) : trendData.length === 0 ? (
+            <EmptyState
+              icon={Wallet}
+              title="No processed payroll runs"
+              description="Once payroll runs are calculated, expenditure will trend here."
+              action={
+                <Button size="sm" onClick={() => navigate(routes.payroll)}>
+                  Go to Payroll
+                </Button>
+              }
+            />
+          ) : (
+            <PayrollTrendChart data={trendData} />
+          )}
+        </Card>
+
+        {/* Daily check-ins */}
+        <Card padding="lg">
+          <CardHeader
+            title="Daily Check-ins"
+            description="Latest clock-ins recorded today."
+          />
+          {attendanceQuery.isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
+            </div>
+          ) : attendanceQuery.isError ? (
+            <EmptyState
+              icon={Clock}
+              title="Could not load check-ins"
+              action={
+                <Button size="sm" variant="secondary" onClick={() => attendanceQuery.refetch()}>
+                  Retry
+                </Button>
+              }
+            />
+          ) : checkIns.length === 0 ? (
+            <EmptyState
+              icon={Clock}
+              title="No check-ins yet"
+              description="No staff have clocked in today."
+            />
+          ) : (
+            <div className="space-y-3">
+              {checkIns.map((r) => {
+                const name = nameMap.get(r.staff_profile_id) ?? `Staff #${r.staff_profile_id}`;
+                return (
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between rounded-2xl bg-secondary-500/5 px-4 py-3 dark:bg-white/5"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-500/10 text-[10px] font-black text-primary-500">
+                        {initials(name) || "?"}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-bold text-secondary-900">{name}</p>
+                        <p className="data-mono text-[10px] font-medium text-secondary-400">
+                          {fmtTime(r.clock_in_at)}
+                          {r.is_late && r.minutes_late ? ` · +${r.minutes_late}m late` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={
+                        r.is_absent
+                          ? "h-2 w-2 shrink-0 rounded-full bg-rose-500"
+                          : r.is_late
+                            ? "h-2 w-2 shrink-0 rounded-full bg-amber-500"
+                            : "h-2 w-2 shrink-0 rounded-full bg-emerald-500"
+                      }
+                      aria-label={r.is_absent ? "Absent" : r.is_late ? "Late" : "On time"}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <p className="text-xs font-medium text-secondary-400">
+              {lateToday > 0 ? `${lateToday} late arrival${lateToday === 1 ? "" : "s"} today` : "No late arrivals today"}
+            </p>
+            <Button variant="secondary" size="sm" onClick={() => navigate("/hr/attendance")}>
+              Full Attendance
+            </Button>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Chart ----------
+
+function PayrollTrendChart({
+  data,
+}: {
+  data: { month: string; net: number; gross: number }[];
+}) {
+  const chart = useChartTheme();
+
+  return (
+    <div className="h-[300px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="hrPayrollNet" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={chart.areaGradient.from} />
+              <stop offset="95%" stopColor={chart.areaGradient.to} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
+          <XAxis dataKey="month" axisLine={false} tickLine={false} tick={chart.tick} />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            tick={chart.tick}
+            tickFormatter={(v: number) => compactMoney.format(v)}
+            width={56}
+          />
+          <Tooltip
+            cursor={chart.cursor}
+            contentStyle={chart.tooltip}
+            formatter={(value, name) => [
+              money.format(Number(value)),
+              name === "net" ? "Net pay" : "Gross pay",
+            ]}
+          />
+          <Area
+            type="monotone"
+            dataKey="gross"
+            stroke={chart.muted}
+            strokeWidth={2}
+            fill="transparent"
+          />
+          <Area
+            type="monotone"
+            dataKey="net"
+            stroke={chart.series[0]}
+            strokeWidth={3}
+            fill="url(#hrPayrollNet)"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }

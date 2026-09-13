@@ -127,9 +127,10 @@ export async function createPatient(
   return (data?.data ?? data?.patient ?? data) as Patient;
 }
 
-export async function searchPatients(query: string) {
+export async function searchPatients(query: string, limit = 20) {
   const response = await apiClient.get<PaginatedResponse<Patient>>("/patients/search", {
-    params: { full_name: query },
+    // Unified quick-search across name, hospital number, phone, or id.
+    params: { search: query, limit },
   });
   return response.data;
 }

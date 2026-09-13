@@ -1,4 +1,6 @@
 import { PageHeader } from "@/components/layout/PageHeader";
+import { MetricCard, type MetricTone } from "@/components/charts/MetricCard";
+import { useChartTheme } from "@/components/charts/chart-theme";
 import {
   AreaChart,
   Area,
@@ -15,14 +17,10 @@ import {
 } from "recharts";
 import {
   Users,
-  TrendingUp,
   CreditCard,
   Activity,
   ShieldCheck,
   ArrowUpRight,
-  ArrowDownRight,
-  Globe,
-  Layers,
   Zap,
   Calendar,
   Search,
@@ -32,12 +30,16 @@ import { useSaasMetrics, useSaasTenants } from "../hooks/use-saas-analytics";
 import { useSystemHealth } from "../hooks/use-system-health";
 import { format } from "date-fns";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { routes } from "@/config/routes";
 
 export function SaasOverviewPage() {
   const { data: metrics, isLoading: isMetricsLoading } = useSaasMetrics();
-  const { data: health } = useSystemHealth();
-  const { data: tenantData } = useSaasTenants(1, 5);
+  useSystemHealth();
+  useSaasTenants(1, 5);
   const [activeTab, setActiveTab] = useState<'revenue' | 'usage'>('revenue');
+  const chart = useChartTheme();
+  const navigate = useNavigate();
 
   if (isMetricsLoading) {
     return (
@@ -51,6 +53,18 @@ export function SaasOverviewPage() {
     );
   }
 
+  const kpis: {
+    label: string;
+    value: string | number;
+    icon: typeof Users;
+    tone: MetricTone;
+  }[] = [
+    { label: "Total ARR", value: `$${(metrics?.total_arr || 0).toLocaleString()}`, icon: CreditCard, tone: "slate" },
+    { label: "Active Tenants", value: metrics?.active_tenants || 0, icon: Users, tone: "primary" },
+    { label: "Platform Uptime", value: metrics?.platform_uptime != null ? `${metrics.platform_uptime}%` : "—", icon: Activity, tone: "cyan" },
+    { label: "Net Expansion", value: metrics?.net_expansion != null ? `${metrics.net_expansion}%` : "—", icon: ShieldCheck, tone: "amber" },
+  ];
+
   return (
     <div className="space-y-10 animate-fade-in pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -59,53 +73,43 @@ export function SaasOverviewPage() {
           description="Global performance metrics, revenue growth, and tenant distribution analytics."
         />
         <div className="flex gap-3">
-          <div className="flex bg-white/50 p-1.5 rounded-2xl border border-secondary-400/50 shadow-sm">
+          <div className="flex bg-white/50 p-1.5 rounded-2xl border border-secondary-400/50 shadow-sm dark:bg-white/5 dark:border-white/10">
             <button
               onClick={() => setActiveTab('revenue')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'revenue' ? 'bg-secondary-900 text-white shadow-lg' : 'text-secondary-400 hover:bg-white'}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'revenue' ? 'bg-secondary-900 text-white shadow-lg dark:bg-white/15' : 'text-secondary-400 hover:bg-white dark:hover:bg-white/10'}`}
             >
               Revenue
             </button>
             <button
               onClick={() => setActiveTab('usage')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'usage' ? 'bg-secondary-900 text-white shadow-lg' : 'text-secondary-400 hover:bg-white'}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'usage' ? 'bg-secondary-900 text-white shadow-lg dark:bg-white/15' : 'text-secondary-400 hover:bg-white dark:hover:bg-white/10'}`}
             >
               Usage
             </button>
           </div>
-          <button className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
+          <button onClick={() => navigate(routes.connectivity)} className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
             <Zap className="h-5 w-5" />
             <span className="font-bold">System Health</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Cards with micro-animations */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { label: "Total ARR", value: `$${(metrics?.total_arr || 0).toLocaleString()}`, icon: CreditCard, trend: "+12.5%", color: "secondary" },
-          { label: "Active Tenants", value: metrics?.active_tenants || 0, icon: Users, trend: "+8.2%", color: "emerald" },
-          { label: "Platform Uptime", value: `${metrics?.platform_uptime || 99.98}%`, icon: Activity, trend: "-0.01%", color: "primary" },
-          { label: "Net Expansion", value: `${metrics?.net_expansion || 0}%`, icon: ShieldCheck, trend: "+15.0%", color: "amber" },
-        ].map((kpi, i) => (
-          <div key={i} className="glass-card group rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium hover:scale-[1.02] transition-all duration-500">
-            <div className="flex justify-between items-start mb-6">
-              <div className={`h-14 w-14 rounded-2xl bg-${kpi.color === 'secondary' ? 'secondary-900' : kpi.color + '-500'} text-white flex items-center justify-center shadow-lg group-hover:rotate-6 transition-transform`}>
-                <kpi.icon className="h-7 w-7" />
-              </div>
-              <span className={`flex items-center gap-1 ${kpi.trend.startsWith('+') ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'} text-[10px] font-black px-2 py-1 rounded-lg`}>
-                {kpi.trend.startsWith('+') ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />} {kpi.trend}
-              </span>
-            </div>
-            <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">{kpi.label}</p>
-            <h4 className="text-3xl font-black text-secondary-900 mt-2">{kpi.value}</h4>
-          </div>
+        {kpis.map((kpi) => (
+          <MetricCard
+            key={kpi.label}
+            label={kpi.label}
+            value={kpi.value}
+            icon={kpi.icon}
+            tone={kpi.tone}
+          />
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Growth Chart */}
-        <div className="lg:col-span-2 glass-card rounded-[3rem] p-10 border border-secondary-400/50 bg-white/40 shadow-premium relative overflow-hidden">
+        <div className="lg:col-span-2 glass-card rounded-[3rem] p-10 shadow-premium relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/5 blur-[100px] -translate-y-1/2 translate-x-1/2" />
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-12 gap-6">
@@ -114,10 +118,10 @@ export function SaasOverviewPage() {
               <p className="text-xs text-secondary-400 font-bold mt-1">Growth analysis for the current fiscal period</p>
             </div>
             <div className="flex gap-2">
-              <button className="p-2.5 rounded-xl border border-secondary-400 hover:bg-white transition-all">
+              <button className="p-2.5 rounded-xl border border-secondary-400 hover:bg-white transition-all dark:border-white/10 dark:hover:bg-white/10">
                 <Calendar className="h-4 w-4 text-secondary-600" />
               </button>
-              <button className="p-2.5 rounded-xl border border-secondary-400 hover:bg-white transition-all">
+              <button className="p-2.5 rounded-xl border border-secondary-400 hover:bg-white transition-all dark:border-white/10 dark:hover:bg-white/10">
                 <Filter className="h-4 w-4 text-secondary-600" />
               </button>
             </div>
@@ -129,29 +133,23 @@ export function SaasOverviewPage() {
                 <AreaChart data={metrics?.revenue_trend || []}>
                   <defs>
                     <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0F172A" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#0F172A" stopOpacity={0} />
+                      <stop offset="5%" stopColor={chart.areaGradient.from} />
+                      <stop offset="95%" stopColor={chart.areaGradient.to} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#64748B' }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#64748B' }} tickFormatter={(val) => `$${val / 1000}k`} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '1rem' }}
-                    itemStyle={{ fontWeight: 900, fontSize: '12px' }}
-                  />
-                  <Area type="monotone" dataKey="revenue" stroke="#0F172A" strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={chart.tick} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={chart.tick} tickFormatter={(val) => `$${val / 1000}k`} />
+                  <Tooltip contentStyle={chart.tooltip} />
+                  <Area type="monotone" dataKey="revenue" stroke={chart.series[0]} strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" />
                 </AreaChart>
               ) : (
                 <BarChart data={metrics?.revenue_trend || []}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#64748B' }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#64748B' }} />
-                  <Tooltip
-                    cursor={{ fill: '#F1F5F9' }}
-                    contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '1rem' }}
-                  />
-                  <Bar dataKey="users" fill="#0F172A" radius={[10, 10, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={chart.tick} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={chart.tick} />
+                  <Tooltip cursor={chart.cursor} contentStyle={chart.tooltip} />
+                  <Bar dataKey="users" fill={chart.series[0]} radius={[10, 10, 0, 0]} />
                 </BarChart>
               )}
             </ResponsiveContainer>
@@ -159,7 +157,7 @@ export function SaasOverviewPage() {
         </div>
 
         {/* Plan Distribution */}
-        <div className="lg:col-span-1 glass-card rounded-[3rem] p-10 border border-secondary-400/50 bg-white/40 shadow-premium flex flex-col relative overflow-hidden">
+        <div className="lg:col-span-1 glass-card rounded-[3rem] p-10 shadow-premium flex flex-col relative overflow-hidden">
           <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/5 blur-[80px] -translate-y-1/2 translate-x-1/2" />
           <h4 className="text-xl font-black text-secondary-900 mb-2">Market Share</h4>
           <p className="text-xs text-secondary-400 font-bold mb-12">Tenant distribution by plan tier</p>
@@ -177,10 +175,14 @@ export function SaasOverviewPage() {
                   dataKey="value"
                 >
                   {metrics?.plan_distribution?.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
+                    <Cell
+                      key={`cell-${entry.name}`}
+                      fill={chart.series[index % chart.series.length]}
+                      strokeWidth={0}
+                    />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={chart.tooltip} />
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -190,10 +192,16 @@ export function SaasOverviewPage() {
           </div>
 
           <div className="space-y-3 mt-12">
-            {metrics?.plan_distribution?.map((item) => (
-              <div key={item.name} className="flex items-center justify-between p-4 rounded-2xl bg-white/50 border border-secondary-50 hover:border-secondary-200 transition-colors">
+            {(!metrics?.plan_distribution || metrics.plan_distribution.length === 0) && (
+              <p className="text-sm text-secondary-400 italic text-center">No active subscription plans yet.</p>
+            )}
+            {metrics?.plan_distribution?.map((item, index) => (
+              <div key={item.name} className="flex items-center justify-between p-4 rounded-2xl bg-white/50 border border-secondary-50 hover:border-secondary-200 transition-colors dark:bg-white/5 dark:border-white/5 dark:hover:border-white/15">
                 <div className="flex items-center gap-3">
-                  <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                  <div
+                    className="h-3 w-3 rounded-full"
+                    style={{ backgroundColor: chart.series[index % chart.series.length] }}
+                  />
                   <span className="text-sm font-bold text-secondary-700">{item.name}</span>
                 </div>
                 <span className="text-sm font-black text-secondary-900">{item.value}%</span>
@@ -205,18 +213,21 @@ export function SaasOverviewPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Recent Activity */}
-        <div className="lg:col-span-1 glass-card rounded-[3rem] p-10 border border-secondary-400/50 bg-white/40 shadow-premium">
+        <div className="lg:col-span-1 glass-card rounded-[3rem] p-10 shadow-premium">
           <div className="flex items-center justify-between mb-10">
             <h4 className="text-xl font-black text-secondary-900">Live Activity</h4>
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
           <div className="space-y-6">
+            {(!metrics?.recent_activities || metrics.recent_activities.length === 0) && (
+              <p className="text-sm text-secondary-400 italic py-6 text-center">No recent platform activity yet.</p>
+            )}
             {metrics?.recent_activities?.map((activity) => (
               <div key={activity.id} className="flex gap-4 group">
-                <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${activity.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${activity.status === 'SUCCESS' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300' : 'bg-rose-500/10 text-rose-600 dark:text-rose-300'}`}>
                   <Activity className="h-5 w-5" />
                 </div>
-                <div className="flex-1 min-w-0 border-b border-secondary-400/50 pb-4 group-last:border-0">
+                <div className="flex-1 min-w-0 border-b border-secondary-400/50 pb-4 group-last:border-0 dark:border-white/10">
                   <div className="flex justify-between items-start gap-2">
                     <p className="text-sm font-bold text-secondary-900 truncate">{activity.action}</p>
                     <span className="text-[10px] font-bold text-secondary-400 shrink-0">{format(new Date(activity.timestamp), 'HH:mm')}</span>
@@ -226,13 +237,13 @@ export function SaasOverviewPage() {
               </div>
             ))}
           </div>
-          <button className="w-full mt-8 py-4 rounded-2xl bg-secondary-900 text-white text-xs font-black uppercase tracking-widest hover:bg-secondary-800 transition-colors">
+          <button onClick={() => navigate(routes.connectivity)} className="w-full mt-8 py-4 rounded-2xl bg-secondary-900 text-white text-xs font-black uppercase tracking-widest hover:bg-secondary-800 transition-colors dark:bg-white/10 dark:hover:bg-white/15">
             View All Logs
           </button>
         </div>
 
         {/* Top Tenants */}
-        <div className="lg:col-span-2 glass-card rounded-[3rem] p-10 border border-secondary-400/50 bg-white/40 shadow-premium">
+        <div className="lg:col-span-2 glass-card rounded-[3rem] p-10 shadow-premium">
           <div className="flex items-center justify-between mb-10">
             <h4 className="text-xl font-black text-secondary-900">Performance Leaders</h4>
             <div className="flex items-center gap-2">
@@ -243,34 +254,37 @@ export function SaasOverviewPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-secondary-400">
+                <tr className="border-b border-secondary-400 dark:border-white/10">
                   <th className="text-left pb-4 text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Tenant</th>
                   <th className="text-left pb-4 text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Code</th>
                   <th className="text-left pb-4 text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Revenue</th>
                   <th className="text-right pb-4 text-[10px] font-bold text-secondary-400 uppercase tracking-widest">Growth</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-secondary-100/50">
+              <tbody className="divide-y divide-secondary-100/50 dark:divide-white/5">
+                {(!metrics?.top_tenants || metrics.top_tenants.length === 0) && (
+                  <tr><td colSpan={4} className="py-10 text-center text-sm text-secondary-400 italic">No tenants to rank yet.</td></tr>
+                )}
                 {metrics?.top_tenants?.map((tenant) => (
-                  <tr key={tenant.id} className="group hover:bg-white/50 transition-colors">
+                  <tr key={tenant.id} className="group hover:bg-white/50 transition-colors dark:hover:bg-white/5">
                     <td className="py-6">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-secondary-100 flex items-center justify-center font-black text-secondary-600">
+                        <div className="h-10 w-10 rounded-xl bg-secondary-100 flex items-center justify-center font-black text-secondary-600 dark:bg-white/10">
                           {tenant.name.charAt(0)}
                         </div>
                         <span className="text-sm font-bold text-secondary-900">{tenant.name}</span>
                       </div>
                     </td>
                     <td className="py-6">
-                      <span className="px-2 py-1 rounded bg-secondary-50 text-[10px] font-black text-secondary-600 uppercase tracking-tighter">
+                      <span className="data-mono px-2 py-1 rounded bg-secondary-50 text-[10px] font-black text-secondary-600 uppercase tracking-tighter dark:bg-white/10">
                         {tenant.code}
                       </span>
                     </td>
                     <td className="py-6">
-                      <span className="text-sm font-black text-secondary-900">${tenant.revenue.toLocaleString()}</span>
+                      <span className="data-mono text-sm font-black text-secondary-900">${tenant.revenue.toLocaleString()}</span>
                     </td>
                     <td className="py-6 text-right">
-                      <span className="flex items-center justify-end gap-1 text-emerald-600 text-xs font-black">
+                      <span className="flex items-center justify-end gap-1 text-emerald-600 text-xs font-black dark:text-emerald-300">
                         <ArrowUpRight className="h-3.5 w-3.5" /> {tenant.growth}%
                       </span>
                     </td>

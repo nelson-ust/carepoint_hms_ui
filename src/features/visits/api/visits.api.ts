@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api/api-client";
-import { VisitStep, VisitTemplate } from "./visit-flows.api";
+import type { VisitStep, VisitTemplate } from "./visit-flows.api";
 
 export type PatientSummary = {
   id: number;
@@ -214,6 +214,31 @@ export async function deleteVisit(visitId: number) {
 
 export async function rerouteVisit(visitId: number, payload: RerouteVisitPayload) {
   const response = await apiClient.post<RerouteVisitResponse>(`/visits/${visitId}/reroute`, payload);
+  return response.data;
+}
+
+export type AdvanceVisitPayload = {
+  /** "complete" (default) finishes the current stage; "skip" bypasses it. */
+  action?: "complete" | "skip";
+  notes?: string;
+  create_queue_ticket?: boolean;
+};
+
+export type AdvanceVisitResponse = {
+  success: boolean;
+  message: string;
+  visit: Visit;
+  completed_step?: unknown;
+  next_step?: unknown;
+  next_queue_ticket?: unknown;
+};
+
+/** POST /visits/{id}/advance — complete/skip the current stage and move to the next. */
+export async function advanceVisit(visitId: number, payload: AdvanceVisitPayload = {}) {
+  const response = await apiClient.post<AdvanceVisitResponse>(
+    `/visits/${visitId}/advance`,
+    { action: payload.action ?? "complete", ...payload },
+  );
   return response.data;
 }
 

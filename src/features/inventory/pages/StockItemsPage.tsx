@@ -21,6 +21,7 @@ import {
   Sigma,
   Trash2,
   TrendingDown,
+  Upload,
   X,
 } from "lucide-react";
 import {
@@ -39,6 +40,8 @@ import type {
 } from "../api/inventory.api";
 import { listDrugs } from "@/features/drugs/api/drugs.api";
 import type { Drug } from "@/features/drugs/api/drugs.api";
+import { apiErrorMessage } from "@/lib/api/api-error";
+import { BulkUploadModal } from "../components/BulkUploadModal";
 
 type ItemForm = {
   store_id: string;
@@ -89,10 +92,12 @@ function daysToExpiry(date?: string): number | null {
 }
 
 function isLowStock(item: StockItem): boolean {
+  // Store-level reorder wins; otherwise fall back to the linked drug's default.
+  const threshold = item.effective_reorder_level ?? item.reorder_level;
   return (
-    item.reorder_level != null &&
+    threshold != null &&
     item.quantity_on_hand != null &&
-    item.quantity_on_hand <= item.reorder_level
+    item.quantity_on_hand <= threshold
   );
 }
 
@@ -126,6 +131,8 @@ export function StockItemsPage() {
   const [confirmDelete, setConfirmDelete] = useState<StockItem | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+
   const showFeedback = (tone: "success" | "error", message: string) => {
     setFeedback({ tone, message });
     window.setTimeout(() => setFeedback(null), 3500);
@@ -148,7 +155,7 @@ export function StockItemsPage() {
       setStores(storesRes.items ?? []);
       setDrugs(drugsRes?.items ?? []);
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Unable to load stock items.");
+      setError(apiErrorMessage(err, "Unable to load stock items. Please retry."));
     } finally {
       setIsLoading(false);
     }
@@ -165,6 +172,20 @@ export function StockItemsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeFilter]);
+
+  // Deep link from the Drugs page: /inventory/items?drug_id=123 opens the
+  // create modal pre-linked to that formulary drug (no re-typing).
+  useEffect(() => {
+    const drugParam = searchParams.get("drug_id");
+    if (!drugParam || drugs.length === 0) return;
+    const drug = drugs.find((d) => String(d.id) === drugParam);
+    if (drug) {
+      openCreateForDrug(drug, searchParams.get("store") || undefined);
+      searchParams.delete("drug_id");
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drugs]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -195,6 +216,20 @@ export function StockItemsPage() {
   const storeName = (id: number) => stores.find((s) => s.id === id)?.name ?? `Store #${id}`;
 
   // ----- Modal -----
+  const openCreateForDrug = (drug: Drug, storeId?: string) => {
+    setModal({ open: true, editing: null });
+    setForm({
+      ...emptyForm,
+      store_id: storeId || storeFilter || (stores[0] ? String(stores[0].id) : ""),
+      item_type: "DRUG",
+      drug_id: String(drug.id),
+      item_name: drug.name ?? "",
+      sku: drug.sku ?? "",
+      unit_of_measure: drug.dosage_form ?? "",
+      reorder_level: drug.reorder_level != null ? String(drug.reorder_level) : "",
+    });
+    setSaveError(null);
+  };
   const openCreate = () => {
     setModal({ open: true, editing: null });
     setForm({
@@ -273,7 +308,7 @@ export function StockItemsPage() {
       showFeedback("success", "Stock item saved.");
       setModal({ open: false, editing: null });
     } catch (err: any) {
-      setSaveError(err?.response?.data?.message || "Failed to save stock item.");
+      setSaveError(apiErrorMessage(err, "Failed to save stock item. Please check the details and retry."));
     } finally {
       setSaving(false);
     }
@@ -288,7 +323,7 @@ export function StockItemsPage() {
       showFeedback("success", "Stock item removed.");
       setConfirmDelete(null);
     } catch (err: any) {
-      showFeedback("error", err?.response?.data?.message || "Failed to delete.");
+      showFeedback("error", apiErrorMessage(err, "Failed to delete."));
     } finally {
       setDeleting(false);
     }
@@ -323,6 +358,13 @@ export function StockItemsPage() {
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
           <button
+            onClick={() => setShowBulkUpload(true)}
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
+          >
+            <Upload className="h-4 w-4" />
+            <span className="text-sm font-bold">Bulk Upload</span>
+          </button>
+          <button
             onClick={openCreate}
             className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20"
           >
@@ -331,6 +373,12 @@ export function StockItemsPage() {
           </button>
         </div>
       </div>
+
+      <BulkUploadModal
+        isOpen={showBulkUpload}
+        onClose={() => setShowBulkUpload(false)}
+        onImported={load}
+      />
 
       {feedback && (
         <div
@@ -743,22 +791,30 @@ function ItemModal({
             </select>
           </div>
 
-          {form.item_type === "DRUG" && !editing && (
+          {form.item_type === "DRUG" && (
             <div className="space-y-2 md:col-span-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                Linked Drug (optional)
+                Linked Drug (recommended)
               </label>
               <select
                 value={form.drug_id}
                 onChange={(e) => {
                   const drugId = e.target.value;
                   const drug = drugs.find((d) => String(d.id) === drugId);
-                  onChange({
-                    ...form,
-                    drug_id: drugId,
-                    item_name: drug?.name || form.item_name,
-                    sku: drug?.sku || form.sku,
-                  });
+                  if (drug) {
+                    onChange({
+                      ...form,
+                      drug_id: drugId,
+                      item_name: drug.name || form.item_name,
+                      sku: drug.sku || form.sku,
+                      unit_of_measure: drug.dosage_form || form.unit_of_measure,
+                      reorder_level:
+                        form.reorder_level ||
+                        (drug.reorder_level != null ? String(drug.reorder_level) : form.reorder_level),
+                    });
+                  } else {
+                    onChange({ ...form, drug_id: "" });
+                  }
                 }}
                 className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
               >
@@ -769,6 +825,9 @@ function ItemModal({
                   </option>
                 ))}
               </select>
+              <p className="text-[9px] font-bold text-secondary-400 uppercase tracking-widest">
+                Name, SKU & unit are taken from the drug — keeping the formulary the single source of truth.
+              </p>
             </div>
           )}
 
@@ -781,7 +840,8 @@ function ItemModal({
               value={form.item_name}
               onChange={(e) => onChange({ ...form, item_name: e.target.value })}
               placeholder="Paracetamol 500mg Tablets"
-              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
+              readOnly={!!form.drug_id}
+              className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${form.drug_id ? "opacity-60 cursor-not-allowed" : ""}`}
             />
           </div>
 
@@ -794,7 +854,8 @@ function ItemModal({
               value={form.sku}
               onChange={(e) => onChange({ ...form, sku: e.target.value.toUpperCase() })}
               placeholder="PCM-500-T"
-              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
+              readOnly={!!form.drug_id}
+              className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono ${form.drug_id ? "opacity-60 cursor-not-allowed" : ""}`}
             />
           </div>
           <div className="space-y-2">
@@ -806,7 +867,8 @@ function ItemModal({
               value={form.unit_of_measure}
               onChange={(e) => onChange({ ...form, unit_of_measure: e.target.value })}
               placeholder="tabs, ml, vials"
-              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
+              readOnly={!!form.drug_id}
+              className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${form.drug_id ? "opacity-60 cursor-not-allowed" : ""}`}
             />
           </div>
 

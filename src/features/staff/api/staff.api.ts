@@ -16,12 +16,20 @@ export async function getCurrentStaff(staffList?: Staff[]): Promise<Staff | null
 
     // If a list is provided (already loaded in page), search it.
     if (staffList && staffList.length > 0) {
-      return staffList.find((s) => s.user_id === userId) ?? null;
+      return (
+        staffList.find((s) => s.user_id === userId) ??
+        staffList.find((s) => s.id === userId) ??
+        null
+      );
     }
 
     // Otherwise, fetch from the API.
     const allStaff = await getStaff(0, 1000);
-    return allStaff.find((s) => s.user_id === userId) ?? null;
+    return (
+      allStaff.find((s) => s.user_id === userId) ??
+      allStaff.find((s) => s.id === userId) ??
+      null
+    );
   } catch {
     return null;
   }

@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api/api-client";
-import { ServiceDeliveryPoint, PaginatedResponse, DeleteResponse } from "./visits.api";
+import type { ServiceDeliveryPoint, PaginatedResponse, DeleteResponse } from "./visits.api";
 
 export type TemplateStep = {
   id: number;
@@ -182,5 +182,29 @@ export async function deleteVisitStep(id: number) {
 // ----- Combined Create -----
 export async function createCombinedFlow(payload: CombinedCreatePayload) {
   const response = await apiClient.post<CombinedCreateResponse>("/visit-flows/combined-create", payload);
+  return response.data;
+}
+
+// ----- Standard pathway seed -----
+export type SeedStandardPathwayResponse = {
+  created: boolean;
+  template_id: number | null;
+  template_code: string;
+  message: string;
+  steps: Array<{
+    step_order: number;
+    service_delivery_point_id: number;
+    service_delivery_point: string;
+    type: string;
+    is_required: boolean;
+  }>;
+  skipped_types: string[];
+};
+
+/** POST /visit-flows/seed-standard — create the default outpatient pathway. */
+export async function seedStandardPathway() {
+  const response = await apiClient.post<SeedStandardPathwayResponse>(
+    "/visit-flows/seed-standard",
+  );
   return response.data;
 }

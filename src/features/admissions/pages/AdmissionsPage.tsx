@@ -27,6 +27,7 @@ import {
   admitPatient,
   captureBedDayCharges,
   convertVisitToAdmission,
+  getActiveAdmissionForPatient,
   listAdmissions,
   transferAdmissionBed,
   updateAdmissionStatus,
@@ -40,11 +41,12 @@ import { listWards } from "../api/wards.api";
 import type { Ward } from "../api/wards.api";
 import { listBeds } from "../api/beds.api";
 import type { Bed } from "../api/beds.api";
-import { searchPatients } from "@/features/patients/api/patients.api";
+import { getVisits, getServiceDeliveryPoints } from "@/features/visits/api/visits.api";
+import type { Visit, ServiceDeliveryPoint } from "@/features/visits/api/visits.api";
+import { searchPatients, getPatientById } from "@/features/patients/api/patients.api";
 import type { Patient } from "@/features/patients/api/patients.api";
-import { getStaff, staffDisplayName } from "@/features/staff/api/staff.api";
+import { getStaff, getCurrentStaff, staffDisplayName } from "@/features/staff/api/staff.api";
 import type { Staff } from "@/features/staff/api/staff.api";
-import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
 
 const statusStyles: Record<string, string> = {
   ADMITTED: "bg-primary-50 text-primary-600 border-primary-100",
@@ -59,6 +61,35 @@ const STATUS_FILTERS = [
   { value: "", label: "All Statuses" },
   ...ADMISSION_STATUSES.map((s) => ({ value: s, label: s.replace("_", " ") })),
 ];
+
+/**
+ * Pull the most specific message out of an API error so the UI shows the real
+ * cause (backend message / detail / validation) instead of a generic string.
+ * Falls back to a network hint when no HTTP response reached the browser.
+ */
+function extractApiError(err: any, fallback: string): string {
+  const res = err?.response;
+  if (!res) return err?.message ? `${fallback} (${err.message})` : fallback;
+  const data = res.data ?? {};
+  const detail = data.detail;
+  let msg =
+    (typeof data.message === "string" && data.message) ||
+    (typeof detail === "string" && detail) ||
+    (detail && typeof detail.message === "string" && detail.message) ||
+    (Array.isArray(detail)
+      ? detail
+          .map((d: any) => (typeof d === "string" ? d : d?.msg || d?.message))
+          .filter(Boolean)
+          .join("; ")
+      : "") ||
+    "";
+  const kind =
+    detail && typeof detail === "object" && typeof detail.exception_type === "string"
+      ? detail.exception_type
+      : "";
+  if (!msg) msg = res.status ? `${fallback} (HTTP ${res.status})` : fallback;
+  return kind ? `${msg} [${kind}]` : msg;
+}
 
 function formatDateTime(value?: string) {
   if (!value) return "—";
@@ -75,16 +106,9 @@ function formatDateTime(value?: string) {
   }
 }
 
-function readStoredUserId(): number | null {
-  try {
-    const raw = localStorageService.get(storageKeys.user);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return typeof parsed?.id === "number" ? parsed.id : null;
-  } catch {
-    return null;
-  }
-}
+/** Visit statuses that can still be linked to / converted into an admission. */
+const OPEN_VISIT_STATUSES = new Set(["INITIATED", "IN_PROGRESS", "WAITING", "ON_HOLD"]);
+const isOpenVisit = (v: Visit) => OPEN_VISIT_STATUSES.has(String(v.status || "").toUpperCase());
 
 type ActionKind = "admit" | "from-visit" | "transfer" | "status" | "bed-days" | null;
 
@@ -100,6 +124,7 @@ type AdmitForm = {
   admission_reason: string;
   admitted_at: string; // local datetime input
   expected_discharge_at: string;
+  is_emergency: boolean;
   capture_first_bed_day_charge: boolean;
 };
 
@@ -113,6 +138,7 @@ const emptyAdmitForm: AdmitForm = {
   admission_reason: "",
   admitted_at: "",
   expected_discharge_at: "",
+  is_emergency: false,
   capture_first_bed_day_charge: true,
 };
 
@@ -123,6 +149,7 @@ type FromVisitForm = {
   admitting_staff_id: number | null;
   admission_reason: string;
   expected_discharge_at: string;
+  is_emergency: boolean;
   capture_first_bed_day_charge: boolean;
   route_to_service_delivery_point_id: string;
 };
@@ -134,6 +161,7 @@ const emptyFromVisitForm: FromVisitForm = {
   admitting_staff_id: null,
   admission_reason: "",
   expected_discharge_at: "",
+  is_emergency: false,
   capture_first_bed_day_charge: true,
   route_to_service_delivery_point_id: "",
 };
@@ -168,6 +196,13 @@ export function AdmissionsPage() {
   const [wards, setWards] = useState<Ward[]>([]);
   const [beds, setBeds] = useState<Bed[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [sdps, setSdps] = useState<ServiceDeliveryPoint[]>([]);
+  // Open outpatient/ER visits eligible for conversion, + a patient-name cache
+  // for their labels. The Admit modal loads the selected patient's own visits.
+  const [openVisits, setOpenVisits] = useState<Visit[]>([]);
+  const [visitPatients, setVisitPatients] = useState<Record<number, Patient>>({});
+  const [patientVisits, setPatientVisits] = useState<Visit[]>([]);
+  const [currentStaffId, setCurrentStaffId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<
@@ -202,6 +237,8 @@ export function AdmissionsPage() {
   const [patientQuery, setPatientQuery] = useState("");
   const [patientResults, setPatientResults] = useState<Patient[]>([]);
   const [searchingPatients, setSearchingPatients] = useState(false);
+  const [admitActive, setAdmitActive] = useState<Admission | null>(null);
+  const [convertActive, setConvertActive] = useState<Admission | null>(null);
 
   const showFeedback = (tone: "success" | "error", message: string) => {
     setFeedback({ tone, message });
@@ -212,7 +249,7 @@ export function AdmissionsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [admRes, wardsRes, bedsRes, staffRes] = await Promise.all([
+      const [admRes, wardsRes, bedsRes, staffRes, sdpRes, visitsRes] = await Promise.all([
         listAdmissions({
           skip: 0,
           limit: 200,
@@ -221,13 +258,17 @@ export function AdmissionsPage() {
         listWards({ skip: 0, limit: 200 }).catch(() => null),
         listBeds({ skip: 0, limit: 500 }).catch(() => null),
         getStaff(0, 200).catch(() => [] as Staff[]),
+        getServiceDeliveryPoints({ limit: 200 }).catch(() => [] as ServiceDeliveryPoint[]),
+        getVisits({ limit: 200 }).catch(() => ({ items: [] as Visit[] })),
       ]);
       setAdmissions(admRes.items ?? []);
       setWards(wardsRes?.items ?? []);
       setBeds(bedsRes?.items ?? []);
       setStaffList(Array.isArray(staffRes) ? staffRes : []);
+      setSdps(Array.isArray(sdpRes) ? sdpRes.filter((s) => s.is_active !== false) : []);
+      setOpenVisits((visitsRes.items ?? []).filter(isOpenVisit));
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Unable to load admissions.");
+      setError(extractApiError(err, "Unable to load admissions."));
     } finally {
       setIsLoading(false);
     }
@@ -238,18 +279,24 @@ export function AdmissionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
-  // Default the admitting staff to the logged-in user
+  // Resolve the logged-in user's staff record and default the admitting staff
+  // to them across both admission modals.
   useEffect(() => {
-    const userId = readStoredUserId();
-    if (userId == null) return;
-    const match = staffList.find((s) => s.user_id === userId);
-    if (!match) return;
-    setAdmitForm((prev) =>
-      prev.admitting_staff_id == null ? { ...prev, admitting_staff_id: match.id } : prev,
-    );
-    setFromVisitForm((prev) =>
-      prev.admitting_staff_id == null ? { ...prev, admitting_staff_id: match.id } : prev,
-    );
+    if (staffList.length === 0) return;
+    let cancelled = false;
+    getCurrentStaff(staffList).then((me) => {
+      if (cancelled || !me) return;
+      setCurrentStaffId(me.id);
+      setAdmitForm((prev) =>
+        prev.admitting_staff_id == null ? { ...prev, admitting_staff_id: me.id } : prev,
+      );
+      setFromVisitForm((prev) =>
+        prev.admitting_staff_id == null ? { ...prev, admitting_staff_id: me.id } : prev,
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [staffList]);
 
   // Debounced patient search for admit modal
@@ -271,6 +318,57 @@ export function AdmissionsPage() {
     }, 300);
     return () => clearTimeout(handle);
   }, [patientQuery]);
+
+  // Enrich the conversion visit list with patient names (the visit list endpoint
+  // doesn't always embed the patient), so the dropdown reads clearly.
+  useEffect(() => {
+    const missing = Array.from(
+      new Set(openVisits.filter((v) => !v.patient).map((v) => v.patient_id)),
+    );
+    const toFetch = missing.filter((id) => !visitPatients[id]).slice(0, 50);
+    if (toFetch.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      toFetch.map((id) =>
+        getPatientById(id)
+          .then((p) => [id, p] as const)
+          .catch(() => null),
+      ),
+    ).then((pairs) => {
+      if (cancelled) return;
+      setVisitPatients((prev) => {
+        const next = { ...prev };
+        pairs.forEach((pair) => {
+          if (pair) next[pair[0]] = pair[1];
+        });
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openVisits]);
+
+  // Load the selected patient's own open visits for the (optional) link in the
+  // Admit modal.
+  useEffect(() => {
+    if (!admitForm.patient_id) {
+      setPatientVisits([]);
+      return;
+    }
+    let cancelled = false;
+    getVisits({ patient_id: admitForm.patient_id, limit: 50 })
+      .then((r) => {
+        if (!cancelled) setPatientVisits((r.items ?? []).filter(isOpenVisit));
+      })
+      .catch(() => {
+        if (!cancelled) setPatientVisits([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [admitForm.patient_id]);
 
   const filteredAdmissions = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -302,11 +400,24 @@ export function AdmissionsPage() {
   const bedNumber = (id: number) =>
     beds.find((b) => b.id === id)?.bed_no ?? `Bed #${id}`;
 
+  // Label an open visit for the conversion dropdown: code · patient · status.
+  const visitOptionLabel = (v: Visit) => {
+    const p = v.patient || visitPatients[v.patient_id];
+    const name = p
+      ? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || `Patient #${v.patient_id}`
+      : `Patient #${v.patient_id}`;
+    const code = v.visit_code || `VISIT-${v.id}`;
+    return `${code} · ${name} · ${String(v.status || "").replace(/_/g, " ")}`;
+  };
+
   // ----- Open modals -----
   const openAdmit = () => {
     setActionKind("admit");
     setActionTarget(null);
-    setAdmitForm({ ...emptyAdmitForm, admitting_staff_id: admitForm.admitting_staff_id });
+    setAdmitForm({
+      ...emptyAdmitForm,
+      admitting_staff_id: admitForm.admitting_staff_id ?? currentStaffId,
+    });
     setPatientQuery("");
     setPatientResults([]);
     setActionError(null);
@@ -317,7 +428,7 @@ export function AdmissionsPage() {
     setActionTarget(null);
     setFromVisitForm({
       ...emptyFromVisitForm,
-      admitting_staff_id: fromVisitForm.admitting_staff_id,
+      admitting_staff_id: fromVisitForm.admitting_staff_id ?? currentStaffId,
     });
     setActionError(null);
   };
@@ -373,6 +484,37 @@ export function AdmissionsPage() {
   };
 
   // ----- Submit handlers -----
+  // A patient can hold only one active admission — detect it up front.
+  useEffect(() => {
+    if (actionKind !== "admit" || !admitForm.patient_id) {
+      setAdmitActive(null);
+      return;
+    }
+    let cancelled = false;
+    getActiveAdmissionForPatient(admitForm.patient_id)
+      .then((a) => { if (!cancelled) setAdmitActive(a); })
+      .catch(() => { if (!cancelled) setAdmitActive(null); });
+    return () => { cancelled = true; };
+  }, [actionKind, admitForm.patient_id]);
+
+  useEffect(() => {
+    const vid = fromVisitForm.visit_id;
+    if (actionKind !== "from-visit" || !vid) {
+      setConvertActive(null);
+      return;
+    }
+    const visit = openVisits.find((v) => String(v.id) === String(vid));
+    if (!visit) {
+      setConvertActive(null);
+      return;
+    }
+    let cancelled = false;
+    getActiveAdmissionForPatient(visit.patient_id)
+      .then((a) => { if (!cancelled) setConvertActive(a); })
+      .catch(() => { if (!cancelled) setConvertActive(null); });
+    return () => { cancelled = true; };
+  }, [actionKind, fromVisitForm.visit_id, openVisits]);
+
   const handleAdmit = async () => {
     if (!admitForm.patient_id) {
       setActionError("Pick a patient first.");
@@ -380,6 +522,12 @@ export function AdmissionsPage() {
     }
     if (!admitForm.ward_id || !admitForm.bed_id) {
       setActionError("Pick a ward and bed.");
+      return;
+    }
+    if (admitActive) {
+      setActionError(
+        `This patient already has an active admission (${admitActive.admission_no}). Discharge or cancel it first.`,
+      );
       return;
     }
     setActionPending(true);
@@ -398,6 +546,7 @@ export function AdmissionsPage() {
         expected_discharge_at: admitForm.expected_discharge_at
           ? new Date(admitForm.expected_discharge_at).toISOString()
           : undefined,
+        is_emergency: admitForm.is_emergency,
         capture_first_bed_day_charge: admitForm.capture_first_bed_day_charge,
       };
       const res = await admitPatient(payload);
@@ -405,7 +554,7 @@ export function AdmissionsPage() {
       showFeedback("success", res.message || "Patient admitted.");
       closeAction();
     } catch (err: any) {
-      setActionError(err?.response?.data?.message || "Failed to admit patient.");
+      setActionError(extractApiError(err, "Failed to admit patient."));
     } finally {
       setActionPending(false);
     }
@@ -420,6 +569,12 @@ export function AdmissionsPage() {
       setActionError("Pick a ward and bed.");
       return;
     }
+    if (convertActive) {
+      setActionError(
+        `This patient already has an active admission (${convertActive.admission_no}). Discharge or cancel it first.`,
+      );
+      return;
+    }
     setActionPending(true);
     setActionError(null);
     try {
@@ -432,6 +587,7 @@ export function AdmissionsPage() {
         expected_discharge_at: fromVisitForm.expected_discharge_at
           ? new Date(fromVisitForm.expected_discharge_at).toISOString()
           : undefined,
+        is_emergency: fromVisitForm.is_emergency,
         capture_first_bed_day_charge: fromVisitForm.capture_first_bed_day_charge,
         route_to_service_delivery_point_id: fromVisitForm.route_to_service_delivery_point_id
           ? Number(fromVisitForm.route_to_service_delivery_point_id)
@@ -442,7 +598,7 @@ export function AdmissionsPage() {
       showFeedback("success", res.message || "Visit converted to admission.");
       closeAction();
     } catch (err: any) {
-      setActionError(err?.response?.data?.message || "Failed to convert visit.");
+      setActionError(extractApiError(err, "Failed to convert visit."));
     } finally {
       setActionPending(false);
     }
@@ -466,7 +622,7 @@ export function AdmissionsPage() {
       showFeedback("success", res.message || "Admission transferred.");
       closeAction();
     } catch (err: any) {
-      setActionError(err?.response?.data?.message || "Failed to transfer admission.");
+      setActionError(extractApiError(err, "Failed to transfer admission."));
     } finally {
       setActionPending(false);
     }
@@ -489,7 +645,7 @@ export function AdmissionsPage() {
       showFeedback("success", res.message || "Admission status updated.");
       closeAction();
     } catch (err: any) {
-      setActionError(err?.response?.data?.message || "Failed to update status.");
+      setActionError(extractApiError(err, "Failed to update status."));
     } finally {
       setActionPending(false);
     }
@@ -514,7 +670,7 @@ export function AdmissionsPage() {
       });
       showFeedback("success", res.message || "Bed-day charges captured.");
     } catch (err: any) {
-      setActionError(err?.response?.data?.message || "Failed to capture charges.");
+      setActionError(extractApiError(err, "Failed to capture charges."));
     } finally {
       setActionPending(false);
     }
@@ -882,15 +1038,22 @@ export function AdmissionsPage() {
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
-              <FieldLabel label="Visit ID (Optional)">
-                <input
-                  type="number"
-                  value={admitForm.visit_id}
-                  onChange={(e) => setAdmitForm({ ...admitForm, visit_id: e.target.value })}
-                  placeholder="e.g. 12"
-                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
-                />
-              </FieldLabel>
+              <VisitPicker
+                label="Linked Visit (Optional)"
+                value={admitForm.visit_id}
+                visits={patientVisits}
+                labelFor={(v) =>
+                  `${v.visit_code || `VISIT-${v.id}`} · ${String(v.status || "").replace(/_/g, " ")}`
+                }
+                placeholder={admitForm.patient_id ? "— No linked visit —" : "Select a patient first"}
+                disabled={!admitForm.patient_id}
+                emptyHint={
+                  admitForm.patient_id && patientVisits.length === 0
+                    ? "This patient has no open visits."
+                    : undefined
+                }
+                onChange={(v) => setAdmitForm({ ...admitForm, visit_id: v })}
+              />
               <StaffPicker
                 label="Admitting Staff"
                 value={admitForm.admitting_staff_id}
@@ -950,6 +1113,13 @@ export function AdmissionsPage() {
             </div>
 
             <ToggleSwitch
+              label="Emergency Admission"
+              hint="Bypass the doctor-recommendation requirement (life-threatening / ER)."
+              value={admitForm.is_emergency}
+              onChange={(v) => setAdmitForm({ ...admitForm, is_emergency: v })}
+            />
+
+            <ToggleSwitch
               label="Capture First Bed-Day Charge"
               hint="Auto-bill the first bed-day immediately"
               value={admitForm.capture_first_bed_day_charge}
@@ -959,12 +1129,21 @@ export function AdmissionsPage() {
             />
           </div>
 
+          {admitActive && (
+            <div className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-700">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+              <p className="text-xs font-bold">
+                This patient already has an active admission ({admitActive.admission_no}). Discharge or cancel it before admitting again.
+              </p>
+            </div>
+          )}
           <ModalActions
             onClose={closeAction}
             onSubmit={handleAdmit}
             pending={actionPending}
             submitLabel="Admit Patient"
             submitIcon={LogIn}
+            disabled={!!admitActive}
           />
         </ModalShell>
       )}
@@ -978,17 +1157,17 @@ export function AdmissionsPage() {
         >
           {actionError && <ErrorBanner message={actionError} />}
           <div className="space-y-5">
-            <FieldLabel label="Visit ID *">
-              <input
-                type="number"
-                value={fromVisitForm.visit_id}
-                onChange={(e) =>
-                  setFromVisitForm({ ...fromVisitForm, visit_id: e.target.value })
-                }
-                placeholder="e.g. 1245"
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
-              />
-            </FieldLabel>
+            <VisitPicker
+              label="Visit *"
+              value={fromVisitForm.visit_id}
+              visits={openVisits}
+              labelFor={visitOptionLabel}
+              placeholder="Select an open visit..."
+              emptyHint={
+                openVisits.length === 0 ? "No open visits are available to convert." : undefined
+              }
+              onChange={(v) => setFromVisitForm({ ...fromVisitForm, visit_id: v })}
+            />
             <div className="grid sm:grid-cols-2 gap-4">
               <WardPicker
                 label="Ward *"
@@ -1037,20 +1216,24 @@ export function AdmissionsPage() {
                 className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono text-xs"
               />
             </FieldLabel>
-            <FieldLabel label="Route To Service Point ID (Optional)">
-              <input
-                type="number"
-                value={fromVisitForm.route_to_service_delivery_point_id}
-                onChange={(e) =>
-                  setFromVisitForm({
-                    ...fromVisitForm,
-                    route_to_service_delivery_point_id: e.target.value,
-                  })
-                }
-                placeholder="SDP id"
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
-              />
-            </FieldLabel>
+            <SdpPicker
+              label="Route To Service Point (Optional)"
+              value={fromVisitForm.route_to_service_delivery_point_id}
+              sdps={sdps}
+              onChange={(v) =>
+                setFromVisitForm({
+                  ...fromVisitForm,
+                  route_to_service_delivery_point_id: v,
+                })
+              }
+            />
+            <ToggleSwitch
+              label="Emergency Admission"
+              hint="Bypass the doctor-recommendation requirement (life-threatening / ER)."
+              value={fromVisitForm.is_emergency}
+              onChange={(v) => setFromVisitForm({ ...fromVisitForm, is_emergency: v })}
+            />
+
             <ToggleSwitch
               label="Capture First Bed-Day Charge"
               hint="Auto-bill the first bed-day immediately"
@@ -1060,12 +1243,21 @@ export function AdmissionsPage() {
               }
             />
           </div>
+          {convertActive && (
+            <div className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-700">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+              <p className="text-xs font-bold">
+                This patient already has an active admission ({convertActive.admission_no}). Discharge or cancel it before converting this visit.
+              </p>
+            </div>
+          )}
           <ModalActions
             onClose={closeAction}
             onSubmit={handleFromVisit}
             pending={actionPending}
             submitLabel="Convert to Admission"
             submitIcon={ArrowRightLeft}
+            disabled={!!convertActive}
           />
         </ModalShell>
       )}
@@ -1313,27 +1505,24 @@ function WardPicker({
 }) {
   return (
     <FieldLabel label={label}>
-      {wards.length > 0 ? (
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-        >
-          <option value="">Pick a ward...</option>
-          {wards.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.name ?? `Ward #${w.id}`}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Ward ID"
-          className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
-        />
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={wards.length === 0}
+        className="input-field h-12 bg-secondary-50 border-secondary-400 w-full disabled:opacity-60"
+      >
+        <option value="">{wards.length ? "Pick a ward..." : "No wards configured"}</option>
+        {wards.map((w) => (
+          <option key={w.id} value={w.id}>
+            {w.name ?? `Ward #${w.id}`}
+            {w.ward_type ? ` · ${w.ward_type}` : ""}
+          </option>
+        ))}
+      </select>
+      {wards.length === 0 && (
+        <p className="text-[10px] font-semibold text-amber-600">
+          Create wards under Wards &amp; Beds first.
+        </p>
       )}
     </FieldLabel>
   );
@@ -1361,31 +1550,30 @@ function BedPicker({
     return true;
   });
 
+  const placeholder = !wardId
+    ? "Pick a ward first..."
+    : filtered.length
+      ? "Pick a bed..."
+      : "No available beds in this ward";
+
   return (
     <FieldLabel label={label}>
-      {beds.length > 0 ? (
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-        >
-          <option value="">Pick a bed...</option>
-          {filtered.map((b) => (
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={!wardId || filtered.length === 0}
+        className="input-field h-12 bg-secondary-50 border-secondary-400 w-full disabled:opacity-60"
+      >
+        <option value="">{placeholder}</option>
+        {wardId &&
+          filtered.map((b) => (
             <option key={b.id} value={b.id}>
               {b.bed_no ?? `Bed #${b.id}`}
+              {b.bed_type ? ` · ${b.bed_type}` : ""}
               {b.bed_status ? ` · ${b.bed_status}` : ""}
             </option>
           ))}
-        </select>
-      ) : (
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Bed ID"
-          className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
-        />
-      )}
+      </select>
     </FieldLabel>
   );
 }
@@ -1413,6 +1601,77 @@ function StaffPicker({
           <option key={s.id} value={s.id}>
             {staffDisplayName(s)}
             {s.designation ? ` · ${s.designation}` : ""}
+          </option>
+        ))}
+      </select>
+    </FieldLabel>
+  );
+}
+
+function VisitPicker({
+  label,
+  value,
+  visits,
+  labelFor,
+  placeholder,
+  emptyHint,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  visits: Visit[];
+  labelFor: (v: Visit) => string;
+  placeholder: string;
+  emptyHint?: string;
+  disabled?: boolean;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <FieldLabel label={label}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="input-field h-12 bg-secondary-50 border-secondary-400 w-full disabled:opacity-60"
+      >
+        <option value="">{placeholder}</option>
+        {visits.map((v) => (
+          <option key={v.id} value={v.id}>
+            {labelFor(v)}
+          </option>
+        ))}
+      </select>
+      {emptyHint && (
+        <p className="text-[10px] font-semibold text-amber-600">{emptyHint}</p>
+      )}
+    </FieldLabel>
+  );
+}
+
+function SdpPicker({
+  label,
+  value,
+  sdps,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  sdps: ServiceDeliveryPoint[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <FieldLabel label={label}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
+      >
+        <option value="">— None —</option>
+        {sdps.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+            {s.code ? ` (${s.code})` : ""}
           </option>
         ))}
       </select>
@@ -1476,6 +1735,7 @@ function ModalActions({
   submitLabel,
   submitIcon: Icon,
   tone = "primary",
+  disabled = false,
 }: {
   onClose: () => void;
   onSubmit: () => void;
@@ -1483,6 +1743,7 @@ function ModalActions({
   submitLabel: string;
   submitIcon: typeof Save;
   tone?: "primary" | "amber" | "emerald" | "rose";
+  disabled?: boolean;
 }) {
   const cls =
     tone === "amber"
@@ -1503,7 +1764,7 @@ function ModalActions({
       </button>
       <button
         onClick={onSubmit}
-        disabled={pending}
+        disabled={pending || disabled}
         className={`flex-[2] py-4 rounded-2xl text-white font-black tracking-tight shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 ${cls}`}
       >
         <Icon className="h-4 w-4" />

@@ -28,7 +28,7 @@ export function SaasLoginPage() {
   const navigate = useNavigate();
 
   const [identifier, setIdentifier] = useState("superadmin@carepointhms.com");
-  const [password, setPassword] = useState("Alvin@oct2016");
+  const [password, setPassword] = useState("SuperAdmin123!");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,12 +87,17 @@ export function SaasLoginPage() {
         role: rawUser.role || "SAAS_ADMIN",
         is_superuser: !!rawUser.is_superuser,
         is_saas_admin: true,
+        theme_preference: rawUser.theme_preference === "dark" ? "dark" : "light",
       };
 
       localStorageService.set(storageKeys.user, JSON.stringify(user));
       navigate(routes.saasDashboard);
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Invalid credentials. Please try again.");
+      setError(
+        err?.response
+          ? err.response.data?.message || err.response.data?.detail || "Invalid credentials. Please try again."
+          : "Cannot reach the API server. Check that the backend is running and VITE_API_BASE_URL is correct."
+      );
     } finally {
       setIsSubmitting(false);
     }

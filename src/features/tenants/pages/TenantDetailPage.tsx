@@ -279,15 +279,24 @@ export function TenantDetailPage() {
               {tenant.domain_url && (
                 <DetailRow icon={Globe} label="Domain" value={tenant.domain_url} mono />
               )}
-              {tenant.db_connection_string && (
-                <DetailRow
-                  icon={Database}
-                  label="DB Connection"
-                  value={tenant.db_connection_string.length > 30
-                    ? `${tenant.db_connection_string.slice(0, 30)}…`
-                    : tenant.db_connection_string}
-                  mono
-                />
+              <DetailRow
+                icon={Database}
+                label="Database"
+                value={tenant.is_provisioned ? "Provisioned" : "Not provisioned"}
+                tone={tenant.is_provisioned ? undefined : "amber"}
+              />
+              {tenant.provisioning_error && (
+                <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">
+                    Last provisioning error
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-rose-600 dark:text-rose-300 break-words">
+                    {tenant.provisioning_error}
+                  </p>
+                  <p className="mt-1.5 text-[11px] text-secondary-500">
+                    The tenant was returned to PENDING — fix the cause and approve again to retry.
+                  </p>
+                </div>
               )}
             </div>
           </div>

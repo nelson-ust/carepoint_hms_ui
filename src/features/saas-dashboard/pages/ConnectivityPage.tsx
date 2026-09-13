@@ -6,20 +6,14 @@ import {
    CheckCircle2,
    Clock,
    Globe,
-   RefreshCw,
-   Search,
    ShieldCheck,
    Signal,
    Zap,
-   MoreHorizontal,
-   ChevronRight,
-   AlertCircle,
    Wifi,
 } from "lucide-react";
 import { useSystemHealth } from "../hooks/use-system-health";
 import { useConnectivityProbe } from "../hooks/use-connectivity";
 import { format } from "date-fns";
-import { Key, ReactElement, JSXElementConstructor, ReactNode, ReactPortal } from "react";
 
 export function ConnectivityPage() {
    const { data: health, isLoading: isHealthLoading, refetch: refetchHealth } = useSystemHealth();
@@ -32,18 +26,18 @@ export function ConnectivityPage() {
          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <PageHeader
                title="Network Connectivity"
-               description="Monitor platform uptime, API latency, and global service availability stats."
+               description="Monitor platform uptime, API latency, and core service health in real time."
             />
             <button
                onClick={() => {
-                  probeMutation.mutate({ target_url: "https://api.carepoint-hms.com" });
+                  probeMutation.mutate({ target_url: "self" });
                   refetchHealth();
                }}
                disabled={probeMutation.isPending || isHealthLoading}
                className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20"
             >
                <Wifi className={`h-5 w-5 ${probeMutation.isPending ? 'animate-pulse' : ''}`} />
-               <span className="font-bold">Run Global Probe</span>
+               <span className="font-bold">Run Health Check</span>
             </button>
          </div>
 
@@ -127,7 +121,7 @@ export function ConnectivityPage() {
             <div className="lg:col-span-2 space-y-6">
                <h3 className="text-lg font-bold text-secondary-900 flex items-center gap-2">
                   <Signal className="h-5 w-5 text-primary-500" />
-                  Regional Performance
+                  Service Performance
                </h3>
                <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium space-y-8">
                   {network?.regional_performance.length ? network.regional_performance.map((r: { region: string; status: string; latency_ms: number; }) => (
@@ -144,7 +138,7 @@ export function ConnectivityPage() {
                   )) : (
                      <div className="py-10 text-center">
                         <Globe className="h-10 w-10 text-secondary-200 mx-auto mb-4 animate-spin-slow" />
-                        <p className="text-sm text-secondary-400 font-medium">Fetching regional data...</p>
+                        <p className="text-sm text-secondary-400 font-medium">Running health checks…</p>
                      </div>
                   )}
                </div>

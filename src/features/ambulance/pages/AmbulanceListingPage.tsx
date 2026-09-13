@@ -29,9 +29,10 @@ export function AmbulanceListingPage() {
     switch (status) {
       case "AVAILABLE":
         return "bg-emerald-50 text-emerald-600 border-emerald-100";
-      case "ON_MISSION":
+      case "DISPATCHED":
+      case "IN_TRANSIT":
         return "bg-blue-50 text-blue-600 border-blue-100";
-      case "MAINTENANCE":
+      case "UNDER_MAINTENANCE":
         return "bg-amber-50 text-amber-600 border-amber-100";
       case "OUT_OF_SERVICE":
         return "bg-rose-50 text-rose-600 border-rose-100";
@@ -138,16 +139,15 @@ export function AmbulanceListingPage() {
                     <p className="text-sm font-bold text-secondary-900">{ambulance.current_mileage.toLocaleString()} KM</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-1">Equipment</p>
-                    <p className="text-sm font-bold text-emerald-600">Ready</p>
+                    <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-1">Year</p>
+                    <p className="text-sm font-bold text-secondary-900">{ambulance.year_of_manufacture || "—"}</p>
                   </div>
                 </div>
 
                 <div className="mt-6 flex items-center justify-between">
-                  <div className="flex -space-x-2">
-                    <div className="h-8 w-8 rounded-full bg-secondary-200 border-2 border-white flex items-center justify-center text-[10px] font-bold">DR</div>
-                    <div className="h-8 w-8 rounded-full bg-primary-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-primary-700">+</div>
-                  </div>
+                  <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">
+                    {ambulance.color || ""}
+                  </span>
                   <ChevronRight className="h-5 w-5 text-secondary-300 group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>

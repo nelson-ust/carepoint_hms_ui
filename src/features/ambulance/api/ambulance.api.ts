@@ -11,7 +11,7 @@ export type Ambulance = {
   manufacturer: string;
   year_of_manufacture: number;
   color: string;
-  status: "AVAILABLE" | "ON_MISSION" | "MAINTENANCE" | "OUT_OF_SERVICE";
+  status: "AVAILABLE" | "DISPATCHED" | "IN_TRANSIT" | "OUT_OF_SERVICE" | "UNDER_MAINTENANCE";
   current_mileage: number;
   notes?: string;
   created_at: string;
@@ -56,6 +56,23 @@ export type AmbulanceMaintenance = {
   mileage_at_service: number;
 };
 
+export type AmbulanceFleetStats = {
+  fleet_total: number;
+  by_status: Record<string, number>;
+  ready_count: number;
+  drivers_total: number;
+  maintenance_open: number;
+};
+
+export type AmbulanceReadiness = {
+  ambulance_id: number;
+  ready: boolean;
+  reasons: string[];
+  primary_driver_id: number | null;
+  expired_equipment_ids: number[];
+  open_maintenance_ids: number[];
+};
+
 // ---------- Payloads ----------
 
 export type CreateAmbulancePayload = Omit<Ambulance, "id" | "status" | "created_at" | "updated_at">;
@@ -93,7 +110,21 @@ export const ambulanceApi = {
     apiClient.delete(`/ambulances/${id}`).then((res) => res.data),
   
   getReadiness: (id: number) =>
-    apiClient.get<{ success: boolean; message: string; ready: boolean; reasons?: string }>(`/ambulances/${id}/readiness`).then((res) => res.data),
+    apiClient
+      .get<{ success: boolean; message: string } & AmbulanceReadiness>(`/ambulances/${id}/readiness`)
+      .then((res) => {
+        // Normalize the {success, message, ...fields} envelope to a plain readiness object.
+        const { success: _s, message: _m, ...readiness } = res.data;
+        return { ...readiness, reasons: readiness.reasons ?? [] } as AmbulanceReadiness;
+      }),
+
+  getStats: () =>
+    apiClient
+      .get<{ success: boolean; message: string } & AmbulanceFleetStats>("/ambulances/stats")
+      .then((res) => {
+        const { success: _s, message: _m, ...stats } = res.data;
+        return { ...stats, by_status: stats.by_status ?? {} } as AmbulanceFleetStats;
+      }),
 
   // Drivers
   listDrivers: () =>

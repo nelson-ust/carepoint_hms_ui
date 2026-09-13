@@ -41,6 +41,7 @@ import type {
 } from "../api/beds.api";
 import { listWards } from "../api/wards.api";
 import type { Ward } from "../api/wards.api";
+import { apiErrorMessage } from "@/lib/api/api-error";
 
 type BedForm = {
   ward_id: string;
@@ -140,7 +141,7 @@ export function BedsPage() {
       setBeds(bedsRes.items ?? []);
       setWards(wardsRes?.items ?? []);
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Unable to load beds.");
+      setError(apiErrorMessage(err, "Unable to load beds. Please retry."));
     } finally {
       setIsLoading(false);
     }
@@ -190,7 +191,9 @@ export function BedsPage() {
         b.bed_status?.toLowerCase().includes(q) ||
         b.bed_type?.toLowerCase().includes(q) ||
         b.notes?.toLowerCase().includes(q) ||
-        b.ward?.name?.toLowerCase().includes(q)
+        b.ward?.name?.toLowerCase().includes(q) ||
+        b.ward_name?.toLowerCase().includes(q) ||
+        b.ward_code?.toLowerCase().includes(q)
       );
     });
   }, [beds, search, typeFilter]);
@@ -292,7 +295,7 @@ export function BedsPage() {
       }
       setModal({ open: false, editing: null });
     } catch (err: any) {
-      setSaveError(err?.response?.data?.message || "Failed to save bed.");
+      setSaveError(apiErrorMessage(err, "Failed to save bed. Please check the details and retry."));
     } finally {
       setSaving(false);
     }
@@ -307,7 +310,7 @@ export function BedsPage() {
       showFeedback("success", res.message || "Bed deleted.");
       setConfirmDelete(null);
     } catch (err: any) {
-      showFeedback("error", err?.response?.data?.message || "Failed to delete bed.");
+      showFeedback("error", apiErrorMessage(err, "Failed to delete bed."));
     } finally {
       setDeleting(false);
     }

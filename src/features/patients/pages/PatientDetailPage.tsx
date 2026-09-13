@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
-  User,
   Activity,
-  Calendar,
-  Clock,
   ArrowRight,
   ChevronRight,
   ShieldCheck,
@@ -19,15 +16,16 @@ import {
   TrendingUp,
   HeartPulse,
   Stethoscope,
-  FlaskConical,
-  Zap
+  FlaskConical
 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { getPatientById } from "../api/patients.api";
 import type { Patient } from "../api/patients.api";
 import { getVisits } from "@/features/visits/api/visits.api";
 import type { Visit } from "@/features/visits/api/visits.api";
+import { adherenceApi } from "@/features/medication-adherence/api/adherence.api";
 import { routes } from "@/config/routes";
+import { BaselineProfileCard } from "../components/BaselineProfileCard";
+import { DiagnosticResultsPanel } from "../components/DiagnosticResultsPanel";
 
 export function PatientDetailPage() {
   const { patientId } = useParams<{ patientId: string }>();
@@ -36,6 +34,8 @@ export function PatientDetailPage() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [activeVisit, setActiveVisit] = useState<Visit | null>(null);
   const [recentVisits, setRecentVisits] = useState<Visit[]>([]);
+  const [totalEncounters, setTotalEncounters] = useState<number | null>(null);
+  const [adherencePct, setAdherencePct] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,6 +58,17 @@ export function PatientDetailPage() {
         const active = allVisits.find(v => v.status === 'ACTIVE' || v.status === 'IN_PROGRESS' || v.status === 'WAITING');
         setActiveVisit(active || null);
         setRecentVisits(allVisits.filter(v => v.id !== active?.id));
+        setTotalEncounters(visitsResponse.meta?.total ?? visitsResponse.count ?? allVisits.length);
+
+        // Adherence is non-critical — fetch it separately so a failure
+        // doesn't break the clinical view.
+        try {
+          const snapshots = await adherenceApi.listSnapshots({ patient_id: id });
+          const latest = snapshots.items[0];
+          setAdherencePct(latest ? Math.round(Number(latest.adherence_pct || 0)) : null);
+        } catch {
+          setAdherencePct(null);
+        }
 
       } catch (err: any) {
         console.error("Failed to load patient dashboard", err);
@@ -169,6 +180,8 @@ export function PatientDetailPage() {
       <div className="grid lg:grid-cols-12 gap-10">
         {/* Left: Vital Info & Identity */}
         <div className="lg:col-span-4 space-y-10">
+          <BaselineProfileCard patientId={patient.id} />
+          <DiagnosticResultsPanel patientId={patient.id} />
           <div className="glass-card rounded p-10 border border-secondary-400/50 shadow-premium bg-white/40 backdrop-blur-xl">
             <h3 className="text-xl font-black font-display mb-10 flex items-center gap-3">
               <ShieldCheck className="h-6 w-6 text-primary-500" />
@@ -228,12 +241,12 @@ export function PatientDetailPage() {
           <div className="grid grid-cols-2 gap-6">
             <div className="glass-card rounded-[2.5rem] p-6 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-xl shadow-indigo-500/20">
               <TrendingUp className="h-6 w-6 mb-4 opacity-50" />
-              <p className="text-2xl font-black leading-none">12</p>
+              <p className="text-2xl font-black leading-none">{totalEncounters ?? "—"}</p>
               <p className="text-[9px] font-black uppercase tracking-widest mt-2 opacity-70">Total Encounters</p>
             </div>
             <div className="glass-card rounded-[2.5rem] p-6 bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-xl shadow-emerald-500/20">
               <HeartPulse className="h-6 w-6 mb-4 opacity-50" />
-              <p className="text-2xl font-black leading-none">98%</p>
+              <p className="text-2xl font-black leading-none">{adherencePct === null ? "—" : `${adherencePct}%`}</p>
               <p className="text-[9px] font-black uppercase tracking-widest mt-2 opacity-70">Adherence Score</p>
             </div>
           </div>

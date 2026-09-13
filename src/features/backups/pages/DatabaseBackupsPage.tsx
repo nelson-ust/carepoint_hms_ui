@@ -15,13 +15,13 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { backupsApi, type Backup } from "../api/backups.api";
+import { backupsApi, type Backup, type BackupSummary } from "../api/backups.api";
 import { Modal } from "@/components/ui/Modal";
-import { Spinner } from "@/components/ui/Spinner";
 import { resolveTenantCode } from "@/lib/tenant/tenant-resolver";
 
 export function DatabaseBackupsPage() {
   const [backups, setBackups] = useState<Backup[]>([]);
+  const [summary, setSummary] = useState<BackupSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isTriggering, setIsTriggering] = useState(false);
@@ -38,15 +38,22 @@ export function DatabaseBackupsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await backupsApi.list();
-      setBackups(data || []);
+      const data = await backupsApi.getDashboard();
+      setBackups(data.backups || []);
+      setSummary(data.summary || null);
     } catch (err: any) {
       console.error("Backup load error:", err);
-      const tenant = resolveTenantCode();
-      if (err.message === "Network Error") {
-        setError(`Connectivity Blocked (CORS): The server at carepoint-hms.onrender.com is refusing requests from ${window.location.origin}. This is a security policy configuration on the backend.`);
+      const status = err?.response?.status;
+      const serverMsg = err?.response?.data?.message;
+      if (!err?.response) {
+        setError("Cannot reach the API server. Check that the backend is running, then retry.");
+      } else if (status === 401 || status === 403) {
+        setError(
+          serverMsg ||
+            "You don't have permission to view backups (requires BACKUP_READ). Ask your administrator to grant it via Roles & Permissions.",
+        );
       } else {
-        setError(`System Error (500): The backup vault for tenant "${tenant}" is currently unreachable or crashed on the server.`);
+        setError(serverMsg || "The backup service returned an error. Please retry, and contact support if it persists.");
       }
     } finally {
       setIsLoading(false);
@@ -80,13 +87,23 @@ export function DatabaseBackupsPage() {
     try {
       const response: any = await backupsApi.download(id);
       if (response.s3_url || response.download_url) {
-        window.open(response.s3_url || response.download_url, '_blank');
+        window.open(response.s3_url || response.download_url, "_blank", "noopener");
       } else {
-        alert("Secure download link could not be generated.");
+        setModalConfig({
+          title: "Download Unavailable",
+          message: "A secure download link could not be generated for this recovery point.",
+          type: "error",
+        });
+        setShowModal(true);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Download error", err);
-      alert("Failed to retrieve the backup file.");
+      setModalConfig({
+        title: "Download Failed",
+        message: err?.response?.data?.message || "The backup file could not be retrieved.",
+        type: "error",
+      });
+      setShowModal(true);
     }
   };
 
@@ -94,8 +111,8 @@ export function DatabaseBackupsPage() {
     load();
   }, []);
 
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return '0 B';
+  const formatSize = (bytes?: number | null) => {
+    if (!bytes || bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -135,20 +152,33 @@ export function DatabaseBackupsPage() {
             <div className="h-16 w-16 rounded-2xl bg-primary-900 text-white flex items-center justify-center mb-6 shadow-lg shadow-primary-900/20">
               <ShieldCheck className="h-8 w-8" />
             </div>
-            <h4 className="text-xl font-black text-secondary-900 mb-2">Health: Healthy</h4>
-            <p className="text-xs text-secondary-500 leading-relaxed mb-8">
-              Backups are encrypted and synchronized with S3 regional storage every 6 hours.
-            </p>
-            <div className="space-y-6">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-1">Last Daily</span>
-                <span className="text-sm font-black text-secondary-900">Today, 04:00 AM</span>
+            {isLoading ? (
+              <div className="space-y-4">
+                <div className="h-7 w-40 rounded-xl bg-secondary-100/50 animate-pulse" />
+                <div className="h-4 w-full rounded-xl bg-secondary-100/40 animate-pulse" />
               </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-1">Retention Policy</span>
-                <span className="text-sm font-black text-secondary-900">30 Days (Rolling)</span>
-              </div>
-            </div>
+            ) : (
+              <>
+                <h4 className="text-xl font-black text-secondary-900 mb-2">
+                  Health: {summary?.health_status ?? "—"}
+                </h4>
+                <p className="text-xs text-secondary-500 leading-relaxed mb-8">
+                  {summary?.health_description ?? "Backup health information is unavailable."}
+                </p>
+                <div className="space-y-6">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-1">Last Backup</span>
+                    <span className="text-sm font-black text-secondary-900">
+                      {summary?.last_backup_at ? new Date(summary.last_backup_at).toLocaleString() : "—"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-1">Retention Policy</span>
+                    <span className="text-sm font-black text-secondary-900">{summary?.retention_policy ?? "—"}</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-emerald-500 text-white shadow-xl shadow-emerald-500/20">
@@ -156,8 +186,18 @@ export function DatabaseBackupsPage() {
               <HardDrive className="h-6 w-6" />
             </div>
             <h4 className="text-lg font-bold mb-2">Storage Usage</h4>
-            <p className="text-3xl font-black mb-2">12.4 GB</p>
-            <p className="text-xs text-emerald-100 font-medium">Used across 182 recovery points</p>
+            {isLoading ? (
+              <div className="h-9 w-28 rounded-xl bg-white/20 animate-pulse mb-2" />
+            ) : (
+              <p className="text-3xl font-black mb-2">
+                {summary ? `${summary.storage_usage_gb.toLocaleString()} GB` : "—"}
+              </p>
+            )}
+            <p className="text-xs text-emerald-100 font-medium">
+              {summary
+                ? `Used across ${summary.recovery_points_count.toLocaleString()} recovery point${summary.recovery_points_count === 1 ? "" : "s"}`
+                : "Recovery point information unavailable"}
+            </p>
           </div>
         </div>
 
@@ -168,22 +208,15 @@ export function DatabaseBackupsPage() {
               <div className="flex items-center gap-4">
                 <ShieldAlert className="h-8 w-8 shrink-0" />
                 <div>
-                  <h4 className="font-black text-lg">Access Denied or System Failure</h4>
+                  <h4 className="font-black text-lg">Couldn't load backups</h4>
                   <p className="text-sm font-medium opacity-80">{error}</p>
-                </div>
-              </div>
-              <div className="pt-4 border-t border-rose-200/50 flex flex-wrap gap-4">
-                <div className="bg-white/50 px-4 py-2 rounded-xl border border-rose-200">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-rose-400 block">Resolved Tenant</span>
-                  <span className="text-xs font-black text-rose-700">{resolveTenantCode() || "NONE"}</span>
-                </div>
-                <div className="bg-white/50 px-4 py-2 rounded-xl border border-rose-200">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-rose-400 block">Origin</span>
-                  <span className="text-xs font-black text-rose-700">{window.location.origin}</span>
+                  <p className="mt-1 text-[11px] font-bold uppercase tracking-widest text-rose-400">
+                    Workspace: {resolveTenantCode() || "—"}
+                  </p>
                 </div>
               </div>
               <button onClick={load} className="w-full btn-primary bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-2xl shadow-xl shadow-rose-500/20">
-                Retry Connection
+                Retry
               </button>
             </div>
           )}
@@ -223,7 +256,7 @@ export function DatabaseBackupsPage() {
                           </div>
                           <div className="flex flex-col">
                             <span className="text-sm font-black text-secondary-900">{bk.filename}</span>
-                            <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">{new Date(bk.created_at).toLocaleString()}</span>
+                            <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">{new Date(bk.date_created).toLocaleString()}</span>
                           </div>
                         </div>
                       </td>

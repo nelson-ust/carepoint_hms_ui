@@ -1,4 +1,6 @@
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useNavigate } from "react-router-dom";
+import { routes } from "@/config/routes";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -14,20 +16,25 @@ import {
   Search,
   ShieldAlert,
   Tag,
+  PackagePlus,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import {
+  bulkUploadDrugCategories,
   createDrug,
   createDrugCategory,
   deleteDrug,
   deleteDrugCategory,
+  downloadDrugCategoryTemplate,
   DOSAGE_FORMS,
   listDrugCategories,
   listDrugs,
   updateDrug,
   updateDrugCategory,
 } from "../api/drugs.api";
+import { DrugBulkUploadModal } from "../components/DrugBulkUploadModal";
 import type {
   CreateDrugCategoryPayload,
   CreateDrugPayload,
@@ -85,6 +92,7 @@ function priceFmt(value?: number) {
 }
 
 export function DrugsPage() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("DRUGS");
   const [drugs, setDrugs] = useState<Drug[]>([]);
   const [categories, setCategories] = useState<DrugCategory[]>([]);
@@ -119,6 +127,7 @@ export function DrugsPage() {
     { kind: "drug"; entity: Drug } | { kind: "cat"; entity: DrugCategory } | null
   >(null);
   const [deleting, setDeleting] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const showFeedback = (tone: "success" | "error", message: string) => {
     setFeedback({ tone, message });
@@ -334,6 +343,30 @@ export function DrugsPage() {
 
   return (
     <div className="space-y-10 animate-fade-in pb-20">
+      <DrugBulkUploadModal
+        isOpen={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        onImported={() => {
+          load();
+          showFeedback(
+            "success",
+            tab === "DRUGS"
+              ? "Drugs imported successfully."
+              : "Categories imported successfully.",
+          );
+        }}
+        {...(tab === "CATEGORIES"
+          ? {
+              title: "Bulk Upload Drug Categories",
+              subtitle: "Import Many Categories From Excel",
+              description:
+                "Category Name is required and must be unique; Code is optional. Fill one row per category, then upload it below.",
+              importLabel: "Import Categories",
+              download: downloadDrugCategoryTemplate,
+              upload: bulkUploadDrugCategories,
+            }
+          : {})}
+      />
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <PageHeader
@@ -347,6 +380,14 @@ export function DrugsPage() {
             title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            onClick={() => setBulkOpen(true)}
+            className="btn-secondary gap-2 py-3 px-6 rounded-2xl bg-white/80 border-secondary-400 inline-flex items-center"
+            title={tab === "DRUGS" ? "Bulk upload drugs from Excel" : "Bulk upload drug categories from Excel"}
+          >
+            <Upload className="h-4 w-4" />
+            <span className="font-bold">Bulk Upload</span>
           </button>
           <button
             onClick={tab === "DRUGS" ? openCreateDrug : openCreateCategory}
@@ -463,6 +504,9 @@ export function DrugsPage() {
           categoryName={categoryName}
           onEdit={openEditDrug}
           onDelete={(d) => setConfirmDelete({ kind: "drug", entity: d })}
+          onReceiveStock={(d) =>
+            navigate(`${routes.inventoryItems}?drug_id=${d.id}`)
+          }
           onCreate={openCreateDrug}
         />
       ) : (
@@ -741,6 +785,7 @@ function DrugsTable({
   categoryName,
   onEdit,
   onDelete,
+  onReceiveStock,
   onCreate,
 }: {
   drugs: Drug[];
@@ -748,6 +793,7 @@ function DrugsTable({
   categoryName: (id?: number) => string | undefined;
   onEdit: (d: Drug) => void;
   onDelete: (d: Drug) => void;
+  onReceiveStock: (d: Drug) => void;
   onCreate: () => void;
 }) {
   return (
@@ -827,7 +873,7 @@ function DrugsTable({
                     {d.drug_category_id != null ? (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-bold uppercase tracking-widest">
                         <Tag className="h-3 w-3" />
-                        {categoryName(d.drug_category_id) ?? `Cat #${d.drug_category_id}`}
+                        {d.category?.name ?? categoryName(d.drug_category_id) ?? `Cat #${d.drug_category_id}`}
                       </span>
                     ) : (
                       <span className="text-secondary-400 text-[11px] font-bold">—</span>
@@ -850,6 +896,14 @@ function DrugsTable({
                   </td>
                   <td className="px-8 py-6">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => onReceiveStock(d)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md shadow-emerald-500/10"
+                        title="Receive this drug into a store as stock"
+                      >
+                        <PackagePlus className="h-3.5 w-3.5" />
+                        <span>Receive Stock</span>
+                      </button>
                       <button
                         onClick={() => onEdit(d)}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-primary-700 transition-all shadow-md shadow-primary-500/10"

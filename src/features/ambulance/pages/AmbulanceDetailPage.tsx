@@ -15,13 +15,14 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { routes } from "@/config/routes";
-import { useAmbulance } from "../hooks/use-ambulance";
+import { useAmbulance, useAmbulanceReadiness } from "../hooks/use-ambulance";
 import { format } from "date-fns";
 
 export function AmbulanceDetailPage() {
    const navigate = useNavigate();
    const { ambulanceId } = useParams<{ ambulanceId: string }>();
    const { data: ambulance, isLoading, error } = useAmbulance(Number(ambulanceId));
+   const { data: readiness, isLoading: readinessLoading } = useAmbulanceReadiness(Number(ambulanceId));
 
    if (isLoading) return <div className="p-20 text-center">Loading vehicle data...</div>;
    if (!ambulance) return <div className="p-20 text-center">Vehicle not found.</div>;
@@ -70,7 +71,23 @@ export function AmbulanceDetailPage() {
                   </div>
                   <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40">
                      <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-2">Readiness</p>
-                     <p className="text-xl font-black text-emerald-600">100%</p>
+                     {readinessLoading ? (
+                        <div className="h-7 w-24 rounded-lg bg-secondary-100/50 animate-pulse" />
+                     ) : readiness ? (
+                        <>
+                           <p className={`text-xl font-black ${readiness.ready ? "text-emerald-600" : "text-rose-600"}`}>
+                              {readiness.ready ? "READY" : "NOT READY"}
+                           </p>
+                           {!readiness.ready && readiness.reasons.length > 0 && (
+                              <p className="text-[10px] text-secondary-500 font-medium mt-1 leading-snug">
+                                 {readiness.reasons[0]}
+                                 {readiness.reasons.length > 1 ? ` (+${readiness.reasons.length - 1} more)` : ""}
+                              </p>
+                           )}
+                        </>
+                     ) : (
+                        <p className="text-xl font-black text-secondary-400">—</p>
+                     )}
                   </div>
                </div>
 

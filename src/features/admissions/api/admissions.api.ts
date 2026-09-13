@@ -52,6 +52,8 @@ export type AdmitPatientPayload = {
   admission_reason?: string;
   admitted_at?: string;
   expected_discharge_at?: string;
+  /** Emergency admission bypasses the doctor-recommendation requirement. */
+  is_emergency?: boolean;
   capture_first_bed_day_charge?: boolean;
 };
 
@@ -62,6 +64,8 @@ export type ConvertVisitToAdmissionPayload = {
   admitting_staff_id?: number;
   admission_reason?: string;
   expected_discharge_at?: string;
+  /** Emergency admission bypasses the doctor-recommendation requirement. */
+  is_emergency?: boolean;
   capture_first_bed_day_charge?: boolean;
   route_to_service_delivery_point_id?: number;
 };
@@ -101,13 +105,25 @@ export type CaptureBedDayChargesResponse = {
 // ---------- Endpoints ----------
 
 export async function listAdmissions(
-  params: { skip?: number; limit?: number; status?: string } = {},
+  params: { skip?: number; limit?: number; status?: string; patient_id?: number } = {},
 ): Promise<PaginatedResponse<Admission>> {
-  const { skip = 0, limit = 100, status } = params;
+  const { skip = 0, limit = 100, status, patient_id } = params;
   const response = await apiClient.get<PaginatedResponse<Admission>>("/admissions/", {
-    params: { skip, limit, status },
+    params: { skip, limit, status, patient_id },
   });
   return response.data;
+}
+
+/** Admission statuses that still hold a bed (a patient may have only one). */
+export const ADMISSION_ACTIVE_STATUSES = ["PENDING", "ADMITTED", "TRANSFERRED"];
+
+/** Return the patient's current open admission, or null if none. */
+export async function getActiveAdmissionForPatient(
+  patientId: number,
+): Promise<Admission | null> {
+  const res = await listAdmissions({ patient_id: patientId, limit: 20 });
+  const items = res.items ?? [];
+  return items.find((a) => ADMISSION_ACTIVE_STATUSES.includes(a.admission_status)) ?? null;
 }
 
 export async function listActiveAdmissionsForWard(

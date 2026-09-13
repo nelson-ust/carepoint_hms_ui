@@ -1,11 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { adherenceApi } from "../api/adherence.api";
+import { adherenceApi, type AdherenceDoseStatus } from "../api/adherence.api";
 
 export const adherenceKeys = {
   all: ["medication-adherence"] as const,
   profiles: (patientId?: number) => [...adherenceKeys.all, "profiles", patientId] as const,
+  schedules: (patientId?: number) => [...adherenceKeys.all, "schedules", patientId] as const,
   doses: (patientId?: number) => [...adherenceKeys.all, "doses", patientId] as const,
   alerts: () => [...adherenceKeys.all, "alerts"] as const,
+  snapshots: (patientId?: number) => [...adherenceKeys.all, "snapshots", patientId] as const,
 };
 
 export function useAdherenceProfiles(patientId?: number) {
@@ -15,11 +17,18 @@ export function useAdherenceProfiles(patientId?: number) {
   });
 }
 
-export function useAdherenceDoses(patientId: number) {
+export function useAdherenceSchedules(patientId?: number) {
+  return useQuery({
+    queryKey: adherenceKeys.schedules(patientId),
+    queryFn: () => adherenceApi.listSchedules({ patient_id: patientId }),
+  });
+}
+
+/** Doses across the tenant, or for a single patient when patientId is given. */
+export function useAdherenceDoses(patientId?: number) {
   return useQuery({
     queryKey: adherenceKeys.doses(patientId),
-    queryFn: () => adherenceApi.listDoses({ patient_id: patientId }),
-    enabled: !!patientId,
+    queryFn: () => adherenceApi.listDoses(patientId ? { patient_id: patientId } : {}),
   });
 }
 
@@ -30,10 +39,17 @@ export function useAdherenceAlerts() {
   });
 }
 
+export function useAdherenceSnapshots(patientId?: number) {
+  return useQuery({
+    queryKey: adherenceKeys.snapshots(patientId),
+    queryFn: () => adherenceApi.listSnapshots(patientId ? { patient_id: patientId } : {}),
+  });
+}
+
 export function useConfirmDose() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ doseId, payload }: { doseId: number; payload: { status: string; taken_at?: string } }) => 
+    mutationFn: ({ doseId, payload }: { doseId: number; payload: { status: AdherenceDoseStatus; taken_at?: string; source?: string } }) =>
       adherenceApi.confirmDose(doseId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adherenceKeys.all });

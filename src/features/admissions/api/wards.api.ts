@@ -51,14 +51,61 @@ export type UpdateWardPayload = Partial<CreateWardPayload>;
 
 // ---------- Endpoints (Wards) ----------
 
+/**
+ * Largest page size that EVERY backend revision is guaranteed to accept.
+ * Older builds capped the `limit` query param at 100, so requesting more
+ * returned a 422 and broke the list whenever the server was running stale
+ * code. We always fetch in <=100 chunks to stay compatible regardless of
+ * which backend revision is live.
+ */
+const SAFE_PAGE = 100;
+
 export async function listWards(
   params: { skip?: number; limit?: number } = {},
 ): Promise<PaginatedResponse<Ward>> {
-  const { skip = 0, limit = 200 } = params;
-  const response = await apiClient.get<PaginatedResponse<Ward>>("/wards/", {
-    params: { skip, limit },
-  });
-  return response.data;
+  const startSkip = params.skip ?? 0;
+  const desired = params.limit ?? SAFE_PAGE;
+
+  const items: Ward[] = [];
+  let skip = startSkip;
+  let last: PaginatedResponse<Ward> | null = null;
+
+  // Page through in backend-safe chunks until we've collected everything the
+  // caller asked for (or the server runs out of rows). A guard caps the loop
+  // so a malformed `meta` can never spin forever.
+  for (let guard = 0; guard < 200; guard += 1) {
+    const pageSize = Math.min(SAFE_PAGE, desired - items.length);
+    if (pageSize <= 0) break;
+
+    const response = await apiClient.get<PaginatedResponse<Ward>>("/wards/", {
+      params: { skip, limit: pageSize },
+    });
+    last = response.data;
+
+    const pageItems = response.data?.items ?? [];
+    items.push(...pageItems);
+
+    const total = response.data?.meta?.total;
+    const reachedEnd =
+      pageItems.length < pageSize ||
+      (typeof total === "number" && items.length >= total);
+    if (reachedEnd) break;
+
+    skip += pageSize;
+  }
+
+  return {
+    success: last?.success ?? true,
+    message: last?.message ?? "Wards fetched successfully.",
+    items,
+    count: items.length,
+    meta: {
+      ...(last?.meta ?? {}),
+      total: last?.meta?.total ?? items.length,
+      skip: startSkip,
+      limit: items.length,
+    },
+  };
 }
 
 export async function getWard(wardId: number): Promise<Ward> {

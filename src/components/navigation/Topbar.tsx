@@ -1,11 +1,41 @@
 import { resolveTenantCode } from "@/lib/tenant/tenant-resolver";
-import { Search, Bell, Menu, HelpCircle, LayoutGrid, Sun, Moon, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Search, HelpCircle, LayoutGrid, Sun, Moon, PanelLeftClose, PanelLeft } from "lucide-react";
+import { NotificationsBell } from "@/features/notifications/components/NotificationsBell";
+import { useNavigate } from "react-router-dom";
+import { routes } from "@/config/routes";
 import { useTheme } from "@/lib/theme/ThemeProvider";
+import { useQuery } from "@tanstack/react-query";
+import { getMyProfile } from "@/features/users/api/users.api";
+import { profileKeys } from "@/features/users/hooks/use-profile";
+import { isSaaSAdmin } from "@/lib/auth/current-user";
 import { useUI } from "@/app/providers/UIProvider";
 import { useLocation } from "react-router-dom";
 
 export function Topbar() {
   const tenant = resolveTenantCode();
+  const navigate = useNavigate();
+  const initials = (() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("carepoint.user") || "null");
+      const name: string = u?.full_name || u?.first_name || u?.email || u?.username || "";
+      const parts = String(name).replace(/@.*/, "").split(/[\s._-]+/).filter(Boolean);
+      return (parts.length >= 2 ? parts[0][0] + parts[1][0] : (parts[0] || "U").slice(0, 2)).toUpperCase();
+    } catch {
+      return "U";
+    }
+  })();
+  // Presigned profile photo — same cache key as the My Profile page, so an
+  // upload there refreshes this chip instantly. SaaS admins are master-DB
+  // principals with no tenant /users/me, so we skip the fetch for them.
+  const myProfile = useQuery({
+    queryKey: profileKeys.me(),
+    queryFn: getMyProfile,
+    enabled: !isSaaSAdmin(),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const photoUrl = myProfile.data?.profile_photo_display_url || null;
+
   const { theme, toggleTheme } = useTheme();
   const { isSidebarCollapsed, toggleSidebar } = useUI();
   const location = useLocation();
@@ -40,7 +70,7 @@ export function Topbar() {
   };
 
   return (
-    <header className="sticky top-0 z-20 border-b border-black bg-white/80 backdrop-blur-xl dark:bg-secondary-900/70 dark:border-white">
+    <header className="print:hidden sticky top-0 z-20 border-b border-secondary-200/60 bg-white/70 backdrop-blur-2xl dark:bg-secondary-950/70 dark:border-white/5">
       <div className="flex h-18 items-center justify-between p-6">
         {/* Left: Mobile Menu & Search */}
         <div className="flex items-center gap-4 flex-1">
@@ -75,7 +105,7 @@ export function Topbar() {
         {/* Right: Tenant, Notifications, User */}
         <div className="flex items-center gap-4">
           {/* Workspace Switcher / Info */}
-          <div className="hidden sm:flex flex-col items-end mr-4 pr-4 border-r border-secondary-200 dark:border-white/50">
+          <div className="hidden sm:flex flex-col items-end mr-4 pr-4 border-r border-secondary-200 dark:border-white/10">
             <span className="text-[10px] uppercase tracking-widest font-bold text-secondary-400">
               Active Workspace
             </span>
@@ -103,10 +133,7 @@ export function Topbar() {
                   }`}
               />
             </button>
-            <button className="p-2.5 text-secondary-500 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all relative dark:text-secondary-300 dark:hover:bg-white/5 dark:hover:text-primary-300">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-2.5 right-2.5 h-2 w-2 bg-rose-500 rounded-full border-2 border-white dark:border-secondary-900" />
-            </button>
+            <NotificationsBell />
             <button className="p-2.5 text-secondary-500 hover:text-secondary-900 hover:bg-secondary-100 rounded-xl transition-all dark:text-secondary-300 dark:hover:bg-white/5 dark:hover:text-secondary-100">
               <HelpCircle className="h-5 w-5" />
             </button>
@@ -115,9 +142,17 @@ export function Topbar() {
             </button>
           </div>
 
-          <div className="h-10 w-10 ml-2 rounded-2xl bg-secondary-900 ring-4 ring-secondary-900/5 flex items-center justify-center text-white text-xs font-bold shadow-lg shadow-secondary-900/10 dark:bg-primary-500 dark:ring-primary-500/15">
-            NA
-          </div>
+          <button
+            onClick={() => navigate(routes.profile)}
+            title="My Profile"
+            className="h-10 w-10 ml-2 rounded-2xl bg-secondary-900 ring-4 ring-secondary-900/5 flex items-center justify-center text-white text-xs font-bold shadow-lg shadow-secondary-900/10 dark:bg-primary-500 dark:ring-primary-500/15 transition-transform hover:scale-105 overflow-hidden"
+          >
+            {photoUrl ? (
+              <img src={photoUrl} alt="My profile" className="h-full w-full object-cover" />
+            ) : (
+              initials
+            )}
+          </button>
         </div>
       </div>
     </header>

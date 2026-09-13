@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api/api-client";
+import { fetchAllPaged } from "@/lib/api/paginate";
 import type { PaginatedResponse } from "@/features/visits/api/visits.api";
 import type {
   MovementActionResponse,
@@ -20,11 +21,13 @@ export type TransferStockPayload = {
 export async function listStockMovements(
   params: { skip?: number; limit?: number; store_id?: number; movement_type?: string } = {},
 ): Promise<PaginatedResponse<StockMovement>> {
-  const { skip = 0, limit = 200, store_id, movement_type } = params;
-  const response = await apiClient.get<PaginatedResponse<StockMovement>>("/stock-movements/", {
-    params: { skip, limit, store_id, movement_type },
+  const { skip, limit = 200, store_id, movement_type } = params;
+  return fetchAllPaged<StockMovement>(apiClient, "/stock-movements/", {
+    skip,
+    limit,
+    params: { store_id, movement_type },
+    defaultMessage: "Movements fetched successfully.",
   });
-  return response.data;
 }
 
 export async function postStockMovement(

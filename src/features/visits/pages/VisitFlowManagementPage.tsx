@@ -34,6 +34,7 @@ import {
   deleteVisitTemplate,
   getVisitTemplate,
   getVisitTemplates,
+  seedStandardPathway,
   updateTemplateStep,
   updateVisitTemplate,
 } from "../api/visit-flows.api";
@@ -87,6 +88,7 @@ export function VisitFlowManagementPage() {
   const [sdps, setSdps] = useState<ServiceDeliveryPoint[]>([]);
   const [activeTemplateId, setActiveTemplateId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSeeding, setIsSeeding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<
     { tone: "success" | "error"; message: string } | null
@@ -110,6 +112,29 @@ export function VisitFlowManagementPage() {
   const showFeedback = (tone: "success" | "error", message: string) => {
     setFeedback({ tone, message });
     window.setTimeout(() => setFeedback(null), 3500);
+  };
+
+  const handleSeedStandard = async () => {
+    if (
+      !confirm(
+        "Create the standard outpatient pathway (Registration → Triage → Consultation → Laboratory → Radiology → Pharmacy → Billing) from your configured service points?",
+      )
+    )
+      return;
+    setIsSeeding(true);
+    try {
+      const result = await seedStandardPathway();
+      await load();
+      let msg = result.message;
+      if (result.skipped_types?.length) {
+        msg += `\n\nSkipped (no service point configured): ${result.skipped_types.join(", ")}.`;
+      }
+      alert(msg);
+    } catch (err: any) {
+      alert(err?.response?.data?.message || "Unable to seed the standard pathway.");
+    } finally {
+      setIsSeeding(false);
+    }
   };
 
   const load = async () => {
@@ -433,6 +458,17 @@ export function VisitFlowManagementPage() {
             className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            onClick={handleSeedStandard}
+            disabled={isSeeding}
+            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400 disabled:opacity-50"
+            title="Create the standard outpatient pathway from your service points"
+          >
+            <Sparkles className="h-4 w-4" />
+            <span className="text-sm font-bold">
+              {isSeeding ? "Seeding..." : "Seed Standard Pathway"}
+            </span>
           </button>
           <button
             onClick={openCombined}

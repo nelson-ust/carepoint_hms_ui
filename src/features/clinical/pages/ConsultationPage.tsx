@@ -45,6 +45,7 @@ import type {
 import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
 import { DiagnosesPanel } from "@/features/diagnoses/components/DiagnosesPanel";
 import { PrescriptionsPanel } from "@/features/prescriptions/components/PrescriptionsPanel";
+import { ConsultationLabPanel } from "../components/ConsultationLabPanel";
 
 const statusStyles: Record<string, string> = {
   DRAFT: "bg-amber-50 text-amber-600 border-amber-100",
@@ -86,6 +87,8 @@ type SoapForm = {
   objective_note: string;
   assessment_note: string;
   plan_note: string;
+  recommends_admission: boolean;
+  admission_recommendation_note: string;
 };
 
 const emptySoap: SoapForm = {
@@ -93,6 +96,8 @@ const emptySoap: SoapForm = {
   objective_note: "",
   assessment_note: "",
   plan_note: "",
+  recommends_admission: false,
+  admission_recommendation_note: "",
 };
 
 function soapFromConsultation(c?: Consultation | null): SoapForm {
@@ -102,6 +107,8 @@ function soapFromConsultation(c?: Consultation | null): SoapForm {
     objective_note: c.objective_note ?? "",
     assessment_note: c.assessment_note ?? "",
     plan_note: c.plan_note ?? "",
+    recommends_admission: c.recommends_admission ?? false,
+    admission_recommendation_note: c.admission_recommendation_note ?? "",
   };
 }
 
@@ -728,6 +735,45 @@ export function ConsultationPage() {
                 disabled={isReadOnly}
               />
 
+              {/* Inpatient-admission recommendation. A patient can only be
+                  admitted on a doctor's recommendation (recorded here) or on
+                  emergency. */}
+              <div className="rounded-2xl border border-secondary-300 bg-secondary-50/60 p-5 dark:border-white/10 dark:bg-white/5">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 rounded accent-primary-600"
+                    checked={soap.recommends_admission}
+                    disabled={isReadOnly}
+                    onChange={(e) => {
+                      setSoap({ ...soap, recommends_admission: e.target.checked });
+                      setIsDirty(true);
+                    }}
+                  />
+                  <span>
+                    <span className="block text-sm font-bold text-secondary-900 dark:text-secondary-100">
+                      Recommend inpatient admission
+                    </span>
+                    <span className="block text-xs text-secondary-500">
+                      Required before this patient can be admitted to a ward (emergencies excepted).
+                    </span>
+                  </span>
+                </label>
+                {soap.recommends_admission && (
+                  <textarea
+                    className="input-field mt-3 w-full resize-none"
+                    rows={2}
+                    placeholder="Reason for admission (optional)"
+                    value={soap.admission_recommendation_note}
+                    disabled={isReadOnly}
+                    onChange={(e) => {
+                      setSoap({ ...soap, admission_recommendation_note: e.target.value });
+                      setIsDirty(true);
+                    }}
+                  />
+                )}
+              </div>
+
               {!isReadOnly && (
                 <div className="flex flex-wrap items-center justify-between pt-6 border-t border-secondary-400 gap-3">
                   <button
@@ -773,6 +819,14 @@ export function ConsultationPage() {
               even before a consultation is started. Add/Edit is gated by
               having an active, non-finalized consultation. */}
           <DiagnosesPanel
+            visitId={visit.id}
+            consultationId={activeConsultation?.id ?? null}
+            disabled={isReadOnly}
+          />
+
+          {/* Laboratory panel — order investigations and review released
+              results (abnormals highlighted) without leaving the encounter. */}
+          <ConsultationLabPanel
             visitId={visit.id}
             consultationId={activeConsultation?.id ?? null}
             disabled={isReadOnly}

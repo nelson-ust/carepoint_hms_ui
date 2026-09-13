@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowLeft,
@@ -26,6 +27,7 @@ type LocationState = {
 
 export function TwoFactorPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const location = useLocation();
   const state = (location.state ?? null) as LocationState;
 
@@ -124,9 +126,11 @@ export function TwoFactorPage() {
         is_email_verified: true,
         is_phone_verified: true,
         is_two_factor_enabled: false,
+        theme_preference: (result as any).theme_preference === "dark" ? "dark" : "light",
       };
 
       localStorageService.set(storageKeys.user, JSON.stringify(user));
+      queryClient.clear();
 
       let target: string = routes.dashboard;
       try {

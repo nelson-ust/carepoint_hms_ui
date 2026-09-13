@@ -1,5 +1,6 @@
 // carepoint_hms_ui/src/features/auth/components/LoginForm.tsx
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -20,6 +21,7 @@ const backgroundGradients = [
 
 export function LoginForm() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const urlTenant = resolveTenantCode();
 
   const [identifier, setIdentifier] = useState("");
@@ -111,9 +113,13 @@ export function LoginForm() {
         is_phone_verified: !!rawUser.is_phone_verified,
         is_two_factor_enabled: !!rawUser.is_two_factor_enabled,
         is_saas_admin: isSaaSAdmin,
+        theme_preference: rawUser.theme_preference === "dark" ? "dark" : "light",
       };
 
       localStorageService.set(storageKeys.user, JSON.stringify(user));
+      // Fresh session: discard any cached queries from a previous user so
+      // menus/permissions reflect the account that just signed in.
+      queryClient.clear();
 
       let target: string = isSaaSAdmin ? routes.saasDashboard : routes.dashboard;
       try {
@@ -125,7 +131,11 @@ export function LoginForm() {
       } catch { /* ignore */ }
       navigate(target);
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Invalid credentials. Please try again.");
+      setError(
+        err?.response
+          ? err.response.data?.message || err.response.data?.detail || "Invalid credentials. Please try again."
+          : "Cannot reach the API server. Check that the backend is running and VITE_API_BASE_URL is correct."
+      );
     } finally {
       setIsSubmitting(false);
     }

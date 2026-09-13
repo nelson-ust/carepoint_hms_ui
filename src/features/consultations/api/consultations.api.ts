@@ -10,6 +10,9 @@ export type Consultation = {
   objective_note?: string;
   assessment_note?: string;
   plan_note?: string;
+  recommends_admission?: boolean;
+  admission_recommended_at?: string;
+  admission_recommendation_note?: string;
   consultation_started_at?: string;
   consultation_ended_at?: string;
   created_at: string;
@@ -23,6 +26,8 @@ export type CreateConsultationPayload = {
   objective_note?: string;
   assessment_note?: string;
   plan_note?: string;
+  recommends_admission?: boolean;
+  admission_recommendation_note?: string;
 };
 
 export type UpdateConsultationPayload = {
@@ -30,6 +35,8 @@ export type UpdateConsultationPayload = {
   objective_note?: string;
   assessment_note?: string;
   plan_note?: string;
+  recommends_admission?: boolean;
+  admission_recommendation_note?: string;
 };
 
 export type FinalizeConsultationPayload = {

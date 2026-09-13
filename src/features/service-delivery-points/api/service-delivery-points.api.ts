@@ -96,6 +96,27 @@ export async function setServiceDeliveryPointStatus(
   return response.data;
 }
 
+export type SdpQueueStat = {
+  service_delivery_point_id: number;
+  waiting: number;
+  called: number;
+  serving: number;
+  total_today: number;
+};
+
+export type SdpQueueStatsResponse = {
+  success: boolean;
+  total_today: number;
+  points: SdpQueueStat[];
+};
+
+export async function getSdpQueueStats(): Promise<SdpQueueStatsResponse> {
+  const response = await apiClient.get<SdpQueueStatsResponse>(
+    "/service-delivery-points/queue-stats",
+  );
+  return response.data;
+}
+
 export async function deleteServiceDeliveryPoint(id: number): Promise<DeleteResponse> {
   const response = await apiClient.delete<DeleteResponse>(`/service-delivery-points/${id}`);
   return response.data;

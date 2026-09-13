@@ -1,133 +1,227 @@
-import { PageHeader } from "@/components/layout/PageHeader";
-import {
-   Receipt,
-   Plus,
-   Search,
-   Filter,
-   RefreshCw,
-   MoreHorizontal,
-   CreditCard,
-   History,
-   TrendingUp,
-   ChevronRight,
-   Download,
-   AlertCircle,
-} from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Banknote, FileWarning, Plus, Receipt, Wallet } from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
+import { SearchInput } from "@/components/forms/SearchInput";
+import { MetricCard } from "@/components/charts/MetricCard";
+import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
+import { Pagination } from "@/components/data-table/Pagination";
+import { useDisclosure } from "@/hooks/useDisclosure";
 import { routes } from "@/config/routes";
-import { CardSkeleton } from "@/components/ui/Skeleton";
+import { formatMoney, INVOICE_STATUSES, type Invoice } from "../api/billing.api";
+import { useBillingSummary, useInvoices } from "../hooks/use-billing";
+import { InvoiceStatusBadge } from "../components/InvoiceStatusBadge";
+import { CreateInvoiceModal } from "../components/CreateInvoiceModal";
+
+const PAGE_SIZE = 20;
+
+const STATUS_OPTIONS = [
+  { value: "", label: "All statuses" },
+  ...INVOICE_STATUSES.map((status) => ({
+    value: status,
+    label: status.replace(/_/g, " "),
+  })),
+];
+
+function formatDate(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
 
 export function BillingListPage() {
-   const navigate = useNavigate();
-   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState("");
+  const [search, setSearch] = useState("");
+  const createModal = useDisclosure();
 
-   return (
-      <div className="space-y-10 animate-fade-in pb-20">
-         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <PageHeader
-               title="Patient Billing"
-               description="Manage invoices, billing cycles, and payment charges for all clinical services."
-            />
-            <div className="flex gap-3">
-               <button className="btn-secondary gap-3 py-3 px-6">
-                  <History className="h-4 w-4" />
-                  <span className="font-bold">Audit Logs</span>
-               </button>
-               <button className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
-                  <Plus className="h-5 w-5" />
-                  <span className="font-bold">Create Invoice</span>
-               </button>
-            </div>
-         </div>
+  const filters = useMemo(
+    () => ({ skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE, status: status || undefined }),
+    [page, status],
+  );
 
-         {/* Financial Overview */}
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="glass-card rounded-[2rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-2">Total Outstanding</p>
-               <h4 className="text-3xl font-black text-rose-600">$12,482.50</h4>
-               <p className="text-[10px] text-rose-500 font-bold mt-2 flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" /> 15 Invoices Overdue
-               </p>
-            </div>
-            <div className="glass-card rounded-[2rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-2">Collected Today</p>
-               <h4 className="text-3xl font-black text-emerald-600">$4,200.00</h4>
-               <p className="text-[10px] text-emerald-600 font-bold mt-2 flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" /> +18% from yesterday
-               </p>
-            </div>
-            <div className="glass-card rounded-[2rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
-               <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-2">Pending Approvals</p>
-               <h4 className="text-3xl font-black text-secondary-900">8</h4>
-               <p className="text-[10px] text-secondary-400 font-bold mt-2">Insurance confirmation needed</p>
-            </div>
-         </div>
+  const invoicesQuery = useInvoices(filters);
+  const summaryQuery = useBillingSummary();
 
-         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-               <h3 className="text-lg font-bold text-secondary-900 flex items-center gap-2">
-                  <Receipt className="h-5 w-5 text-primary-500" />
-                  Recent Invoices
-               </h3>
-               <div className="flex gap-2">
-                  <button className="btn-secondary p-2.5 rounded-xl"><Filter className="h-4 w-4" /></button>
-                  <button className="btn-secondary p-2.5 rounded-xl"><RefreshCw className="h-4 w-4" /></button>
-               </div>
-            </div>
+  const rows = useMemo(() => {
+    const items = invoicesQuery.data?.items ?? [];
+    if (!search) return items;
+    const term = search.toLowerCase();
+    return items.filter(
+      (inv) =>
+        inv.invoice_no.toLowerCase().includes(term) ||
+        String(inv.patient_id).includes(term),
+    );
+  }, [invoicesQuery.data?.items, search]);
 
-            <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
-               <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                     <thead>
-                        <tr className="bg-secondary-900/5">
-                           <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Invoice</th>
-                           <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Patient</th>
-                           <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Amount</th>
-                           <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Status</th>
-                           <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500 text-right">Action</th>
-                        </tr>
-                     </thead>
-                     <tbody className="divide-y divide-secondary-100/50">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                           <tr
-                              key={i}
-                              onClick={() => navigate(routes.billing + `/INV-2026-00${i}`)}
-                              className="hover:bg-primary-50/30 transition-all group cursor-pointer"
-                           >
-                              <td className="px-8 py-6">
-                                 <p className="text-sm font-bold text-secondary-900">INV-2026-00{i}</p>
-                                 <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-tighter mt-0.5">May 12, 2026</p>
-                              </td>
-                              <td className="px-8 py-6">
-                                 <p className="text-sm font-bold text-secondary-900">Patient #{100 + i}</p>
-                                 <p className="text-[10px] font-medium text-secondary-500">Consultation Fee</p>
-                              </td>
-                              <td className="px-8 py-6 text-sm font-black text-secondary-900">
-                                 ${(150 * i).toFixed(2)}
-                              </td>
-                              <td className="px-8 py-6">
-                                 <span className={`px-3 py-1.5 rounded-xl text-[10px] font-bold border ${i % 2 === 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                                    {i % 2 === 0 ? 'PAID' : 'PENDING'}
-                                 </span>
-                              </td>
-                              <td className="px-8 py-6 text-right">
-                                 <div className="flex items-center justify-end gap-2">
-                                    <button className="p-2 hover:bg-secondary-100 rounded-xl text-secondary-400">
-                                       <Download className="h-4 w-4" />
-                                    </button>
-                                    <button className="p-2 hover:bg-secondary-100 rounded-xl text-secondary-400">
-                                       <MoreHorizontal className="h-4 w-4" />
-                                    </button>
-                                 </div>
-                              </td>
-                           </tr>
-                        ))}
-                     </tbody>
-                  </table>
-               </div>
-            </div>
-         </div>
+  const meta = invoicesQuery.data?.meta;
+  const summary = summaryQuery.data;
+
+  const columns: DataTableColumn<Invoice>[] = [
+    {
+      key: "invoice_no",
+      header: "Invoice",
+      render: (inv) => (
+        <div>
+          <p className="data-mono text-sm font-bold text-secondary-900">{inv.invoice_no}</p>
+          <p className="mt-0.5 text-xs text-secondary-400">{formatDate(inv.invoice_date)}</p>
+        </div>
+      ),
+    },
+    {
+      key: "patient_id",
+      header: "Patient",
+      render: (inv) => (
+        <div>
+          <p className="text-sm font-bold text-secondary-900">Patient #{inv.patient_id}</p>
+          {inv.visit_id ? (
+            <p className="mt-0.5 text-xs text-secondary-400">Visit #{inv.visit_id}</p>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: "due_date",
+      header: "Due",
+      render: (inv) => <span className="text-sm text-secondary-600">{formatDate(inv.due_date)}</span>,
+    },
+    {
+      key: "total_amount",
+      header: "Total",
+      align: "right",
+      render: (inv) => (
+        <span className="data-mono text-sm font-bold text-secondary-900">
+          {formatMoney(inv.total_amount)}
+        </span>
+      ),
+    },
+    {
+      key: "balance_due",
+      header: "Balance",
+      align: "right",
+      render: (inv) => (
+        <span
+          className={
+            inv.balance_due > 0
+              ? "data-mono text-sm font-bold text-rose-500"
+              : "data-mono text-sm font-bold text-emerald-500"
+          }
+        >
+          {formatMoney(inv.balance_due)}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (inv) => <InvoiceStatusBadge status={inv.status} />,
+    },
+  ];
+
+  return (
+    <div className="space-y-8 animate-fade-in">
+      <PageHeader
+        title="Patient Billing"
+        description="Manage invoices, billing cycles, and payment charges for all clinical services."
+        actions={
+          <Button leftIcon={<Plus className="h-4 w-4" />} onClick={createModal.open}>
+            Create Invoice
+          </Button>
+        }
+      />
+
+      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Total Invoices"
+          value={summary ? summary.totalInvoices.toLocaleString() : "—"}
+          icon={Receipt}
+          tone="primary"
+          isLoading={summaryQuery.isLoading}
+        />
+        <MetricCard
+          label="Total Collected"
+          value={summary ? formatMoney(summary.totalCollected) : "—"}
+          icon={Banknote}
+          tone="cyan"
+          isLoading={summaryQuery.isLoading}
+        />
+        <MetricCard
+          label="Outstanding Balance"
+          value={summary ? formatMoney(summary.totalOutstanding) : "—"}
+          icon={Wallet}
+          tone="rose"
+          isLoading={summaryQuery.isLoading}
+        />
+        <MetricCard
+          label="Overdue Invoices"
+          value={summary ? summary.overdueCount.toLocaleString() : "—"}
+          icon={FileWarning}
+          tone="amber"
+          isLoading={summaryQuery.isLoading}
+        />
       </div>
-   );
+
+      <Card padding="none">
+        <div className="flex flex-wrap items-center gap-3 px-6 py-4">
+          <SearchInput
+            onSearch={setSearch}
+            placeholder="Search invoice no. or patient…"
+            className="w-72"
+          />
+          <Select
+            aria-label="Filter by status"
+            options={STATUS_OPTIONS}
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
+            className="w-44 py-2.5"
+          />
+        </div>
+        <DataTable
+          columns={columns}
+          data={rows}
+          rowKey={(inv) => inv.id}
+          isLoading={invoicesQuery.isLoading}
+          error={invoicesQuery.isError ? "Failed to load invoices." : null}
+          onRetry={() => invoicesQuery.refetch()}
+          onRowClick={(inv) => navigate(`${routes.billing}/${inv.id}`)}
+          empty={{
+            icon: Receipt,
+            title: "No invoices found",
+            description: search
+              ? "No invoices match your search on this page."
+              : "Invoices will appear here once billings are issued.",
+            action: (
+              <Button size="sm" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={createModal.open}>
+                Create Invoice
+              </Button>
+            ),
+          }}
+          footer={
+            <Pagination
+              page={page}
+              totalPages={meta?.total_pages}
+              hasNext={meta?.has_next}
+              totalItems={typeof meta?.total === "number" ? meta.total : undefined}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          }
+        />
+      </Card>
+
+      <CreateInvoiceModal
+        isOpen={createModal.isOpen}
+        onClose={createModal.close}
+        onCreated={(invoiceId) => navigate(`${routes.billing}/${invoiceId}`)}
+      />
+    </div>
+  );
 }

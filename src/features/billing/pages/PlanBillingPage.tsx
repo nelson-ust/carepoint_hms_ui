@@ -108,7 +108,20 @@ export function PlanBillingPage() {
     mutationFn: (vars: { code: string; interval: BillingInterval }) =>
       subscriptionPlanApi.changeMyPlan(vars.code, vars.interval),
     onSuccess: (res) => {
-      toast.success("Plan updated", res.message);
+      if (res.direction === "downgrade") {
+        toast.success("Downgrade scheduled", res.message);
+      } else if (res.direction === "upgrade") {
+        const amt = Number(res.amount_due ?? 0);
+        toast.success(
+          "Plan upgraded",
+          amt > 0
+            ? `${res.message} Amount due now: ${(res.currency || "NGN")} ${amt.toLocaleString()}.`
+            : res.message,
+        );
+      } else {
+        toast.success("Plan updated", res.message);
+      }
+      setUpgradeTarget(null);
       refreshSub();
     },
     onError: (err: any) => {
@@ -137,6 +150,14 @@ export function PlanBillingPage() {
   const subStatus = String(subQuery.data?.status ?? "").toUpperCase();
   const isTrialing = subStatus === "TRIALING";
   const trialEnds = subQuery.data?.trial_end_date ?? subQuery.data?.current_period_end;
+  const currentPeriodEnd = subQuery.data?.current_period_end;
+
+  // Effective (interval-aware) prices decide whether a pick is an upgrade or
+  // a downgrade, so the confirm dialog explains the right billing behaviour.
+  const currentEffective = currentPlan ? planAmount(currentPlan, currentInterval) : -1;
+  const targetEffective = upgradeTarget ? planAmount(upgradeTarget, interval) : 0;
+  const changeIsDowngrade = !!upgradeTarget && currentEffective >= 0 && targetEffective < currentEffective;
+  const changeIsUpgrade = !!upgradeTarget && targetEffective > currentEffective;
 
   // Billing state derived from the enriched /me/subscription payload.
   const amountDue = Number(subQuery.data?.amount_due ?? 0);
@@ -452,19 +473,23 @@ export function PlanBillingPage() {
         isOpen={!!upgradeTarget}
         onClose={() => setUpgradeTarget(null)}
         title={
-          upgradeTarget && Number(upgradeTarget.price) >= currentPrice
-            ? `Upgrade to ${upgradeTarget?.name}?`
-            : `Switch to ${upgradeTarget?.name}?`
+          changeIsDowngrade
+            ? `Downgrade to ${upgradeTarget?.name}?`
+            : changeIsUpgrade
+              ? `Upgrade to ${upgradeTarget?.name}?`
+              : `Switch to ${upgradeTarget?.name}?`
         }
         tone="primary"
-        confirmLabel={upgradeTarget && Number(upgradeTarget.price) >= currentPrice ? "Upgrade now" : "Switch plan"}
+        confirmLabel={
+          changeIsDowngrade ? "Schedule downgrade" : changeIsUpgrade ? "Upgrade now" : "Switch plan"
+        }
         description={
           upgradeTarget
-            ? `Your hospital moves to the ${upgradeTarget.name} plan (${formatPlanPrice(upgradeTarget, interval)}, billed ${interval === "YEARLY" ? "annually" : "monthly"}) immediately. ` +
-              (Number(upgradeTarget.price) < currentPrice
-                ? "Downgrading removes access to modules not included in the new plan — pages already open may show a locked screen."
-                : "Newly included modules appear in your menu right away.") +
-              " Billing for the new period is issued at the next invoice run."
+            ? changeIsDowngrade
+              ? `Your hospital keeps the current ${currentPlan?.name ?? "plan"} and all its features until the current period ends${currentPeriodEnd ? ` on ${safeDate(currentPeriodEnd)}` : ""}. The ${upgradeTarget.name} plan (${formatPlanPrice(upgradeTarget, interval)}) then takes effect automatically at the next renewal — nothing is charged now.`
+              : changeIsUpgrade
+                ? `Your hospital moves to the ${upgradeTarget.name} plan (${formatPlanPrice(upgradeTarget, interval)}, billed ${interval === "YEARLY" ? "annually" : "monthly"}) immediately, and newly included modules appear right away. A prorated invoice for the price difference over the days left in your current period is issued now — settle it below to complete the upgrade.`
+                : `Your hospital switches to the ${upgradeTarget.name} plan (${formatPlanPrice(upgradeTarget, interval)}, billed ${interval === "YEARLY" ? "annually" : "monthly"}) immediately.`
             : undefined
         }
         onConfirm={async () => {

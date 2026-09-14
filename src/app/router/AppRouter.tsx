@@ -47,6 +47,7 @@ const AmbulanceListingPage = lazy(() => import("@/features/ambulance/pages/Ambul
 const AmbulanceDetailPage = lazy(() => import("@/features/ambulance/pages/AmbulanceDetailPage").then(m => ({ default: m.AmbulanceDetailPage })));
 const InvitationsPage = lazy(() => import("@/features/invitations/pages/InvitationsPage").then(m => ({ default: m.InvitationsPage })));
 const SaaSInvoicesPage = lazy(() => import("@/features/billing/pages/SaaSInvoicesPage").then(m => ({ default: m.SaaSInvoicesPage })));
+const SubscriptionPlansPage = lazy(() => import("@/features/saas-dashboard/pages/SubscriptionPlansPage").then(m => ({ default: m.SubscriptionPlansPage })));
 const SupportAccessPage = lazy(() => import("@/features/saas-dashboard/pages/SupportAccessPage").then(m => ({ default: m.SupportAccessPage })));
 const ConnectivityPage = lazy(() => import("@/features/saas-dashboard/pages/ConnectivityPage").then(m => ({ default: m.ConnectivityPage })));
 const SaasOverviewPage = lazy(() => import("@/features/saas-dashboard/pages/SaasOverviewPage").then(m => ({ default: m.SaasOverviewPage })));
@@ -372,6 +373,7 @@ const router = createBrowserRouter([
 
           // SaaS Billing
           { path: routes.saasInvoices, element: <Suspense fallback={<PageLoader />}><SaaSInvoicesPage /></Suspense> },
+          { path: routes.subscriptionPlans, element: <Suspense fallback={<PageLoader />}><SubscriptionPlansPage /></Suspense> },
 
           // Support Access
           { path: routes.supportAccess, element: <Suspense fallback={<PageLoader />}><SupportAccessPage /></Suspense> },

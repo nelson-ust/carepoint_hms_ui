@@ -152,6 +152,7 @@ const allModules: AppModule[] = [
   // SaaS
   { code: "SAAS_DASHBOARD", label: "Overview", path: routes.saasDashboard, icon: LayoutDashboard, category: "SaaS", description: "Global performance metrics and tenant analytics." },
   { code: "TENANTS", label: "Tenants", path: routes.tenants, icon: Globe, category: "SaaS", description: "SaaS Tenant management." },
+  { code: "SUBSCRIPTION_PLANS", label: "Subscription Plans", path: routes.subscriptionPlans, icon: Layers, category: "SaaS", description: "Create, price and manage subscription plan tiers." },
   { code: "TENANT_DOMAINS", label: "Custom Domains", path: routes.tenantDomains, icon: Globe, category: "SaaS", description: "Manage white-label domains and SSL." },
   { code: "SAAS_BILLING", label: "Subscription", path: routes.saasInvoices, icon: CreditCard, category: "SaaS", description: "Manage platform subscription and invoices." },
   { code: "PAYMENT_CONFIRMATIONS", label: "Payment Confirmations", path: routes.saasPaymentConfirmations, icon: Banknote, category: "SaaS", description: "Confirm manual tenant subscription payments." },

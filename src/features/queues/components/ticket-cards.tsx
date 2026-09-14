@@ -37,6 +37,13 @@ export function StatusBadge({ status }: { status: QueueTicketStatus }) {
   return <Badge variant={STATUS_BADGE[status] ?? "secondary"}>{status}</Badge>;
 }
 
+export function PriorityBadge({ priority }: { priority?: number | null }) {
+  const p = Number(priority ?? 0);
+  if (p <= 0) return null;
+  const label = p >= 30 ? "Emergency" : p >= 20 ? "Urgent" : "Priority";
+  return <Badge variant="soft-warning">{label}</Badge>;
+}
+
 export function formatTime(value?: string | null) {
   if (!value) return "—";
   const date = new Date(value);
@@ -155,6 +162,7 @@ export function WaitingTicketCard({
               {ticketPatientName(ticket)}
             </p>
             <StatusBadge status={ticket.status} />
+            <PriorityBadge priority={ticket.priority} />
           </div>
           <p className="mt-1 flex items-center gap-2 text-xs font-medium text-secondary-400">
             <span className="data-mono">{ticket.hospital_number ?? `#${ticket.patient_id}`}</span>
@@ -222,6 +230,7 @@ export function ServingTicketCard({
               {ticket.queue_number}
             </span>
             <StatusBadge status={ticket.status} />
+            <PriorityBadge priority={ticket.priority} />
           </div>
           <p className="mt-2 truncate text-sm font-bold text-secondary-900">
             {ticketPatientName(ticket)}

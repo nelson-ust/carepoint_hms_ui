@@ -66,7 +66,7 @@ export function SaaSInvoicesPage() {
           <div className="w-px h-12 bg-secondary-100 hidden md:block" />
           <div>
             <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-[0.2em] mb-2">Balance Due</p>
-            <h4 className="text-2xl font-black text-rose-600">$0.00</h4>
+            <h4 className="text-2xl font-black text-rose-600">₦0.00</h4>
           </div>
           <div className="w-px h-12 bg-secondary-100 hidden md:block" />
           <div>
@@ -126,9 +126,9 @@ export function SaaSInvoicesPage() {
                           {format(new Date(invoice.invoice_date), "MMM d, yyyy")}
                         </td>
                         <td className="px-8 py-6">
-                          <p className="text-sm font-black text-secondary-900">${invoice.total_amount.toLocaleString()}</p>
+                          <p className="text-sm font-black text-secondary-900">₦{invoice.total_amount.toLocaleString()}</p>
                           {invoice.amount_paid > 0 && (
-                            <p className="text-[10px] font-bold text-emerald-600 uppercase">Paid: ${invoice.amount_paid.toLocaleString()}</p>
+                            <p className="text-[10px] font-bold text-emerald-600 uppercase">Paid: ₦{invoice.amount_paid.toLocaleString()}</p>
                           )}
                         </td>
                         <td className="px-8 py-6">

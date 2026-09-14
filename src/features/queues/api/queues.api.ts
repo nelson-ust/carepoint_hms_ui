@@ -43,6 +43,8 @@ export type QueueTicket = {
   service_delivery_point_id: number;
   queue_number: string;
   queue_position?: number | null;
+  /** Clinical priority (0 = normal, higher = more urgent). */
+  priority?: number | null;
   status: QueueTicketStatus;
   called_at?: string | null;
   service_started_at?: string | null;

@@ -49,9 +49,10 @@ type TemplateForm = {
   name: string;
   code: string;
   description: string;
+  is_default: boolean;
 };
 
-const emptyTemplateForm: TemplateForm = { name: "", code: "", description: "" };
+const emptyTemplateForm: TemplateForm = { name: "", code: "", description: "", is_default: false };
 
 type StepForm = {
   service_delivery_point_id: string;
@@ -223,6 +224,7 @@ export function VisitFlowManagementPage() {
       name: activeTemplate.name ?? "",
       code: activeTemplate.code ?? "",
       description: activeTemplate.description ?? "",
+      is_default: !!activeTemplate.is_default,
     });
     setActionError(null);
   };
@@ -285,6 +287,7 @@ export function VisitFlowManagementPage() {
           name: templateForm.name.trim(),
           code: templateForm.code.trim().toUpperCase(),
           description: templateForm.description.trim() || undefined,
+          is_default: templateForm.is_default,
         });
         setTemplates((prev) =>
           prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)),
@@ -295,6 +298,7 @@ export function VisitFlowManagementPage() {
           name: templateForm.name.trim(),
           code: templateForm.code.trim().toUpperCase(),
           description: templateForm.description.trim() || undefined,
+          is_default: templateForm.is_default,
         });
         setTemplates((prev) => [...prev, created]);
         setActiveTemplateId(created.id);
@@ -586,11 +590,21 @@ export function VisitFlowManagementPage() {
                           <Hash className="h-2.5 w-2.5" />
                           {t.code}
                         </span>
-                        <span
-                          className={`text-[10px] font-bold uppercase tracking-widest ${isActive ? "text-white/70" : "text-secondary-400"
-                            }`}
-                        >
-                          {stepCount} step{stepCount === 1 ? "" : "s"}
+                        <span className="flex items-center gap-2">
+                          {t.is_default && (
+                            <span
+                              className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${isActive ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-700"
+                                }`}
+                            >
+                              Default
+                            </span>
+                          )}
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-widest ${isActive ? "text-white/70" : "text-secondary-400"
+                              }`}
+                          >
+                            {stepCount} step{stepCount === 1 ? "" : "s"}
+                          </span>
                         </span>
                       </div>
                       <p className="text-sm font-black">{t.name}</p>
@@ -869,6 +883,19 @@ export function VisitFlowManagementPage() {
                 className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
               />
             </FieldLabel>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={templateForm.is_default}
+                onChange={(e) =>
+                  setTemplateForm({ ...templateForm, is_default: e.target.checked })
+                }
+                className="h-4 w-4 rounded border-secondary-400 text-primary-600"
+              />
+              <span className="text-sm font-semibold text-secondary-700">
+                Set as the hospital's default care pathway
+              </span>
+            </label>
           </div>
           <ModalActions
             onClose={closeAction}

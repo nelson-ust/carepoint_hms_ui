@@ -59,7 +59,7 @@ export function SaasOverviewPage() {
     icon: typeof Users;
     tone: MetricTone;
   }[] = [
-    { label: "Total ARR", value: `$${(metrics?.total_arr || 0).toLocaleString()}`, icon: CreditCard, tone: "slate" },
+    { label: "Total ARR", value: `₦${(metrics?.total_arr || 0).toLocaleString()}`, icon: CreditCard, tone: "slate" },
     { label: "Active Tenants", value: metrics?.active_tenants || 0, icon: Users, tone: "primary" },
     { label: "Platform Uptime", value: metrics?.platform_uptime != null ? `${metrics.platform_uptime}%` : "—", icon: Activity, tone: "cyan" },
     { label: "Net Expansion", value: metrics?.net_expansion != null ? `${metrics.net_expansion}%` : "—", icon: ShieldCheck, tone: "amber" },
@@ -139,8 +139,8 @@ export function SaasOverviewPage() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={chart.tick} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={chart.tick} tickFormatter={(val) => `$${val / 1000}k`} />
-                  <Tooltip contentStyle={chart.tooltip} />
+                  <YAxis axisLine={false} tickLine={false} tick={chart.tick} tickFormatter={(val) => `₦${val / 1000}k`} />
+                  <Tooltip contentStyle={chart.tooltip} formatter={(value) => [`₦${Number(value).toLocaleString()}`, "Revenue"]} />
                   <Area type="monotone" dataKey="revenue" stroke={chart.series[0]} strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" />
                 </AreaChart>
               ) : (
@@ -281,7 +281,7 @@ export function SaasOverviewPage() {
                       </span>
                     </td>
                     <td className="py-6">
-                      <span className="data-mono text-sm font-black text-secondary-900">${tenant.revenue.toLocaleString()}</span>
+                      <span className="data-mono text-sm font-black text-secondary-900">₦{tenant.revenue.toLocaleString()}</span>
                     </td>
                     <td className="py-6 text-right">
                       <span className="flex items-center justify-end gap-1 text-emerald-600 text-xs font-black dark:text-emerald-300">

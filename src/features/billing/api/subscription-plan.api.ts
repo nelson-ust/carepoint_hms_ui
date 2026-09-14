@@ -46,8 +46,23 @@ export type MySubscription = {
 export type ChangePlanResponse = {
   success: boolean;
   message: string;
+  /** "upgrade" (immediate + prorated), "downgrade" (deferred), or "none". */
+  direction?: "upgrade" | "downgrade" | "none" | string;
+  /** "immediate" or "period_end". */
+  effective?: "immediate" | "period_end" | string;
   plan_code: string;
-  status: string;
+  plan_name?: string;
+  billing_interval?: BillingInterval | string;
+  /** Prorated amount due now (upgrades only). */
+  amount_due?: number;
+  currency?: string;
+  /** Invoice raised for an upgrade's prorated difference, if any. */
+  invoice_id?: number | null;
+  invoice_number?: string | null;
+  /** When a scheduled downgrade takes effect (period end). */
+  effective_date?: string | null;
+  // Legacy fields (no longer populated by the backend):
+  status?: string;
   start_date?: string | null;
 };
 

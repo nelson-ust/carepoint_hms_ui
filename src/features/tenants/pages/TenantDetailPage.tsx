@@ -25,11 +25,13 @@ import {
 } from "lucide-react";
 import {
   approveTenant,
+  changeTenantPlan,
   getTenant,
+  listSubscriptionPlans,
   TENANT_STATUSES,
   updateTenantStatus,
 } from "../api/tenants.api";
-import type { Tenant } from "../api/tenants.api";
+import type { SubscriptionPlan, Tenant } from "../api/tenants.api";
 import { TenantModulesManager } from "@/features/tenant-modules/components/TenantModulesManager";
 
 const statusStyles: Record<string, string> = {
@@ -55,7 +57,7 @@ function formatDateTime(value?: string) {
   }
 }
 
-type ActionKind = "approve" | "status" | null;
+type ActionKind = "approve" | "status" | "plan" | null;
 
 export function TenantDetailPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -72,6 +74,12 @@ export function TenantDetailPage() {
   const [statusForm, setStatusForm] = useState<string>("ACTIVE");
   const [actionPending, setActionPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Plan-change modal state
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(false);
+  const [planForm, setPlanForm] = useState<string>("");
+  const [intervalForm, setIntervalForm] = useState<"MONTHLY" | "YEARLY">("MONTHLY");
 
   const showFeedback = (tone: "success" | "error", message: string) => {
     setFeedback({ tone, message });
@@ -114,6 +122,55 @@ export function TenantDetailPage() {
       tenant.status === "ACTIVE" ? "SUSPENDED" : tenant.status === "SUSPENDED" ? "ACTIVE" : "ACTIVE",
     );
     setActionError(null);
+  };
+
+  const openPlan = async () => {
+    if (!tenant) return;
+    setActionKind("plan");
+    setActionError(null);
+    const active = tenant.subscriptions?.find(
+      (sub) =>
+        (sub.status || "").toUpperCase() === "ACTIVE" ||
+        (sub.status || "").toUpperCase() === "TRIALING",
+    );
+    setPlanForm(active?.plan?.code ?? "");
+    setIntervalForm("MONTHLY");
+    if (plans.length === 0) {
+      setPlansLoading(true);
+      try {
+        setPlans(await listSubscriptionPlans());
+      } catch {
+        setActionError("Could not load subscription plans.");
+      } finally {
+        setPlansLoading(false);
+      }
+    }
+  };
+
+  const handleChangePlan = async () => {
+    if (!tenant) return;
+    if (!planForm) {
+      setActionError("Please select a plan.");
+      return;
+    }
+    setActionPending(true);
+    setActionError(null);
+    try {
+      await changeTenantPlan(tenant.id, {
+        plan_code: planForm,
+        billing_interval: intervalForm,
+      });
+      showFeedback(
+        "success",
+        `Plan changed to ${planForm} (${intervalForm.toLowerCase()}).`,
+      );
+      setActionKind(null);
+      await load();
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || "Failed to change plan.");
+    } finally {
+      setActionPending(false);
+    }
   };
 
   const closeAction = () => {
@@ -228,6 +285,13 @@ export function TenantDetailPage() {
           >
             <Sparkles className="h-4 w-4" />
             <span className="text-sm font-bold">Update Status</span>
+          </button>
+          <button
+            onClick={openPlan}
+            className="btn-primary gap-2 px-6 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-500/20"
+          >
+            <Crown className="h-4 w-4" />
+            <span className="text-sm font-bold">Change Plan</span>
           </button>
         </div>
       </div>
@@ -496,6 +560,96 @@ export function TenantDetailPage() {
             submitIcon={Save}
             tone="amber"
           />
+        </ModalShell>
+      )}
+
+      {actionKind === "plan" && (
+        <ModalShell
+          title="Change Subscription Plan"
+          subtitle="Upgrade Or Switch The Tenant's Tier"
+          onClose={closeAction}
+          icon={Crown}
+          tone="primary"
+        >
+          {actionError && <ErrorBanner message={actionError} />}
+          {plansLoading ? (
+            <div className="py-10 text-center text-sm font-bold text-secondary-400">
+              Loading plans...
+            </div>
+          ) : plans.filter((p) => p.is_active).length === 0 ? (
+            <div className="py-10 text-center text-sm font-bold text-secondary-400">
+              No active plans available. Create one in Subscription Plans first.
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2 mb-6">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
+                  Target Plan *
+                </label>
+                <div className="grid gap-2">
+                  {plans
+                    .filter((p) => p.is_active)
+                    .map((p) => {
+                      const selected = planForm === p.code;
+                      return (
+                        <button
+                          key={p.code}
+                          type="button"
+                          onClick={() => setPlanForm(p.code)}
+                          className={`flex items-center justify-between p-4 rounded-2xl border-2 text-left transition-all ${selected
+                              ? "bg-primary-50 border-primary-500 shadow-md"
+                              : "bg-white border-secondary-400 hover:border-primary-300"
+                            }`}
+                        >
+                          <div>
+                            <p className="text-sm font-black text-secondary-900">{p.name}</p>
+                            <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase tracking-widest">
+                              {p.code}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-black text-secondary-900">
+                              {p.currency} {Number(p.price).toLocaleString()}
+                            </p>
+                            <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">
+                              / {String(p.interval).toLowerCase()}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+              <div className="space-y-2 mb-6">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
+                  Billing Cycle *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["MONTHLY", "YEARLY"] as const).map((iv) => (
+                    <button
+                      key={iv}
+                      type="button"
+                      onClick={() => setIntervalForm(iv)}
+                      className={`p-3 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${intervalForm === iv
+                          ? "bg-primary-500 text-white border-primary-500 shadow-md"
+                          : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-300"
+                        }`}
+                    >
+                      {iv}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <ModalActions
+                onClose={closeAction}
+                onSubmit={handleChangePlan}
+                pending={actionPending}
+                submitLabel="Change Plan"
+                submitIcon={Crown}
+                tone="primary"
+              />
+            </>
+          )}
         </ModalShell>
       )}
     </div>

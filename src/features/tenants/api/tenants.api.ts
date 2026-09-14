@@ -139,6 +139,31 @@ export async function registerTenant(
   return response.data;
 }
 
+export type ChangeTenantPlanPayload = {
+  plan_code: string;
+  billing_interval?: "MONTHLY" | "YEARLY";
+};
+
+export type ChangeTenantPlanResult = {
+  success: boolean;
+  message?: string;
+  subscription_id?: number | string;
+  plan_id?: number | string;
+  status?: string;
+};
+
+/** SaaS admin: switch a tenant to a different plan / billing cycle. */
+export async function changeTenantPlan(
+  tenantId: number | string,
+  payload: ChangeTenantPlanPayload,
+): Promise<ChangeTenantPlanResult> {
+  const response = await apiClient.post<ChangeTenantPlanResult>(
+    `/tenants/${tenantId}/change-plan`,
+    payload,
+  );
+  return response.data;
+}
+
 export type ProvisioningStep = {
   step: string;
   detail?: string | null;

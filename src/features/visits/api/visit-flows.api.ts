@@ -19,6 +19,7 @@ export type VisitTemplate = {
   name: string;
   code: string;
   description?: string;
+  is_default?: boolean;
   associated_visit_flow_templates_steps: TemplateStep[];
   created_at?: string;
   updated_at?: string;
@@ -46,6 +47,7 @@ export type CreateVisitTemplatePayload = {
   name: string;
   code: string;
   description?: string;
+  is_default?: boolean;
 };
 
 export type UpdateVisitTemplatePayload = Partial<CreateVisitTemplatePayload>;

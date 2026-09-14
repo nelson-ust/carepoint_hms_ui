@@ -138,6 +138,7 @@ export const routes = {
   invitationAccept: "/invitations/accept",
 
   saasInvoices: "/saas/billing",
+  subscriptionPlans: "/saas/plans",
   saasPaymentsLookup: "/saas/payments",
   supportAccess: "/saas/support",
 

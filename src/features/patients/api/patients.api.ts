@@ -15,6 +15,7 @@ export type Patient = {
   state?: string;
   patient_type: string; // INDIVIDUAL, CORPORATE, etc.
   payer_type: string; // CASH, INSURANCE, etc.
+  patient_class?: string; // SELF_PAY | HMO | RETAINERSHIP
   status: string;
   created_at: string;
 };
@@ -46,6 +47,8 @@ export type CreatePatientPayload = {
   patient_type: string;
   preferred_payer_id?: number;
   payer_type: string;
+  /** Billing class: SELF_PAY (normal), HMO, or RETAINERSHIP. */
+  patient_class?: string;
   national_identifier?: string;
   national_identifier_type?: string;
   identification_details?: Record<string, any>;

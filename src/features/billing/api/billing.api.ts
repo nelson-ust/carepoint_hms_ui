@@ -320,6 +320,9 @@ export type VisitBillingItem = {
   unit_price: number | string;
   discount_amount: number | string;
   line_total: number | string;
+  covered_amount?: number | string | null;
+  patient_amount?: number | string | null;
+  is_covered?: boolean;
   source_reference?: string | null;
   account_code?: string | null;
   account_name?: string | null;

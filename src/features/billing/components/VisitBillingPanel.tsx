@@ -239,8 +239,16 @@ export function VisitBillingPanel({ visitId }: { visitId: number }) {
                       <p className="mt-0.5 text-[11px] font-bold text-amber-600">Unmapped — no ledger account</p>
                     )}
                   </div>
-                  <span className="data-mono text-sm font-bold text-secondary-900">
-                    {formatMoney(toNumber(it.line_total))}
+                  <span className="text-right">
+                    <span className="data-mono block text-sm font-bold text-secondary-900">
+                      {formatMoney(toNumber(it.line_total))}
+                    </span>
+                    {it.patient_amount != null && toNumber(it.patient_amount) < toNumber(it.line_total) ? (
+                      <span className="block text-[10px] font-bold text-emerald-600">
+                        Covered {formatMoney(toNumber(it.covered_amount))} · You pay{" "}
+                        {formatMoney(toNumber(it.patient_amount))}
+                      </span>
+                    ) : null}
                   </span>
                 </li>
               ))}

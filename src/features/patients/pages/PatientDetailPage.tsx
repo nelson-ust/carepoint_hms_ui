@@ -223,7 +223,17 @@ export function PatientDetailPage() {
 
               <div className="pt-8 border-t border-secondary-400">
                 <p className="text-[10px] font-black uppercase tracking-[0.25em] text-secondary-400 mb-6">Financial Classification</p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-5 rounded bg-indigo-50 border border-indigo-100">
+                    <p className="text-[9px] font-black uppercase text-indigo-600 mb-1">Patient Class</p>
+                    <p className="text-xs font-black text-indigo-900 uppercase">
+                      {patient.patient_class === "HMO"
+                        ? "HMO / Insurance"
+                        : patient.patient_class === "RETAINERSHIP"
+                          ? "Retainership"
+                          : "Normal (Self-pay)"}
+                    </p>
+                  </div>
                   <div className="p-5 rounded bg-emerald-50 border border-emerald-100">
                     <p className="text-[9px] font-black uppercase text-emerald-600 mb-1">Payer Group</p>
                     <p className="text-xs font-black text-emerald-900 uppercase">{patient.payer_type}</p>

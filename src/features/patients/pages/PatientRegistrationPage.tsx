@@ -57,6 +57,7 @@ const patientSchema = z.object({
   next_of_kin_address: z.string().optional().or(z.literal("")),
   patient_type: z.string().default("INDIVIDUAL"),
   payer_type: z.string().default("CASH"),
+  patient_class: z.string().default("SELF_PAY"),
   preferred_payer_id: z.coerce.number().optional().or(z.literal(0)),
   national_identifier: z.string().optional().or(z.literal("")),
   national_identifier_type: z.string().optional().or(z.literal("")),
@@ -117,6 +118,7 @@ export function PatientRegistrationPage() {
     defaultValues: {
       patient_type: "OUTPATIENT",
       payer_type: "CASH",
+      patient_class: "SELF_PAY",
       country: "Nigeria",
       previous_identifiers: [],
     },
@@ -566,6 +568,37 @@ export function PatientRegistrationPage() {
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <h3 className="text-xl font-bold font-display">Health Coverage Enrollment</h3>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Patient Class</label>
+                  <Controller
+                    name="patient_class"
+                    control={control}
+                    render={({ field }) => {
+                      const opts = [
+                        { value: "SELF_PAY", label: "Normal (Self-pay)" },
+                        { value: "HMO", label: "HMO / Insurance" },
+                        { value: "RETAINERSHIP", label: "Retainership (Company-billed)" },
+                      ];
+                      return (
+                        <Select
+                          {...field}
+                          options={opts}
+                          styles={selectStyles}
+                          menuPortalTarget={document.body}
+                          value={opts.find((o) => o.value === field.value)}
+                          onChange={(val: any) => field.onChange(val?.value)}
+                          placeholder="Select patient class..."
+                        />
+                      );
+                    }}
+                  />
+                  <p className="text-[11px] text-secondary-500">
+                    Normal patients pay for their own services. HMO/Insurance and Retainership
+                    patients are covered by their provider/company &mdash; add the enrollment
+                    details below so covered charges are billed to the sponsor.
+                  </p>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2">

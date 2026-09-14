@@ -255,7 +255,7 @@ export function DomainsPage() {
                         CNAME (www)
                       </p>
                       <code className="block p-3 rounded-xl bg-secondary-900 text-secondary-100 text-[10px] font-mono break-all">
-                        cname.carepoint-hms.com
+                        cname.carepointhms.com
                       </code>
                     </div>
                   </div>

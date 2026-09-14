@@ -38,7 +38,7 @@ export function TenantRegistrationForm() {
   const { register, handleSubmit, formState: { errors }, trigger, setValue, watch } = useForm<FormData>({
     resolver: zodResolver(registrationSchema) as unknown as Resolver<FormData>,
     defaultValues: {
-      plan_code: "BASIC",
+      plan_code: "",
     },
   });
 
@@ -47,12 +47,9 @@ export function TenantRegistrationForm() {
       try {
         const availablePlans = await listSubscriptionPlans();
         setPlans(availablePlans);
-
-        if (availablePlans.length > 0) {
-          const basicPlan = availablePlans.find(p => p.code?.toUpperCase() === "BASIC") || availablePlans[0];
-          setSelectedPlan(basicPlan);
-          setValue("plan_code", basicPlan.code || "BASIC");
-        }
+        // Intentionally do NOT auto-select a plan. The applicant must
+        // actively choose a subscription tier in the Subscription step
+        // before the registration can be submitted (validation enforces it).
       } catch (err) {
         console.error("Failed to fetch onboarding data", err);
       }
@@ -80,7 +77,7 @@ export function TenantRegistrationForm() {
       const payload: any = { ...data };
 
       // Construct the domain_url automatically from tenant_code
-      payload.domain_url = `https://${payload.tenant_code.toLowerCase()}.carepoint-hms.com`;
+      payload.domain_url = `https://${payload.tenant_code.toLowerCase()}.carepointhms.com`;
 
       if (!payload.tax_id) {
         payload.tax_id = "N/A";

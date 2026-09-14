@@ -16,7 +16,6 @@ import {
   Plus,
   RefreshCw,
   Save,
-  ShieldAlert,
   Stethoscope,
   User,
   X,
@@ -46,6 +45,7 @@ import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
 import { DiagnosesPanel } from "@/features/diagnoses/components/DiagnosesPanel";
 import { PrescriptionsPanel } from "@/features/prescriptions/components/PrescriptionsPanel";
 import { ConsultationLabPanel } from "../components/ConsultationLabPanel";
+import { Patient360Panel } from "../components/Patient360Panel";
 
 const statusStyles: Record<string, string> = {
   DRAFT: "bg-amber-50 text-amber-600 border-amber-100",
@@ -624,17 +624,10 @@ export function ConsultationPage() {
             )}
           </div>
 
-          {/* Allergy / alert panel — informational only */}
-          <div className="glass-card rounded-[2rem] p-6 bg-rose-50 border-rose-100 space-y-3">
-            <div className="flex items-center gap-3 text-rose-600">
-              <ShieldAlert className="h-5 w-5" />
-              <h4 className="font-bold text-sm">Clinical Alerts</h4>
-            </div>
-            <p className="text-xs text-rose-700/80 font-medium">
-              Patient allergies, alerts, and chronic flags will appear here once captured by the
-              triage workflow.
-            </p>
-          </div>
+          {/* Patient 360: chronic problems, progress analytics, baseline, history */}
+          {visit?.patient_id ? (
+            <Patient360Panel patientId={visit.patient_id} />
+          ) : null}
         </div>
 
         {/* RIGHT: SOAP Editor + Diagnoses */}

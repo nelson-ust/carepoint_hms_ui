@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Patient360Panel } from "@/features/clinical/components/Patient360Panel";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Activity,
@@ -140,6 +141,9 @@ export function PatientDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* Clinical overview: chronic problems, progress analytics, baseline & history */}
+      <Patient360Panel patientId={patient.id} />
 
       {/* Status Banner for Active Visit */}
       {activeVisit && (

@@ -77,7 +77,7 @@ export function TenantRegistrationForm() {
       const payload: any = { ...data };
 
       // Construct the domain_url automatically from tenant_code
-      payload.domain_url = `https://${payload.tenant_code.toLowerCase()}.carepoint-hms.com`;
+      payload.domain_url = `https://${payload.tenant_code.toLowerCase()}.carepointhms.com`;
 
       if (!payload.tax_id) {
         payload.tax_id = "N/A";

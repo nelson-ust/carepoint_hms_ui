@@ -35,7 +35,7 @@ export function TenantRegistrationForm() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { register, handleSubmit, formState: { errors }, trigger, setValue, watch } = useForm<FormData>({
+  const { register, handleSubmit, formState: { errors }, trigger, setValue } = useForm<FormData>({
     resolver: zodResolver(registrationSchema) as unknown as Resolver<FormData>,
     defaultValues: {
       plan_code: "",
@@ -98,6 +98,16 @@ export function TenantRegistrationForm() {
         details: validationDetails,
         fullError: err
       });
+
+      // A duplicate tenant code is a 409 conflict; send the operator back to
+      // the Identity step so they can pick a different, unique code.
+      const isCodeConflict =
+        err.response?.status === 409 ||
+        validationDetails?.field === "tenant_code" ||
+        /tenant code/i.test(errorMsg);
+      if (isCodeConflict) {
+        setStep(1);
+      }
 
       setError(errorMsg);
     } finally {

@@ -189,3 +189,68 @@ export async function cancelLabOrder(
   );
   return response.data;
 }
+
+// ---------------------------------------------------------------------------
+// Hospital-wide lab result tracker
+// ---------------------------------------------------------------------------
+
+export type LabTrackItem = {
+  item_id: number;
+  test: string;
+  item_status: string;
+  result_status: string;
+  released_at: string | null;
+};
+
+export type LabTrackRow = {
+  order_id: number;
+  order_no: string;
+  status: string;
+  ordered_at: string | null;
+  visit_id: number | null;
+  patient_id: number | null;
+  patient_name: string;
+  hospital_number: string | null;
+  items: LabTrackItem[];
+  report_available: boolean;
+};
+
+export type LabTrackResponse = {
+  total: number;
+  skip: number;
+  limit: number;
+  items: LabTrackRow[];
+};
+
+/** GET /lab/orders/track — search lab orders across the hospital. */
+export async function trackLabOrders(params: {
+  query?: string;
+  status?: string;
+  skip?: number;
+  limit?: number;
+}): Promise<LabTrackResponse> {
+  const response = await apiClient.get<LabTrackResponse>("/lab/orders/track", {
+    params: {
+      query: params.query || undefined,
+      status: params.status || undefined,
+      skip: params.skip ?? 0,
+      limit: params.limit ?? 50,
+    },
+  });
+  return response.data;
+}
+
+/** Download the branded, released lab report PDF for an order. */
+export async function downloadLabReport(orderId: number, orderNo: string): Promise<void> {
+  const response = await apiClient.get(`/lab/results/orders/${orderId}/report.pdf`, {
+    responseType: "blob",
+  });
+  const url = URL.createObjectURL(response.data as Blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `lab-report-${orderNo}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}

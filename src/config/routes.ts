@@ -69,6 +69,7 @@ export const routes = {
   laboratory: "/laboratory",
   labOrders: "/laboratory/orders",
   labResults: "/laboratory/results",
+  labTracker: "/laboratory/track",
   labTests: "/laboratory/tests",
 
   radiology: "/radiology",

@@ -28,6 +28,7 @@ const QueueDashboardPage = lazy(() => import("@/features/queues/pages/QueueDashb
 const LabTestsPage = lazy(() => import("@/features/laboratory/pages/LabTestsPage").then(m => ({ default: m.LabTestsPage })));
 const LabOrdersPage = lazy(() => import("@/features/laboratory/pages/LabOrdersPage").then(m => ({ default: m.LabOrdersPage })));
 const LabResultsPage = lazy(() => import("@/features/laboratory/pages/LabResultsPage").then(m => ({ default: m.LabResultsPage })));
+const LabResultTrackerPage = lazy(() => import("@/features/laboratory/pages/LabResultTrackerPage").then(m => ({ default: m.LabResultTrackerPage })));
 const DrugsPage = lazy(() => import("@/features/drugs/pages/DrugsPage").then(m => ({ default: m.DrugsPage })));
 const StoresPage = lazy(() => import("@/features/inventory/pages/StoresPage").then(m => ({ default: m.StoresPage })));
 const StockItemsPage = lazy(() => import("@/features/inventory/pages/StockItemsPage").then(m => ({ default: m.StockItemsPage })));
@@ -310,6 +311,7 @@ const router = createBrowserRouter([
           { path: routes.labTests, element: <Suspense fallback={<PageLoader />}><LabTestsPage /></Suspense> },
           { path: routes.labOrders, element: <Suspense fallback={<PageLoader />}><LabOrdersPage /></Suspense> },
           { path: routes.labResults, element: <Suspense fallback={<PageLoader />}><LabResultsPage /></Suspense> },
+          { path: routes.labTracker, element: <Suspense fallback={<PageLoader />}><LabResultTrackerPage /></Suspense> },
 
           // Drugs Catalogue
           { path: routes.drugs, element: <Suspense fallback={<PageLoader />}><DrugsPage /></Suspense> },

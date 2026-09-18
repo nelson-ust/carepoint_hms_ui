@@ -33,7 +33,7 @@ export function useUnreadPatientMessageCount(options: { enabled?: boolean } = {}
   return useQuery({
     queryKey: patientMessageKeys.unreadCount,
     queryFn: getUnreadPatientMessageCount,
-    refetchInterval: enabled ? 60_000 : false,
+    refetchInterval: enabled ? 120_000 : false,
     staleTime: 30_000,
     enabled,
   });

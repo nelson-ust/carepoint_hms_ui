@@ -5,7 +5,7 @@ export function useSaasMetrics() {
   return useQuery<SaasMetrics>({
     queryKey: ["saas-metrics"],
     queryFn: () => saasDashboardApi.getMetrics(),
-    refetchInterval: 60000, // Refresh metrics every minute
+    refetchInterval: 120000, // Refresh metrics every minute
   });
 }
 

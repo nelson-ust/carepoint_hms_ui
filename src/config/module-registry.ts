@@ -4,6 +4,7 @@ import { ClipboardCheck, BookOpenCheck, BookOpen, Scale, KeyRound,
   LayoutDashboard, 
   Users, 
   Stethoscope, 
+  Video,
   ClipboardList, 
   FlaskConical, 
   Activity, 
@@ -88,6 +89,11 @@ const allModules: AppModule[] = [
   { code: "QUEUE_ANALYTICS", label: "Queue Analytics", path: routes.queueAnalytics, icon: BarChart3, category: "Clinical", description: "Wait times, throughput and no-show rates per service point." },
   { code: "QUEUE_DISPLAY", label: "Queue Display", path: routes.queueDisplayBoard, icon: LayoutDashboard, category: "Clinical", description: "Full-screen waiting-room now-serving board." },
   { code: "CLINICAL", moduleCode: "clinical", label: "Clinical", path: routes.clinical, icon: Stethoscope, category: "Clinical", description: "Triage, vitals, consultation, diagnosis." },
+  { code: "HOME_VISITS", label: "Home Visits", path: routes.homeVisits, icon: ClipboardList, category: "Clinical", description: "Schedule, dispatch and document domiciliary visits." },
+  { code: "CARE_PLANS", label: "Care Plans", path: routes.carePlans, icon: ClipboardCheck, category: "Clinical", description: "Care-plan goals, interventions, tasks and reviews." },
+  { code: "REMOTE_MONITORING", label: "Remote Monitoring", path: routes.remoteMonitoring, icon: Activity, category: "Clinical", description: "Home vitals capture, trends and device data." },
+  { code: "CLINICAL_ALERTS", label: "Clinical Alerts", path: routes.clinicalAlerts, icon: ShieldCheck, category: "Clinical", description: "Early-warning alerts, triage and escalation." },
+  { code: "TELEMEDICINE", label: "Telemedicine", path: routes.telemedicineSessions, icon: Video, category: "Clinical", description: "Virtual consultations — video, audio and chat with SOAP notes." },
   { code: "LAB", moduleCode: "laboratory", label: "Laboratory", path: routes.labOrders, icon: FlaskConical, category: "Clinical", description: "Lab orders and results." },
   { code: "LAB_TRACKER", moduleCode: "laboratory", label: "Lab Result Tracker", path: routes.labTracker, icon: ClipboardList, category: "Clinical", description: "Track lab orders hospital-wide and download released reports." },
   { code: "RADIOLOGY", moduleCode: "radiology", label: "Radiology", path: routes.radiology, icon: Activity, category: "Clinical", description: "Radiology orders and reports." },
@@ -193,6 +199,12 @@ export const appModules: AppModule[] = isDedicatedDeployment
  * we never hide something a role can actually use.
  */
 const MENU_PERMISSIONS: Record<string, string[]> = {
+  // Home Health
+  HOME_VISITS: ["HOME_VISIT_READ", "HOME_VISIT_CREATE", "HOME_VISIT_UPDATE", "HOME_VISIT_DOCUMENT", "HOME_VISIT_ASSIGN"],
+  CARE_PLANS: ["CARE_PLAN_READ", "CARE_PLAN_CREATE", "CARE_PLAN_UPDATE", "CARE_PLAN_MANAGE"],
+  REMOTE_MONITORING: ["REMOTE_MONITORING_READ", "REMOTE_MONITORING_RECORD", "REMOTE_MONITORING_MANAGE"],
+  CLINICAL_ALERTS: ["CLINICAL_ALERT_READ", "CLINICAL_ALERT_MANAGE"],
+  TELEMEDICINE: ["TELEMEDICINE_READ", "TELEMEDICINE_CREATE", "TELEMEDICINE_UPDATE", "TELEMEDICINE_CONDUCT"],
   // Clinical
   CLINICAL: ["CONSULTATION_READ", "CONSULTATION_WRITE", "TRIAGE_PERFORM", "VITAL_SIGN_RECORD", "DIAGNOSIS_WRITE", "VISIT_READ"],
   CLINICAL_TEMPLATES: ["TEMPLATE_READ", "TEMPLATE_CREATE"],
@@ -268,6 +280,14 @@ export const navGroups: NavGroup[] = [
     category: "Clinical",
     description: "Surgical worklist, theatres, procedure catalog and instruments.",
     children: ["SURGERY_WORKLIST", "THEATRES", "SURGICAL_PROCEDURES", "INSTRUMENT_SETS"],
+  },
+  {
+    code: "GRP_HOME_HEALTH",
+    label: "Home Health",
+    icon: Stethoscope,
+    category: "Clinical",
+    description: "Home visits, care plans, remote monitoring and clinical alerts.",
+    children: ["HOME_VISITS", "CARE_PLANS", "REMOTE_MONITORING", "CLINICAL_ALERTS", "TELEMEDICINE"],
   },
   {
     code: "GRP_HR",

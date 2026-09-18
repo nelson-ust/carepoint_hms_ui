@@ -75,7 +75,7 @@ export function SDPListingPage() {
   const statsQuery = useQuery({
     queryKey: ["service-delivery-points", "queue-stats"],
     queryFn: () => getSdpQueueStats(),
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
 
   const sdps = listQuery.data?.items ?? [];

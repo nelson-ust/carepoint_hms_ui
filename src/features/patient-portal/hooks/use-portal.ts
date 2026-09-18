@@ -323,7 +323,7 @@ export function usePortalMessagesUnreadCount() {
     queryKey: portalKeys.messagesUnread,
     queryFn: getPortalMessagesUnreadCount,
     enabled: hasPortalSession(),
-    refetchInterval: 60_000,
+    refetchInterval: 120_000,
     staleTime: 30_000,
   });
 }

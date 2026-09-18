@@ -88,7 +88,7 @@ export function ConsultationLabPanel({
   const ordersQuery = useQuery({
     queryKey: ["lab-orders", "visit", visitId],
     queryFn: () => listLabOrdersForVisit(visitId),
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
   const testsQuery = useQuery({
     queryKey: ["lab-tests", "active"],

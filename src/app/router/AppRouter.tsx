@@ -105,6 +105,14 @@ const ApprovalFlowsPage = lazy(() => import("@/features/approvals/pages/Approval
 const ApprovalRequestPage = lazy(() => import("@/features/approvals/pages/ApprovalRequestPage").then(m => ({ default: m.ApprovalRequestPage })));
 const ReportsDashboardPage = lazy(() => import("@/features/reports/pages/ReportsDashboardPage").then(m => ({ default: m.ReportsDashboardPage })));
 const AppointmentsRegistryPage = lazy(() => import("@/features/appointments/pages/AppointmentsRegistryPage").then(m => ({ default: m.AppointmentsRegistryPage })));
+const HomeVisitsPage = lazy(() => import("@/features/home-health/pages/HomeVisitsPage").then(m => ({ default: m.HomeVisitsPage })));
+const HomeVisitDetailPage = lazy(() => import("@/features/home-health/pages/HomeVisitDetailPage").then(m => ({ default: m.HomeVisitDetailPage })));
+const CarePlansPage = lazy(() => import("@/features/home-health/pages/CarePlansPage").then(m => ({ default: m.CarePlansPage })));
+const CarePlanDetailPage = lazy(() => import("@/features/home-health/pages/CarePlanDetailPage").then(m => ({ default: m.CarePlanDetailPage })));
+const RemoteMonitoringPage = lazy(() => import("@/features/home-health/pages/RemoteMonitoringPage").then(m => ({ default: m.RemoteMonitoringPage })));
+const ClinicalAlertsPage = lazy(() => import("@/features/home-health/pages/ClinicalAlertsPage").then(m => ({ default: m.ClinicalAlertsPage })));
+const TelemedicineSessionsPage = lazy(() => import("@/features/telemedicine/pages/TelemedicineSessionsPage").then(m => ({ default: m.TelemedicineSessionsPage })));
+const TelemedicineConsolePage = lazy(() => import("@/features/telemedicine/pages/TelemedicineConsolePage").then(m => ({ default: m.TelemedicineConsolePage })));
 const LeaveRequestsPage = lazy(() => import("@/features/hr/pages/LeaveRequestsPage").then(m => ({ default: m.LeaveRequestsPage })));
 const MyLeavePage = lazy(() => import("@/features/hr/pages/MyLeavePage").then(m => ({ default: m.MyLeavePage })));
 const TaxDashboardPage = lazy(() => import("@/features/tax/pages/TaxDashboardPage").then(m => ({ default: m.TaxDashboardPage })));
@@ -139,6 +147,8 @@ const PortalLoginPage = lazy(() => import("@/features/patient-portal/pages/Porta
 const PortalDashboardPage = lazy(() => import("@/features/patient-portal/pages/PortalDashboardPage").then(m => ({ default: m.PortalDashboardPage })));
 const PortalAppointmentsPage = lazy(() => import("@/features/patient-portal/pages/PortalAppointmentsPage").then(m => ({ default: m.PortalAppointmentsPage })));
 const PortalProfilePage = lazy(() => import("@/features/patient-portal/pages/PortalProfilePage").then(m => ({ default: m.PortalProfilePage })));
+const PortalHomeCarePage = lazy(() => import("@/features/patient-portal/pages/PortalHomeCarePage").then(m => ({ default: m.PortalHomeCarePage })));
+const PortalTelehealthPage = lazy(() => import("@/features/patient-portal/pages/PortalTelehealthPage").then(m => ({ default: m.PortalTelehealthPage })));
 const PortalNotificationsPage = lazy(() => import("@/features/patient-portal/pages/PortalNotificationsPage").then(m => ({ default: m.PortalNotificationsPage })));
 const PortalLabResultsPage = lazy(() => import("@/features/patient-portal/pages/PortalLabResultsPage").then(m => ({ default: m.PortalLabResultsPage })));
 const PortalInvoicesPage = lazy(() => import("@/features/patient-portal/pages/PortalInvoicesPage").then(m => ({ default: m.PortalInvoicesPage })));
@@ -235,6 +245,8 @@ const router = createBrowserRouter([
           { path: routes.portalBaselineDiagnostics, element: <Suspense fallback={<PageLoader />}><PortalBaselineDiagnosticsPage /></Suspense> },
           { path: routes.portalMessages, element: <Suspense fallback={<PageLoader />}><PortalMessagesPage /></Suspense> },
           { path: routes.portalProfile, element: <Suspense fallback={<PageLoader />}><PortalProfilePage /></Suspense> },
+          { path: routes.portalHomeCare, element: <Suspense fallback={<PageLoader />}><PortalHomeCarePage /></Suspense> },
+          { path: routes.portalTelehealth, element: <Suspense fallback={<PageLoader />}><PortalTelehealthPage /></Suspense> },
         ],
       },
     ],
@@ -291,6 +303,14 @@ const router = createBrowserRouter([
           { path: routes.visitFlows, element: <Suspense fallback={<PageLoader />}><VisitFlowManagementPage /></Suspense> },
           { path: routes.visitDetail, element: <Suspense fallback={<PageLoader />}><VisitDetailPage /></Suspense> },
           { path: routes.visitReroute, element: <Suspense fallback={<PageLoader />}><VisitReRoutePage /></Suspense> },
+          { path: routes.homeVisits, element: <Suspense fallback={<PageLoader />}><HomeVisitsPage /></Suspense> },
+          { path: routes.homeVisitDetail, element: <Suspense fallback={<PageLoader />}><HomeVisitDetailPage /></Suspense> },
+          { path: routes.carePlans, element: <Suspense fallback={<PageLoader />}><CarePlansPage /></Suspense> },
+          { path: routes.carePlanDetail, element: <Suspense fallback={<PageLoader />}><CarePlanDetailPage /></Suspense> },
+          { path: routes.remoteMonitoring, element: <Suspense fallback={<PageLoader />}><RemoteMonitoringPage /></Suspense> },
+          { path: routes.clinicalAlerts, element: <Suspense fallback={<PageLoader />}><ClinicalAlertsPage /></Suspense> },
+          { path: routes.telemedicineSessions, element: <Suspense fallback={<PageLoader />}><TelemedicineSessionsPage /></Suspense> },
+          { path: routes.telemedicineConsole, element: <Suspense fallback={<PageLoader />}><TelemedicineConsolePage /></Suspense> },
 
           // Service Delivery Points
           { path: routes.serviceDeliveryPoints, element: <Suspense fallback={<PageLoader />}><SDPListingPage /></Suspense> },

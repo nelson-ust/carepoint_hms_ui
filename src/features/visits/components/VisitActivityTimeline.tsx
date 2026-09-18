@@ -63,7 +63,7 @@ export function VisitActivityTimeline({ visitId }: { visitId: number }) {
     queryKey: ["visits", visitId, "timeline"],
     queryFn: async () =>
       (await apiClient.get<TimelineResponse>(`/visits/${visitId}/timeline`)).data,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
   const events = timeline.data?.events ?? [];
 

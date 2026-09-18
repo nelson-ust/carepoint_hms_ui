@@ -47,7 +47,7 @@ export function PaymentConfirmationsPage() {
   const pendingQuery = useQuery({
     queryKey: ["subscription", "pending-payments"],
     queryFn: subscriptionPlanApi.listPendingPayments,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["subscription", "pending-payments"] });

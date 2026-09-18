@@ -64,7 +64,7 @@ export function DiagnosticResultsPanel({
     queryKey: ["patients", patientId, "diagnostics"],
     queryFn: async () =>
       (await apiClient.get<DiagnosticsResponse>(`/patients/${patientId}/diagnostics`)).data,
-    refetchInterval: 60_000,
+    refetchInterval: 120_000,
   });
 
   const orders = diagnostics.data?.lab_history ?? [];

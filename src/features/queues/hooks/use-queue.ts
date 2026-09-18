@@ -20,9 +20,9 @@ import {
 import type { ListServicePointTicketsParams } from "../api/queues.api";
 import { listActiveServiceDeliveryPoints } from "@/features/service-delivery-points/api/service-delivery-points.api";
 
-const WORKLIST_REFETCH_MS = 15_000;
-const DISPLAY_BOARD_REFETCH_MS = 10_000;
-const STATS_REFETCH_MS = 60_000;
+const WORKLIST_REFETCH_MS = 30_000;
+const DISPLAY_BOARD_REFETCH_MS = 20_000;
+const STATS_REFETCH_MS = 90_000;
 
 export const queueKeys = {
   all: ["queue"] as const,

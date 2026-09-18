@@ -11,6 +11,12 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
       retry: 1,
+      // Cut redundant background DB load: don't refetch every active query
+      // just because the tab regained focus or the network reconnected.
+      // Screens that need live data set an explicit refetchInterval; cached
+      // data stays fresh for staleTime.
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     },
   },
 });

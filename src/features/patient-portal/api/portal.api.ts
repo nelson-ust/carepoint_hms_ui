@@ -1135,3 +1135,120 @@ export function portalErrorMessage(err: unknown, fallback: string): string {
   }
   return fallback;
 }
+
+// =====================================================================
+// Patient Portal — Home Health
+// =====================================================================
+export type PortalHomeHealthSummary = {
+  has_active_care_plan: boolean;
+  care_plan_title?: string | null;
+  upcoming_visit_count: number;
+  next_visit_at?: string | null;
+  open_task_count: number;
+  readings_last_7d: number;
+};
+
+export type PortalHomeVisit = {
+  id: number; visit_code: string; visit_type: string; status: string; priority: string;
+  reason?: string | null; scheduled_start_at?: string | null; assigned_staff_name?: string | null;
+  address?: string | null;
+};
+
+export type PortalCareGoal = { id: number; description: string; goal_type: string; status: string; progress_percent?: number | null };
+export type PortalCareTask = { id: number; title: string; status: string; due_at?: string | null };
+export type PortalCarePlan = {
+  id: number; title: string; condition?: string | null; status: string; next_review_date?: string | null;
+  goals: PortalCareGoal[]; tasks: PortalCareTask[];
+};
+
+export type PortalReading = {
+  id: number; reading_type: string; primary_value?: number | null; systolic?: number | null;
+  diastolic?: number | null; unit?: string | null; is_abnormal?: boolean; recorded_at: string;
+};
+
+export async function getPortalHomeHealthSummary(): Promise<PortalHomeHealthSummary> {
+  const r = await apiClient.get("/portal/home-health/summary", portalAuthOptions());
+  return r.data as PortalHomeHealthSummary;
+}
+export async function getPortalHomeVisits(): Promise<PortalHomeVisit[]> {
+  const r = await apiClient.get<{ items: PortalHomeVisit[] }>("/portal/home-health/visits", portalAuthOptions());
+  return unwrap<{ items: PortalHomeVisit[] }>(r.data)?.items ?? (r.data as any)?.items ?? [];
+}
+export async function getPortalCarePlan(): Promise<PortalCarePlan | null> {
+  const r = await apiClient.get("/portal/home-health/care-plan", portalAuthOptions());
+  return (r.data as any)?.care_plan ?? null;
+}
+export async function getPortalHomeReadings(readingType?: string): Promise<PortalReading[]> {
+  const r = await apiClient.get<{ items: PortalReading[] }>("/portal/home-health/readings", portalAuthOptions({ params: readingType ? { reading_type: readingType } : {} }));
+  return unwrap<{ items: PortalReading[] }>(r.data)?.items ?? (r.data as any)?.items ?? [];
+}
+export async function submitPortalReading(payload: { reading_type: string; primary_value?: number; systolic?: number; diastolic?: number; unit?: string; notes?: string }): Promise<{ success: boolean; message: string; flagged: boolean }> {
+  const r = await apiClient.post("/portal/home-health/readings", payload, portalAuthOptions());
+  return r.data as any;
+}
+export async function requestPortalVisit(payload: { reason: string; preferred_date?: string; address?: string; phone_number?: string }): Promise<{ success: boolean; message: string; visit_code?: string }> {
+  const r = await apiClient.post("/portal/home-health/visit-requests", payload, portalAuthOptions());
+  return r.data as any;
+}
+
+// ---------------------------------------------------------------------------
+// Telemedicine (patient portal)
+// ---------------------------------------------------------------------------
+export type PortalTelemedicineSession = {
+  id: number;
+  session_code: string;
+  modality: string;
+  status: string;
+  reason?: string | null;
+  provider: string;
+  room_name: string;
+  room_url?: string | null;
+  scheduled_start_at?: string | null;
+  started_at?: string | null;
+  ended_at?: string | null;
+  clinician_name?: string | null;
+  summary?: string | null;
+  follow_up_required?: boolean;
+  follow_up_notes?: string | null;
+};
+
+export type PortalTelemedicineJoinInfo = {
+  session_code: string;
+  provider: string;
+  modality: string;
+  status: string;
+  room_name: string;
+  room_url?: string | null;
+  domain: string;
+  display_name?: string | null;
+  is_clinician: boolean;
+};
+
+export type PortalTelemedicineMessage = {
+  id: number;
+  session_id: number;
+  sender_role: string;
+  sender_name?: string | null;
+  body: string;
+  sent_at: string;
+};
+
+export async function getPortalTelemedicineSessions(): Promise<PortalTelemedicineSession[]> {
+  const r = await apiClient.get<{ items: PortalTelemedicineSession[] }>("/portal/telemedicine/sessions", portalAuthOptions());
+  return unwrap<{ items: PortalTelemedicineSession[] }>(r.data)?.items ?? (r.data as any)?.items ?? [];
+}
+
+export async function joinPortalTelemedicine(sessionId: number): Promise<{ join: PortalTelemedicineJoinInfo; session: PortalTelemedicineSession }> {
+  const r = await apiClient.post(`/portal/telemedicine/sessions/${sessionId}/join`, undefined, portalAuthOptions());
+  return { join: (r.data as any).join, session: (r.data as any).session };
+}
+
+export async function getPortalTelemedicineMessages(sessionId: number): Promise<PortalTelemedicineMessage[]> {
+  const r = await apiClient.get<{ items: PortalTelemedicineMessage[] }>(`/portal/telemedicine/sessions/${sessionId}/messages`, portalAuthOptions());
+  return unwrap<{ items: PortalTelemedicineMessage[] }>(r.data)?.items ?? (r.data as any)?.items ?? [];
+}
+
+export async function sendPortalTelemedicineMessage(sessionId: number, body: string): Promise<PortalTelemedicineMessage> {
+  const r = await apiClient.post(`/portal/telemedicine/sessions/${sessionId}/messages`, { body }, portalAuthOptions());
+  return (r.data as any).chat_message;
+}

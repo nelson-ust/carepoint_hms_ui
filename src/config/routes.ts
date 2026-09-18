@@ -27,6 +27,18 @@ export const routes = {
   visitDetail: "/visits/:visitId",
   visitReroute: "/visits/:visitId/reroute",
 
+  // Home Health
+  homeVisits: "/home-health/visits",
+  homeVisitDetail: "/home-health/visits/:visitId",
+  carePlans: "/home-health/care-plans",
+  carePlanDetail: "/home-health/care-plans/:planId",
+  remoteMonitoring: "/home-health/monitoring",
+  clinicalAlerts: "/home-health/alerts",
+
+  // Telemedicine
+  telemedicineSessions: "/telemedicine/sessions",
+  telemedicineConsole: "/telemedicine/sessions/:sessionId",
+
   serviceDeliveryPoints: "/service-delivery-points",
   interoperability: "/interoperability",
   integrations: "/settings/integrations",
@@ -161,6 +173,8 @@ export const routes = {
   medicalExams: "/medical-exams",
   portalMessages: "/portal/messages",
   portalProfile: "/portal/profile",
+  portalHomeCare: "/portal/home-care",
+  portalTelehealth: "/portal/telehealth",
   patientPaymentGateways: "/billing/gateways",
   connectivity: "/saas/connectivity",
 } as const;

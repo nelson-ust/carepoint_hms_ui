@@ -67,7 +67,7 @@ export function CardFundingApprovalsPage() {
   const requestsQuery = useQuery({
     queryKey: ["card-funding-approvals", status],
     queryFn: () => fundingRequestsApi.list(status),
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
 
   const invalidate = () => {

@@ -5,6 +5,6 @@ export function useSystemHealth() {
   return useQuery({
     queryKey: ["system-health"],
     queryFn: () => saasDashboardApi.getHealth(),
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 60000, // Refetch every 30 seconds
   });
 }

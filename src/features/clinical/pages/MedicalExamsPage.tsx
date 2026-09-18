@@ -58,7 +58,7 @@ export function MedicalExamsPage() {
   const exams = useQuery({
     queryKey: ["medical-exams"],
     queryFn: async () => (await apiClient.get<Exam[]>("/medical-exams")).data,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
   const packages = useQuery({
     queryKey: ["medical-exam-packages"],

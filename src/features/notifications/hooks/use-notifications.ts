@@ -43,7 +43,7 @@ export function useUnreadNotificationCount(
   return useQuery({
     queryKey: notificationKeys.unreadCount(userId),
     queryFn: () => getUnreadNotificationCount(userId),
-    refetchInterval: enabled ? 60_000 : false,
+    refetchInterval: enabled ? 120_000 : false,
     staleTime: 30_000,
     enabled,
   });

@@ -21,6 +21,13 @@ export const PLAN_FEATURE_FLAGS = [
   { key: "has_radiology", label: "Radiology" },
   { key: "has_surgical", label: "Surgical" },
   { key: "has_hr", label: "HR & Payroll" },
+  { key: "has_dietary", label: "Dietary & Meals" },
+  { key: "has_ambulance", label: "Ambulance & Fleet" },
+  { key: "has_mortuary", label: "Mortuary & Morgue" },
+  { key: "has_compliance", label: "Compliance & Audit" },
+  { key: "has_dental", label: "Dental Clinic" },
+  { key: "has_eye", label: "Eye Clinic" },
+  { key: "has_ortho", label: "Orthopaedics" },
 ] as const;
 
 export type PlanFeatureKey = (typeof PLAN_FEATURE_FLAGS)[number]["key"];

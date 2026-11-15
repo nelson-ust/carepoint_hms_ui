@@ -1,98 +1,68 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Ban, CheckCircle2, CreditCard, FileText, History, Printer, Receipt, RotateCcw, User } from "lucide-react";
 import {
-  ArrowLeft,
-  Ban,
-  CreditCard,
-  History,
-  Receipt,
-  RotateCcw,
-} from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
-import { Modal } from "@/components/ui/Modal";
-import { Badge } from "@/components/ui/Badge";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Skeleton, CardSkeleton } from "@/components/ui/Skeleton";
-import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
+  DxBadge,
+  DxButton,
+  DxConfirm,
+  DxForm,
+  DxGrid,
+  DxInput,
+  DxMessage,
+  DxPage,
+  DxPageHeader,
+  DxPageLoading,
+  DxPanel,
+  DxPopup,
+  DxProps,
+  DxSelect,
+  DxStatusBadge,
+  DxStatusBar,
+  DxStatusItem,
+  DxTextarea,
+  apiErrorMessage,
+  formatDate,
+  formatDateTime,
+  formatNaira,
+  humanize,
+  type DxGridColumn,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
-import { useDisclosure } from "@/hooks/useDisclosure";
 import { routes } from "@/config/routes";
 import { membershipApi, formatCardMoney } from "@/features/patients/api/membership.api";
-import {
-  formatMoney,
-  type Invoice,
-  type InvoiceItem,
-  type InvoicePayment,
-} from "../api/billing.api";
-import {
-  useInvoice,
-  useInvoicePayments,
-  useReceivePayment,
-  useVoidInvoice,
-} from "../hooks/use-billing";
+import { getPatientById } from "@/features/patients/api/patients.api";
+import { listPatientInsurance } from "@/features/insurance/api/insurance.api";
+import { advanceVisit, getVisitDetails } from "@/features/visits/api/visits.api";
+import { patientDisplayName } from "@/features/visits/lib/clinic-flow";
+import { type Invoice, type InvoiceItem, type InvoicePayment } from "../api/billing.api";
+import { useInvoice, useInvoicePayments, useReceivePayment, useVisitBillingSummary, useVoidInvoice } from "../hooks/use-billing";
 import { InvoiceStatusBadge } from "../components/InvoiceStatusBadge";
+import {
+  PAYMENT_METHOD_OPTIONS,
+  canReceivePayment,
+  canVoidInvoice,
+  chargeTotals,
+  isSettled,
+  paymentMethodLabel,
+  splitForItem,
+  visitIsClosed,
+} from "../lib/billing-view";
 
-const PAYMENT_METHOD_OPTIONS = [
-  { value: "CASH", label: "Cash" },
-  { value: "CARD", label: "Card" },
-  { value: "POS", label: "POS Terminal" },
-  { value: "BANK_TRANSFER", label: "Bank Transfer" },
-  { value: "MOBILE_MONEY", label: "Mobile Money" },
-  { value: "INSURANCE", label: "Insurance" },
-  { value: "LOYALTY", label: "Loyalty" },
-  { value: "WAIVER", label: "Waiver" },
-  { value: "MEMBERSHIP_CARD", label: "Membership Card" },
-  { value: "OTHER", label: "Other" },
-];
+// ============================================================
+// Record payment popup
+// ============================================================
 
-function formatDateTime(value?: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatDate(value?: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-const PAYMENT_STATUS_VARIANT: Record<string, "soft-success" | "soft-warning" | "soft-danger" | "secondary"> = {
-  SUCCESSFUL: "soft-success",
-  PENDING: "soft-warning",
-  FAILED: "soft-danger",
-  REVERSED: "soft-danger",
-  CANCELLED: "secondary",
-};
-
-function RecordPaymentModal({
-  invoice,
-  isOpen,
-  onClose,
-}: {
-  invoice: Invoice;
-  isOpen: boolean;
-  onClose: () => void;
-}) {
+/**
+ * Mounted only while open so its form state resets on every open without
+ * effects. Amount defaults to the outstanding balance.
+ */
+function RecordPaymentPopup({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
   const toast = useToast();
   const receivePayment = useReceivePayment();
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(invoice.balance_due > 0 ? String(invoice.balance_due) : "");
   const [method, setMethod] = useState("CASH");
+  const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [cardId, setCardId] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -104,25 +74,14 @@ function RecordPaymentModal({
     queryFn: () => membershipApi.forPatient(invoice.patient_id),
     enabled: isCardMethod && typeof invoice.patient_id === "number",
   });
-  const cards = cardsQuery.data ?? [];
-  const selectedCard = useMemo(
-    () => cards.find((c) => String(c.id) === cardId),
-    [cards, cardId],
-  );
+  const cards = cardsQuery.data;
+  const selectedCard = useMemo(() => cards?.find((c) => String(c.id) === cardId), [cards, cardId]);
   const selectedCardBalance = selectedCard ? Number(selectedCard.balance) : 0;
-
-  const handleClose = () => {
-    setAmount("");
-    setMethod("CASH");
-    setNote("");
-    setCardId("");
-    setError(null);
-    onClose();
-  };
+  const parsedAmount = Number(amount);
+  const remaining = invoice.balance_due - (Number.isFinite(parsedAmount) ? parsedAmount : 0);
 
   const handleSubmit = () => {
-    const parsed = Number(amount);
-    if (!parsed || parsed <= 0) {
+    if (!parsedAmount || parsedAmount <= 0) {
       setError("Enter a payment amount greater than zero.");
       return;
     }
@@ -135,518 +94,590 @@ function RecordPaymentModal({
         setError(`This card is ${selectedCard.status.toLowerCase()} and cannot be used.`);
         return;
       }
-      if (parsed > selectedCardBalance) {
+      if (parsedAmount > selectedCardBalance) {
         setError(`Insufficient card balance (${formatCardMoney(selectedCardBalance)}).`);
         return;
       }
     }
     setError(null);
+    // POST /payments/ has no reference field of its own — the teller/POS
+    // reference travels in the note so it still lands on the receipt.
+    const composedNote = [reference.trim() ? `Ref: ${reference.trim()}` : null, note.trim() || null].filter(Boolean).join(" — ");
     receivePayment.mutate(
       {
         invoice_id: invoice.id,
-        amount: parsed,
+        amount: parsedAmount,
         payment_method: method,
         membership_card_id: isCardMethod && selectedCard ? selectedCard.id : undefined,
-        note: note.trim() || undefined,
+        note: composedNote || undefined,
       },
       {
         onSuccess: (payment) => {
-          toast.success("Payment recorded", `Reference ${payment.payment_reference}`);
-          handleClose();
+          toast.success("Payment recorded", `${formatNaira(payment.amount)} · ${payment.payment_reference}`);
+          onClose();
         },
-        onError: (err: any) => {
-          toast.error(
-            "Failed to record payment",
-            err?.response?.data?.detail?.toString?.() ??
-              err?.response?.data?.message ??
-              err?.message,
-          );
-        },
+        onError: (err) => toast.error("Could not record payment", apiErrorMessage(err)),
       },
     );
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={handleClose}
-      title={`Record Payment — ${invoice.invoice_no}`}
-      size="sm"
+    <DxPopup
+      isOpen
+      onClose={onClose}
+      locked={receivePayment.isPending}
+      title={`Record payment — ${invoice.invoice_no}`}
+      size="md"
       footer={
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={handleClose}>
+        <>
+          <DxButton onClick={onClose} disabled={receivePayment.isPending}>
             Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            isLoading={receivePayment.isPending}
-            leftIcon={<CreditCard className="h-4 w-4" />}
-          >
-            Record Payment
-          </Button>
-        </div>
+          </DxButton>
+          <DxButton variant="primary" leftIcon={<CreditCard />} onClick={handleSubmit} isLoading={receivePayment.isPending}>
+            Record payment
+          </DxButton>
+        </>
       }
     >
-      <div className="space-y-5">
-        <div className="glass-card p-4">
-          <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
-            Balance Due
-          </p>
-          <p className="data-mono mt-1 text-2xl font-bold text-secondary-900">
-            {formatMoney(invoice.balance_due)}
-          </p>
-        </div>
-        <Input
-          label="Amount"
-          type="number"
-          min={0}
-          step="0.01"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.00"
-          error={error ?? undefined}
+      <div className="space-y-4">
+        <DxProps
+          tight
+          items={[
+            { label: "Patient balance", value: <span className="dx-mono dx-strong">{formatNaira(invoice.balance_due)}</span> },
+            {
+              label: "After this payment",
+              value: (
+                <span className="dx-mono" style={{ color: remaining <= 0 ? "var(--dx-success)" : "var(--dx-text)" }}>
+                  {formatNaira(Math.max(0, remaining))}
+                  {remaining < 0 ? <span className="dx-muted"> (overpayment {formatNaira(-remaining)})</span> : null}
+                </span>
+              ),
+            },
+          ]}
         />
-        <Select
-          label="Payment Method"
-          options={PAYMENT_METHOD_OPTIONS}
-          value={method}
-          onChange={(e) => setMethod(e.target.value)}
-        />
-        {isCardMethod ? (
-          cardsQuery.isLoading ? (
-            <Skeleton className="h-12 w-full" />
-          ) : cards.length === 0 ? (
-            <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-xs font-bold text-amber-600">
-              This patient has no membership card on file.
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              <Select
-                label="Membership Card"
+        <DxForm cols={2}>
+          <DxInput
+            label="Amount"
+            required
+            type="number"
+            min={0}
+            step="0.01"
+            unit="₦"
+            mono
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            error={error ?? undefined}
+            autoFocus
+          />
+          <DxSelect
+            label="Method"
+            required
+            options={PAYMENT_METHOD_OPTIONS}
+            value={method}
+            onChange={(e) => {
+              setMethod(e.target.value);
+              setError(null);
+            }}
+          />
+          {isCardMethod ? (
+            cardsQuery.isLoading ? (
+              <div className="dx-skeleton h-8 dx-col-span-full" />
+            ) : !cards || cards.length === 0 ? (
+              <DxMessage tone="warning" className="dx-col-span-full">
+                This patient has no membership card on file.
+              </DxMessage>
+            ) : (
+              <DxSelect
+                label="Membership card"
+                required
+                fieldClassName="dx-col-span-full"
                 value={cardId}
                 onChange={(e) => setCardId(e.target.value)}
-                options={[
-                  { value: "", label: "Select a card…" },
-                  ...cards.map((c) => ({
-                    value: String(c.id),
-                    label: `${c.card_number} — ${formatCardMoney(c.balance)}${
-                      c.status !== "ACTIVE" ? ` (${c.status})` : ""
-                    }`,
-                  })),
-                ]}
+                placeholder="Select a card…"
+                options={cards.map((c) => ({
+                  value: String(c.id),
+                  label: `${c.card_number} — ${formatCardMoney(c.balance)}${c.status !== "ACTIVE" ? ` (${c.status})` : ""}`,
+                }))}
+                hint={selectedCard ? `Available balance: ${formatCardMoney(selectedCardBalance)}` : undefined}
+                error={selectedCard && selectedCardBalance < parsedAmount ? "Card balance is below the amount entered." : undefined}
               />
-              {selectedCard ? (
-                <p
-                  className={`text-xs font-semibold ${
-                    selectedCardBalance < Number(amount || 0)
-                      ? "text-rose-500"
-                      : "text-secondary-500"
-                  }`}
-                >
-                  Available balance: {formatCardMoney(selectedCardBalance)}
-                </p>
-              ) : null}
-            </div>
-          )
-        ) : null}
-        <Textarea
-          label="Note (optional)"
-          rows={3}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="e.g. POS terminal 2, teller ref…"
-        />
+            )
+          ) : null}
+          <DxInput
+            label="Reference"
+            mono
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+            placeholder="POS slip / transfer / teller ref"
+            fieldClassName="dx-col-span-full"
+          />
+          <DxTextarea
+            label="Note"
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Optional — e.g. POS terminal 2"
+            fieldClassName="dx-col-span-full"
+          />
+        </DxForm>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
-export function BillingDetailPage() {
+// ============================================================
+// Page
+// ============================================================
+
+type ChargeRow = InvoiceItem & { covered: number | null; patient: number };
+
+/**
+ * Cashier view of one invoice: charges with the HMO / patient split, the
+ * payment ledger, Record Payment, Void, Print — and once the balance clears,
+ * the "end visit" hand-off that completes the cashier step of the pathway.
+ */
+export function BillingDetailPage(props: { visitId?: number; embedded?: boolean; invoiceId?: number } = {}) {
+  const embedded = props.embedded ?? false;
   const navigate = useNavigate();
-  const { invoiceId } = useParams<{ invoiceId: string }>();
-  const numericId = invoiceId && /^\d+$/.test(invoiceId) ? Number(invoiceId) : undefined;
+  const toast = useToast();
+  const qc = useQueryClient();
+  const { invoiceId: invoiceIdParam } = useParams<{ invoiceId: string }>();
+  const [searchParams] = useSearchParams();
+  const numericId = props.invoiceId ?? (invoiceIdParam && /^\d+$/.test(invoiceIdParam) ? Number(invoiceIdParam) : undefined);
 
   const invoiceQuery = useInvoice(numericId);
   const paymentsQuery = useInvoicePayments(numericId);
   const voidInvoice = useVoidInvoice();
-  const toast = useToast();
-
-  const paymentModal = useDisclosure();
-  const voidDialog = useDisclosure();
 
   const invoice = invoiceQuery.data;
+  const visitId = invoice?.visit_id ?? undefined;
+  const patientId = invoice?.patient_id;
 
-  const itemColumns: DataTableColumn<InvoiceItem>[] = [
-    {
-      key: "service_name",
-      header: "Description",
-      render: (item) => (
-        <div>
-          <p className="text-sm font-bold text-secondary-900">{item.service_name}</p>
-          {item.service_code ? (
-            <p className="data-mono mt-0.5 text-xs text-secondary-400">{item.service_code}</p>
-          ) : null}
-        </div>
-      ),
-    },
-    {
-      key: "quantity",
-      header: "Qty",
-      align: "center",
-      render: (item) => <span className="data-mono text-sm">{item.quantity}</span>,
-    },
-    {
-      key: "unit_price",
-      header: "Unit Price",
-      align: "right",
-      render: (item) => <span className="data-mono text-sm">{formatMoney(item.unit_price)}</span>,
-    },
-    {
-      key: "discount_amount",
-      header: "Discount",
-      align: "right",
-      render: (item) => (
-        <span className="data-mono text-sm text-secondary-500">
-          {item.discount_amount > 0 ? `-${formatMoney(item.discount_amount)}` : "—"}
-        </span>
-      ),
-    },
-    {
-      key: "line_total",
-      header: "Line Total",
-      align: "right",
-      render: (item) => (
-        <span className="data-mono text-sm font-bold text-secondary-900">
-          {formatMoney(item.line_total)}
-        </span>
-      ),
-    },
-  ];
+  const visitQuery = useQuery({
+    queryKey: ["visits", "detail", visitId],
+    queryFn: () => getVisitDetails(visitId as number),
+    enabled: typeof visitId === "number",
+  });
+  const chargeSheetQuery = useVisitBillingSummary(visitId);
+  const patientQuery = useQuery({
+    queryKey: ["patients", "detail", patientId],
+    queryFn: () => getPatientById(patientId as number),
+    enabled: typeof patientId === "number",
+  });
+  const insuranceQuery = useQuery({
+    queryKey: ["patient-insurance", patientId],
+    queryFn: () => listPatientInsurance(patientId as number),
+    enabled: typeof patientId === "number",
+  });
 
-  const paymentColumns: DataTableColumn<InvoicePayment>[] = [
-    {
-      key: "payment_reference",
-      header: "Reference",
-      render: (p) => (
-        <span className="data-mono text-sm font-bold text-secondary-900">
-          {p.payment_reference}
-        </span>
-      ),
-    },
-    {
-      key: "payment_method",
-      header: "Method",
-      render: (p) => (
-        <span className="text-sm text-secondary-600">
-          {(p.payment_method ?? "—").replace(/_/g, " ")}
-        </span>
-      ),
-    },
-    {
-      key: "paid_at",
-      header: "Paid At",
-      render: (p) => (
-        <span className="text-sm text-secondary-600">{formatDateTime(p.paid_at)}</span>
-      ),
-    },
-    {
-      key: "payment_status",
-      header: "Status",
-      render: (p) => (
-        <Badge variant={PAYMENT_STATUS_VARIANT[p.payment_status] ?? "secondary"}>
-          {p.payment_status}
-        </Badge>
-      ),
-    },
-    {
-      key: "amount",
-      header: "Amount",
-      align: "right",
-      render: (p) => (
-        <span className="data-mono text-sm font-bold text-secondary-900">
-          {formatMoney(p.amount, p.currency)}
-        </span>
-      ),
-    },
-  ];
+  const [paymentOpen, setPaymentOpen] = useState(searchParams.get("pay") === "1");
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [endVisitOpen, setEndVisitOpen] = useState(false);
 
-  const canReceivePayment =
-    invoice && invoice.balance_due > 0 && ["ISSUED", "PARTIALLY_PAID"].includes(invoice.status);
-  const canVoid = invoice && !["VOIDED", "CANCELLED", "PAID"].includes(invoice.status);
+  const visit = visitQuery.data ?? null;
+  const patient = patientQuery.data ?? null;
+  const policy = useMemo(() => {
+    const list = insuranceQuery.data ?? [];
+    return list.find((p) => p.is_active !== false) ?? list[0] ?? null;
+  }, [insuranceQuery.data]);
 
-  const handleVoid = async () => {
-    if (!invoice) return;
-    try {
-      await voidInvoice.mutateAsync({ invoiceId: invoice.id });
-      toast.success("Invoice voided", `Invoice ${invoice.invoice_no} has been voided.`);
-    } catch (err: any) {
-      toast.error(
-        "Failed to void invoice",
-        err?.response?.data?.detail?.toString?.() ?? err?.message,
-      );
-    }
+  // ---------- Charges + HMO split ----------
+  const chargeRows: ChargeRow[] = useMemo(() => {
+    const items = invoice?.items ?? [];
+    return items.map((it) => ({ ...it, ...splitForItem(it, chargeSheetQuery.data?.items) }));
+  }, [invoice?.items, chargeSheetQuery.data?.items]);
+  const totals = useMemo(() => chargeTotals(invoice?.items ?? [], chargeRows), [invoice?.items, chargeRows]);
+  const hasSplit = totals.covered != null;
+  const coveredPct = hasSplit && totals.gross > 0 ? Math.round(((totals.covered ?? 0) / totals.gross) * 100) : null;
+
+  // ---------- Mutations ----------
+  const voidMutation = {
+    run: async () => {
+      if (!invoice) return;
+      try {
+        await voidInvoice.mutateAsync({ invoiceId: invoice.id });
+        toast.success("Invoice voided", `Invoice ${invoice.invoice_no} has been voided.`);
+      } catch (err) {
+        toast.error("Could not void invoice", apiErrorMessage(err));
+        throw err;
+      }
+    },
   };
 
+  const endVisitMutation = useMutation({
+    mutationFn: () => advanceVisit(visitId as number, { action: "complete", notes: "Bill settled at cashier." }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["visits"] });
+      qc.invalidateQueries({ queryKey: ["queue"] });
+      const nextSdp = res.visit?.current_service_delivery_point?.name;
+      if (visitIsClosed(res.visit?.status) || !res.next_step) {
+        toast.success("Visit completed", `${patientDisplayName(visit?.patient)} has been checked out.`);
+      } else {
+        toast.success("Billing step complete", `${patientDisplayName(visit?.patient)} routed to ${nextSdp ?? "the next service point"}.`);
+      }
+    },
+    onError: (err) => {
+      const msg = apiErrorMessage(err);
+      if (/no clinical flow steps|flow steps/i.test(msg)) {
+        toast.warning("Visit has no care pathway", "Close or route this visit from the Queue page instead.");
+        return;
+      }
+      toast.error("Could not complete the billing step", msg);
+    },
+  });
+
+  // ---------- Grids ----------
+  const money = (v: number | null | undefined, strong?: boolean) => (
+    <span className={strong ? "dx-mono dx-strong" : "dx-mono"}>{v == null ? "—" : formatNaira(v)}</span>
+  );
+
+  const chargeColumns: DxGridColumn<ChargeRow>[] = [
+    {
+      key: "service_name",
+      header: "Service",
+      minWidth: 220,
+      wrap: true,
+      render: (r) => (
+        <span className="flex flex-col leading-tight">
+          <span className="dx-strong">{r.service_name}</span>
+          {r.service_code ? <span className="dx-mono text-[11px] text-[var(--dx-text-muted)]">{r.service_code}</span> : null}
+        </span>
+      ),
+    },
+    { key: "quantity", header: "Qty", width: 60, align: "center", render: (r) => <span className="dx-mono">{r.quantity}</span> },
+    { key: "unit_price", header: "Unit price", width: 120, align: "right", render: (r) => money(r.unit_price) },
+    { key: "discount_amount", header: "Discount", width: 110, align: "right", render: (r) => (r.discount_amount > 0 ? money(-r.discount_amount) : <span className="dx-muted">—</span>) },
+    { key: "line_total", header: "Gross", width: 120, align: "right", render: (r) => money(r.line_total) },
+    { key: "covered", header: "HMO covers", width: 120, align: "right", render: (r) => (r.covered == null ? <span className="dx-muted">—</span> : money(r.covered)) },
+    { key: "patient", header: "Patient pays", width: 130, align: "right", render: (r) => money(r.patient, true) },
+  ];
+
+  const chargeSummary = invoice
+    ? {
+        service_name: <span className="dx-strong">Totals ({chargeRows.length} line{chargeRows.length === 1 ? "" : "s"})</span>,
+        discount_amount: totals.discount > 0 ? money(-totals.discount) : null,
+        line_total: money(invoice.subtotal_amount || totals.gross, true),
+        covered: hasSplit ? money(totals.covered, true) : <span className="dx-muted">—</span>,
+        patient: money(hasSplit ? totals.patient : invoice.total_amount, true),
+      }
+    : undefined;
+
+  const paymentColumns: DxGridColumn<InvoicePayment>[] = [
+    { key: "paid_at", header: "Date", width: 140, sortable: true, render: (p) => <span className="dx-mono">{formatDateTime(p.paid_at ?? p.created_at)}</span> },
+    { key: "payment_method", header: "Method", width: 130, render: (p) => paymentMethodLabel(p.payment_method) },
+    { key: "payment_reference", header: "Reference", minWidth: 120, render: (p) => <span className="dx-mono">{p.payment_reference}</span> },
+    { key: "amount", header: "Amount", width: 120, align: "right", sortable: true, render: (p) => money(p.amount, true) },
+    { key: "payment_status", header: "Status", width: 110, render: (p) => <DxStatusBadge status={p.payment_status} /> },
+  ];
+
+  // ---------- Route-level states ----------
   if (numericId === undefined) {
+    if (embedded) {
+      return (
+        <div className="space-y-4">
+          <DxMessage tone="danger" title="This reference does not point to a valid invoice." />
+        </div>
+      );
+    }
     return (
-      <div className="space-y-8 animate-fade-in">
-        <EmptyState
-          icon={Receipt}
-          title="Invalid invoice reference"
-          description="This link does not point to a valid invoice."
-          action={
-            <Button variant="secondary" onClick={() => navigate(routes.billing)}>
-              Back to Billing
-            </Button>
-          }
-        />
-      </div>
+      <DxPage>
+        <DxPageHeader crumbs={[{ label: "Billing & Payment", to: routes.billing }, { label: "Invoice" }]} title="Invalid invoice reference" />
+        <DxMessage tone="danger" title="This link does not point to a valid invoice." action={<DxButton size="sm" onClick={() => navigate(routes.billing)}>Back to billing</DxButton>} />
+      </DxPage>
     );
   }
 
-  if (invoiceQuery.isLoading) {
-    return (
-      <div className="space-y-8 animate-fade-in">
-        <Skeleton className="h-10 w-72" />
-        <CardSkeleton />
-        <CardSkeleton />
+  if (invoiceQuery.isLoading)
+    return embedded ? (
+      <div className="space-y-4">
+        <div className="dx-skeleton h-64 w-full" />
       </div>
+    ) : (
+      <DxPageLoading label="Loading invoice…" />
     );
-  }
 
   if (invoiceQuery.isError || !invoice) {
-    return (
-      <div className="space-y-8 animate-fade-in">
-        <EmptyState
-          icon={Receipt}
-          title="Invoice not found"
-          description="The invoice could not be loaded. It may have been removed, or you may not have access."
-          action={
-            <div className="flex gap-3">
-              <Button
-                variant="secondary"
-                leftIcon={<RotateCcw className="h-4 w-4" />}
-                onClick={() => invoiceQuery.refetch()}
-              >
+    if (embedded) {
+      return (
+        <div className="space-y-4">
+          <DxMessage
+            tone="danger"
+            title="The invoice could not be loaded."
+            action={
+              <DxButton size="sm" leftIcon={<RotateCcw />} onClick={() => invoiceQuery.refetch()}>
                 Retry
-              </Button>
-              <Button variant="ghost" onClick={() => navigate(routes.billing)}>
-                Back to Billing
-              </Button>
-            </div>
+              </DxButton>
+            }
+          >
+            {invoiceQuery.error ? apiErrorMessage(invoiceQuery.error) : "It may have been removed, or you may not have access."}
+          </DxMessage>
+        </div>
+      );
+    }
+    return (
+      <DxPage>
+        <DxPageHeader crumbs={[{ label: "Billing & Payment", to: routes.billing }, { label: "Invoice" }]} title="Invoice not found" />
+        <DxMessage
+          tone="danger"
+          title="The invoice could not be loaded."
+          action={
+            <span className="flex gap-2">
+              <DxButton size="sm" leftIcon={<RotateCcw />} onClick={() => invoiceQuery.refetch()}>
+                Retry
+              </DxButton>
+              <DxButton size="sm" variant="text" onClick={() => navigate(routes.billing)}>
+                Back to billing
+              </DxButton>
+            </span>
           }
-        />
-      </div>
+        >
+          {invoiceQuery.error ? apiErrorMessage(invoiceQuery.error) : "It may have been removed, or you may not have access."}
+        </DxMessage>
+      </DxPage>
     );
   }
 
-  return (
-    <div className="space-y-8 animate-fade-in">
-      <PageHeader
-        eyebrow={
-          <button
-            type="button"
-            onClick={() => navigate(routes.billing)}
-            className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-secondary-400 transition-colors hover:text-secondary-900 dark:hover:text-secondary-100"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to Invoices
-          </button>
+  const payable = canReceivePayment(invoice);
+  const voidable = canVoidInvoice(invoice);
+  const settled = isSettled(invoice);
+  const visitClosed = visitIsClosed(visit?.status);
+  const patientName = visit?.patient ? patientDisplayName(visit.patient) : patient ? patientDisplayName(patient) : `Patient #${invoice.patient_id}`;
+  const hospitalNo = visit?.patient?.hospital_number ?? patient?.hospital_number ?? "—";
+  const payerLabel = policy?.provider_name ?? (invoice.payer_id ? `Payer #${invoice.payer_id}` : patient?.payer_type ? humanize(patient.payer_type) : "Self pay");
+  const balanceColor = invoice.balance_due > 0 ? "var(--dx-danger)" : "var(--dx-success)";
+
+  const body = (
+    <>
+      {embedded && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="dx-mono dx-strong">{invoice.invoice_no}</span>
+          <InvoiceStatusBadge status={invoice.status} />
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <DxButton size="sm" leftIcon={<Printer />} onClick={() => window.print()}>
+              Print
+            </DxButton>
+            {voidable ? (
+              <DxButton size="sm" variant="outline-danger" leftIcon={<Ban />} onClick={() => setVoidOpen(true)}>
+                Void
+              </DxButton>
+            ) : null}
+            {payable ? (
+              <DxButton size="sm" variant="primary" leftIcon={<CreditCard />} onClick={() => setPaymentOpen(true)}>
+                Record payment
+              </DxButton>
+            ) : null}
+          </div>
+        </div>
+      )}
+      {!embedded && (
+      <DxPageHeader
+        crumbs={[{ label: "Billing & Payment", to: routes.billing }, { label: invoice.invoice_no }]}
+        title={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <span className="dx-mono">{invoice.invoice_no}</span>
+            <InvoiceStatusBadge status={invoice.status} />
+          </span>
         }
-        title={`Invoice ${invoice.invoice_no}`}
-        description="Detailed breakdown of clinical charges and payment history."
+        subtitle={`Issued ${formatDate(invoice.invoice_date)}${invoice.due_date ? ` · due ${formatDate(invoice.due_date)}` : ""}`}
         actions={
           <>
-            {canVoid ? (
-              <Button
-                variant="danger"
-                leftIcon={<Ban className="h-4 w-4" />}
-                onClick={voidDialog.open}
-              >
+            <DxButton leftIcon={<Printer />} onClick={() => window.print()}>
+              Print
+            </DxButton>
+            {voidable ? (
+              <DxButton variant="outline-danger" leftIcon={<Ban />} onClick={() => setVoidOpen(true)}>
                 Void
-              </Button>
+              </DxButton>
             ) : null}
-            {canReceivePayment ? (
-              <Button leftIcon={<CreditCard className="h-4 w-4" />} onClick={paymentModal.open}>
-                Record Payment
-              </Button>
+            {payable ? (
+              <DxButton variant="primary" leftIcon={<CreditCard />} onClick={() => setPaymentOpen(true)}>
+                Record payment
+              </DxButton>
             ) : null}
           </>
         }
       />
+      )}
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        <div className="space-y-8 lg:col-span-2">
-          <Card padding="none">
-            <div className="flex flex-wrap items-start justify-between gap-4 px-6 pt-6">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
-                  Billed To
-                </p>
-                <p className="mt-1 text-lg font-bold text-secondary-900">
-                  Patient #{invoice.patient_id}
-                </p>
-                {invoice.visit_id ? (
-                  <p className="text-sm text-secondary-500">Visit #{invoice.visit_id}</p>
-                ) : null}
-              </div>
-              <div className="text-right">
-                <InvoiceStatusBadge status={invoice.status} />
-                <p className="mt-3 text-xs text-secondary-400">
-                  Issued {formatDate(invoice.invoice_date)}
-                </p>
-                <p className="text-xs text-secondary-400">Due {formatDate(invoice.due_date)}</p>
-              </div>
-            </div>
-            <div className="mt-4">
-              <DataTable
-                columns={itemColumns}
-                data={invoice.items}
-                rowKey={(item) => item.id}
-                empty={{
-                  icon: Receipt,
-                  title: "No line items",
-                  description: "This invoice has no charge lines.",
-                }}
-              />
-            </div>
-            <div className="flex justify-end border-t border-secondary-100 px-6 py-6 dark:border-white/5">
-              <dl className="w-72 space-y-3">
-                <div className="flex justify-between text-sm font-medium text-secondary-500">
-                  <dt>Subtotal</dt>
-                  <dd className="data-mono">{formatMoney(invoice.subtotal_amount)}</dd>
-                </div>
-                <div className="flex justify-between text-sm font-medium text-secondary-500">
-                  <dt>Discount</dt>
-                  <dd className="data-mono">
-                    {invoice.discount_amount > 0
-                      ? `-${formatMoney(invoice.discount_amount)}`
-                      : formatMoney(0)}
-                  </dd>
-                </div>
-                <div className="flex justify-between text-sm font-medium text-secondary-500">
-                  <dt>Tax</dt>
-                  <dd className="data-mono">{formatMoney(invoice.tax_amount)}</dd>
-                </div>
-                <div className="flex justify-between border-t border-secondary-100 pt-3 text-base font-bold text-secondary-900 dark:border-white/5">
-                  <dt>Total</dt>
-                  <dd className="data-mono">{formatMoney(invoice.total_amount)}</dd>
-                </div>
-                <div className="flex justify-between text-sm font-medium text-emerald-500">
-                  <dt>Paid</dt>
-                  <dd className="data-mono">{formatMoney(invoice.amount_paid)}</dd>
-                </div>
-                <div className="flex justify-between text-base font-bold">
-                  <dt className="text-secondary-900">Balance Due</dt>
-                  <dd
-                    className={
-                      invoice.balance_due > 0
-                        ? "data-mono text-rose-500"
-                        : "data-mono text-emerald-500"
-                    }
-                  >
-                    {formatMoney(invoice.balance_due)}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          </Card>
+      {!embedded && settled && visitId ? (
+        <DxMessage
+          tone="success"
+          title="Bill settled"
+          action={
+            visitClosed ? (
+              <DxBadge tone="success">Visit {humanize(visit?.status)}</DxBadge>
+            ) : (
+              <DxButton
+                size="sm"
+                variant="primary"
+                leftIcon={<CheckCircle2 />}
+                onClick={() => setEndVisitOpen(true)}
+                isLoading={endVisitMutation.isPending}
+              >
+                Complete billing step / End visit
+              </DxButton>
+            )
+          }
+        >
+          {visitClosed
+            ? "The patient's balance is ₦0 and the visit has already been closed."
+            : "The patient's balance is ₦0. Complete the cashier step to end the visit or move it to the next service point."}
+        </DxMessage>
+      ) : null}
 
-          <Card padding="none">
-            <CardHeader
-              title={
-                <span className="flex items-center gap-2">
-                  <History className="h-5 w-5 text-primary-500" />
-                  Payment History
-                </span>
-              }
-              description="All payments received against this invoice."
-              className="px-6 pt-6"
+      <DxPanel title="Patient & visit" icon={<User className="h-4 w-4" />}>
+        <div className="grid gap-x-8 gap-y-1 md:grid-cols-2">
+          <DxProps
+            tight
+            items={[
+              {
+                label: "Patient",
+                value: (
+                  <Link to={routes.patientDetail.replace(":patientId", String(invoice.patient_id))} className="dx-strong hover:underline">
+                    {patientName}
+                  </Link>
+                ),
+              },
+              { label: "Hospital no.", value: <span className="dx-mono">{hospitalNo}</span> },
+              {
+                label: "Visit",
+                value: visitId ? (
+                  <Link to={routes.visitDetail.replace(":visitId", String(visitId))} className="dx-mono hover:underline">
+                    {visit?.visit_code ?? `#${visitId}`}
+                  </Link>
+                ) : (
+                  <span className="dx-muted">Not linked to a visit</span>
+                ),
+              },
+              { label: "Visit status", value: visit ? <DxStatusBadge status={visit.status} /> : "—" },
+            ]}
+          />
+          <DxProps
+            tight
+            items={[
+              { label: "Payer", value: payerLabel },
+              { label: "Plan", value: policy?.plan_name ?? "—" },
+              { label: "Policy no.", value: policy ? <span className="dx-mono">{policy.policy_number}</span> : "—" },
+              {
+                label: "Coverage class",
+                value: patient?.patient_class ? humanize(patient.patient_class) : patient?.payer_type ? humanize(patient.payer_type) : "—",
+              },
+            ]}
+          />
+        </div>
+      </DxPanel>
+
+      <div className="grid gap-4 xl:grid-cols-12">
+        <DxPanel
+          className="xl:col-span-8"
+          title="Charges"
+          icon={<FileText className="h-4 w-4" />}
+          description={
+            hasSplit
+              ? `HMO covers ${formatNaira(totals.covered)}${coveredPct != null ? ` (${coveredPct}%)` : ""} · patient pays ${formatNaira(totals.patient)}`
+              : chargeSheetQuery.isLoading
+                ? "Loading charge sheet…"
+                : "No payer split on this bill — the patient is responsible for the full amount."
+          }
+          flush
+        >
+          <DxGrid
+            borderless
+            columns={chargeColumns}
+            data={chargeRows}
+            rowKey={(r) => r.id}
+            summary={chargeSummary}
+            empty={{ icon: Receipt, title: "No charge lines", description: "This invoice has no chargeable services." }}
+          />
+        </DxPanel>
+
+        <div className="space-y-4 xl:col-span-4">
+          <DxPanel title="Summary" icon={<Receipt className="h-4 w-4" />} flush>
+            <DxProps
+              items={[
+                { label: "Total charges", value: money(invoice.subtotal_amount || totals.gross) },
+                { label: "Covered by payer", value: hasSplit ? money(totals.covered) : <span className="dx-muted">—</span> },
+                { label: "Discounts", value: invoice.discount_amount > 0 ? money(-invoice.discount_amount) : money(0) },
+                ...(invoice.tax_amount > 0 ? [{ label: "Tax", value: money(invoice.tax_amount) }] : []),
+                { label: "Invoice total", value: money(invoice.total_amount, true) },
+                { label: "Amount paid", value: <span className="dx-mono" style={{ color: "var(--dx-success)" }}>{formatNaira(invoice.amount_paid)}</span> },
+                {
+                  label: <span className="dx-strong">Patient balance</span>,
+                  value: (
+                    <span className="dx-mono text-[16px] font-semibold" style={{ color: balanceColor }}>
+                      {formatNaira(invoice.balance_due)}
+                    </span>
+                  ),
+                },
+              ]}
             />
-            <DataTable
+            {invoice.note ? (
+              <div className="border-t border-[var(--dx-border)] px-3 py-2 text-[12px] text-[var(--dx-text-muted)]">{invoice.note}</div>
+            ) : null}
+          </DxPanel>
+
+          <DxPanel
+            title="Payments"
+            icon={<History className="h-4 w-4" />}
+            flush
+            actions={
+              payable ? (
+                <DxButton size="sm" variant="accent-text" leftIcon={<CreditCard />} onClick={() => setPaymentOpen(true)}>
+                  Record payment
+                </DxButton>
+              ) : undefined
+            }
+          >
+            <DxGrid
+              borderless
               columns={paymentColumns}
               data={paymentsQuery.data}
               rowKey={(p) => p.id}
               isLoading={paymentsQuery.isLoading}
-              error={paymentsQuery.isError ? "Failed to load payments." : null}
+              error={paymentsQuery.isError ? apiErrorMessage(paymentsQuery.error, "Failed to load payments.") : null}
               onRetry={() => paymentsQuery.refetch()}
               skeletonRows={3}
-              empty={{
-                icon: CreditCard,
-                title: "No payments yet",
-                description: "Payments recorded against this invoice will appear here.",
-                action: canReceivePayment ? (
-                  <Button
-                    size="sm"
-                    leftIcon={<CreditCard className="h-3.5 w-3.5" />}
-                    onClick={paymentModal.open}
-                  >
-                    Record Payment
-                  </Button>
-                ) : undefined,
-              }}
+              empty={{ icon: CreditCard, title: "No payments yet", description: "Payments recorded against this invoice appear here." }}
             />
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader title="Summary" />
-            <dl className="space-y-4">
-              <div>
-                <dt className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
-                  Invoice No.
-                </dt>
-                <dd className="data-mono mt-1 text-sm font-bold text-secondary-900">
-                  {invoice.invoice_no}
-                </dd>
-              </div>
-              {invoice.billing_id ? (
-                <div>
-                  <dt className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
-                    Billing Record
-                  </dt>
-                  <dd className="data-mono mt-1 text-sm font-bold text-secondary-900">
-                    #{invoice.billing_id}
-                  </dd>
-                </div>
-              ) : null}
-              <div>
-                <dt className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
-                  Payments Recorded
-                </dt>
-                <dd className="data-mono mt-1 text-sm font-bold text-secondary-900">
-                  {paymentsQuery.data?.length ?? 0}
-                </dd>
-              </div>
-              {invoice.note ? (
-                <div>
-                  <dt className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
-                    Note
-                  </dt>
-                  <dd className="mt-1 text-sm text-secondary-600">{invoice.note}</dd>
-                </div>
-              ) : null}
-            </dl>
-          </Card>
+          </DxPanel>
         </div>
       </div>
 
-      <RecordPaymentModal
-        invoice={invoice}
-        isOpen={paymentModal.isOpen}
-        onClose={paymentModal.close}
-      />
+      <DxStatusBar>
+        <DxStatusItem>
+          Invoice <span className="dx-mono">{invoice.invoice_no}</span>
+        </DxStatusItem>
+        {invoice.billing_id ? <DxStatusItem>Billing record #{invoice.billing_id}</DxStatusItem> : null}
+        <DxStatusItem>{paymentsQuery.data?.length ?? 0} payment(s)</DxStatusItem>
+        {invoice.updated_at ? <DxStatusItem>Updated {formatDateTime(invoice.updated_at)}</DxStatusItem> : null}
+      </DxStatusBar>
 
-      <ConfirmDialog
-        isOpen={voidDialog.isOpen}
-        onClose={voidDialog.close}
-        onConfirm={handleVoid}
+      {paymentOpen ? <RecordPaymentPopup invoice={invoice} onClose={() => setPaymentOpen(false)} /> : null}
+
+      <DxConfirm
+        isOpen={voidOpen}
+        onClose={() => setVoidOpen(false)}
+        onConfirm={voidMutation.run}
         title="Void this invoice?"
         tone="danger"
-        description={`Invoice ${invoice.invoice_no} will be voided. This cannot be undone.`}
-        confirmLabel="Void Invoice"
+        description={`Invoice ${invoice.invoice_no} will be voided and can no longer receive payments. This cannot be undone.`}
+        confirmLabel="Void invoice"
       />
-    </div>
+
+      {!embedded && (
+      <DxConfirm
+        isOpen={endVisitOpen}
+        onClose={() => setEndVisitOpen(false)}
+        onConfirm={() => endVisitMutation.mutateAsync().then(() => undefined)}
+        title="Complete the billing step?"
+        tone="primary"
+        description={`${patientName}'s bill is settled. The cashier step on visit ${visit?.visit_code ?? `#${visitId}`} will be marked complete; the visit ends or moves to its next service point.`}
+        confirmLabel="End visit"
+      />
+      )}
+    </>
   );
+
+  return embedded ? <div className="space-y-4">{body}</div> : <DxPage>{body}</DxPage>;
 }

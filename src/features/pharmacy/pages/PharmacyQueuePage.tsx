@@ -1,910 +1,1016 @@
-import { PageHeader } from "@/components/layout/PageHeader";
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertCircle,
   AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
   Boxes,
-  CalendarClock,
   CheckCircle2,
-  Clock,
+  ClipboardList,
   ExternalLink,
-  Hash,
   ListChecks,
+  PackageCheck,
   Pill,
-  RefreshCw,
+  RotateCcw,
   Save,
-  Search,
-  Stethoscope,
-  TrendingDown,
-  User,
   X,
 } from "lucide-react";
+import {
+  DxBadge,
+  DxButton,
+  DxConfirm,
+  DxForm,
+  DxGrid,
+  DxGroupBox,
+  DxInput,
+  DxKpi,
+  DxMessage,
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxPopup,
+  DxProps,
+  DxSearchBox,
+  DxSelect,
+  DxStatusBadge,
+  DxStatusBar,
+  DxStatusItem,
+  DxTabs,
+  DxTextarea,
+  DxToolbar,
+  DxToolbarGroup,
+  DxToolbarLabel,
+  DxToolbarSeparator,
+  DxToolbarSpacer,
+  apiErrorMessage,
+  formatDate,
+  formatDateTime,
+  humanize,
+  type DxGridColumn,
+} from "@/components/dx";
+import { useToast } from "@/components/feedback/ToastProvider";
+import { routes } from "@/config/routes";
+import { createDispense, type CreateDispenseItemPayload } from "@/features/dispenses/api/dispenses.api";
+import { listStockItems, listStores, type StockItem } from "@/features/inventory/api/inventory.api";
+import {
+  PRESCRIPTION_STATUSES,
+  cancelPrescription,
+  type Prescription,
+  type PrescriptionItem,
+} from "@/features/prescriptions/api/prescriptions.api";
+import { getStaff, staffDisplayName, type Staff } from "@/features/staff/api/staff.api";
+import { advanceVisit } from "@/features/visits/api/visits.api";
 import {
   asPrescriptionFromWorklist,
   asStockAlertArray,
   getPharmacyStockAlerts,
   getPharmacyWorklist,
+  type StockAlert,
 } from "../api/pharmacy.api";
-import type { StockAlert } from "../api/pharmacy.api";
 import {
-  asPrescriptionItemArray,
-  cancelPrescription,
-} from "@/features/prescriptions/api/prescriptions.api";
-import type {
-  Prescription,
-  PrescriptionItem,
-} from "@/features/prescriptions/api/prescriptions.api";
-import { createDispense } from "@/features/dispenses/api/dispenses.api";
-import type { CreateDispenseItemPayload } from "@/features/dispenses/api/dispenses.api";
-import { listStores, listStockItems } from "@/features/inventory/api/inventory.api";
-import type { Store, StockItem } from "@/features/inventory/api/inventory.api";
-import { getStaff, staffDisplayName } from "@/features/staff/api/staff.api";
-import type { Staff } from "@/features/staff/api/staff.api";
-import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
+  canDispensePrescription,
+  defaultStaffIdFor,
+  defaultStockItemFor,
+  drugLabel,
+  isExpired,
+  isNoFlowStepsError,
+  isPending,
+  isToday,
+  matchesSearch,
+  patientNameOf,
+  prescriptionItems,
+  prescriptionStatus,
+  regimenOf,
+  staffNameById,
+  stockItemOptionLabel,
+  stockItemsForLine,
+  totalOnHand,
+} from "../lib/pharmacy-helpers";
 
-const presStatusStyles: Record<string, string> = {
-  ACTIVE: "bg-primary-50 text-primary-600 border-primary-100",
-  DRAFT: "bg-amber-50 text-amber-600 border-amber-100",
-  PARTIALLY_DISPENSED: "bg-amber-50 text-amber-600 border-amber-100",
-  DISPENSED: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  CANCELLED: "bg-rose-50 text-rose-600 border-rose-100",
-};
-
-const alertStyles: Record<string, string> = {
-  LOW_STOCK: "bg-amber-50 text-amber-700 border-amber-200",
-  EXPIRING: "bg-amber-50 text-amber-700 border-amber-200",
-  EXPIRED: "bg-rose-50 text-rose-700 border-rose-200",
-  OUT_OF_STOCK: "bg-rose-50 text-rose-700 border-rose-200",
-};
-
-const alertIcon: Record<string, typeof TrendingDown> = {
-  LOW_STOCK: TrendingDown,
-  EXPIRING: CalendarClock,
-  EXPIRED: AlertTriangle,
-  OUT_OF_STOCK: AlertCircle,
-};
-
-function formatDateTime(value?: string) {
-  if (!value) return "—";
-  try {
-    return new Date(value).toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return value;
-  }
-}
-
-function readStoredUserId(): number | null {
-  try {
-    const raw = localStorageService.get(storageKeys.user);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return typeof parsed?.id === "number" ? parsed.id : null;
-  } catch {
-    return null;
-  }
-}
+// ============================================================
+// Local types
+// ============================================================
 
 type Tab = "WORKLIST" | "ALERTS";
 
-export function PharmacyQueuePage() {
+/** Per prescription-line editable state in the dispense form. */
+type LineState = { qty: string; stockItemId: string };
+
+type Handoff = { prescriptionId: number; visitId: number; patientName: string };
+
+const STATUS_FILTER_OPTIONS = PRESCRIPTION_STATUSES.map((s) => ({ value: s, label: humanize(s) }));
+
+const ALERT_TONE: Record<string, "warning" | "danger"> = {
+  LOW_STOCK: "warning",
+  EXPIRING: "warning",
+  EXPIRED: "danger",
+  OUT_OF_STOCK: "danger",
+};
+
+function buildLineState(items: PrescriptionItem[], stockItems: StockItem[], storeId: string): Record<number, LineState> {
+  const out: Record<number, LineState> = {};
+  items.forEach((it) => {
+    const def = defaultStockItemFor(stockItems, it.drug_id, storeId);
+    out[it.id] = { qty: String(it.quantity ?? 0), stockItemId: def ? String(def.id) : "" };
+  });
+  return out;
+}
+
+// ============================================================
+// Page
+// ============================================================
+
+/**
+ * Pharmacy worklist. Prescriptions arrive here from consultation; the
+ * pharmacist checks stock, dispenses (store, batch/expiry, quantity) with
+ * counselling, then completes the pharmacy step so the visit moves on to
+ * billing (or closes when pharmacy is the last stop).
+ */
+export function PharmacyQueuePage(props: { visitId?: number; embedded?: boolean } = {}) {
+  const embedded = props.embedded ?? false;
+  const navigate = useNavigate();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const focusVisitId = useMemo(() => {
+    if (props.visitId != null) return props.visitId;
+    const n = Number(searchParams.get("visit"));
+    return Number.isInteger(n) && n > 0 ? n : null;
+  }, [searchParams, props.visitId]);
+
+  // ---------- UI state ----------
   const [tab, setTab] = useState<Tab>("WORKLIST");
-  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
-  const [alerts, setAlerts] = useState<StockAlert[]>([]);
-  const [stores, setStores] = useState<Store[]>([]);
-  const [stockItems, setStockItems] = useState<StockItem[]>([]);
-  const [staffList, setStaffList] = useState<Staff[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<
-    { tone: "success" | "error"; message: string } | null
-  >(null);
-
   const [search, setSearch] = useState("");
+  const [storeId, setStoreId] = useState("");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedSnapshot, setSelectedSnapshot] = useState<Prescription | null>(null);
 
-  // Dispense modal
-  const [dispenseTarget, setDispenseTarget] = useState<Prescription | null>(null);
-  const [dispenseStoreId, setDispenseStoreId] = useState<string>("");
-  const [dispenseStaffId, setDispenseStaffId] = useState<number | null>(null);
-  const [dispenseNote, setDispenseNote] = useState("");
-  const [dispenseQuantities, setDispenseQuantities] = useState<Record<number, string>>({});
-  const [dispenseError, setDispenseError] = useState<string | null>(null);
-  const [dispensing, setDispensing] = useState(false);
+  // Dispense form
+  const [staffOverride, setStaffOverride] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [lines, setLines] = useState<Record<number, LineState>>({});
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // Cancel
+  // Cancel popup
   const [cancelTarget, setCancelTarget] = useState<Prescription | null>(null);
   const [cancelReason, setCancelReason] = useState("");
-  const [cancelling, setCancelling] = useState(false);
 
-  const showFeedback = (tone: "success" | "error", message: string) => {
-    setFeedback({ tone, message });
-    window.setTimeout(() => setFeedback(null), 3500);
-  };
+  // Hand-off after dispensing
+  const [handoff, setHandoff] = useState<Handoff | null>(null);
+  const [advanceOpen, setAdvanceOpen] = useState(false);
 
-  const load = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const [worklist, alertsRes, storesRes, itemsRes, staffRes] = await Promise.all([
-        getPharmacyWorklist().catch(() => null),
-        getPharmacyStockAlerts().catch(() => null),
-        listStores({ skip: 0, limit: 200 }).catch(() => null),
-        listStockItems({ skip: 0, limit: 500 }).catch(() => null),
-        getStaff(0, 200).catch(() => [] as Staff[]),
-      ]);
+  // ---------- Data ----------
+  const worklistQuery = useQuery({
+    queryKey: ["pharmacy", "worklist"],
+    queryFn: getPharmacyWorklist,
+    refetchInterval: 60_000,
+  });
+  const alertsQuery = useQuery({ queryKey: ["pharmacy", "stock-alerts"], queryFn: getPharmacyStockAlerts });
+  const storesQuery = useQuery({ queryKey: ["inventory", "stores", "all"], queryFn: () => listStores({ skip: 0, limit: 200 }) });
+  const stockQuery = useQuery({ queryKey: ["inventory", "items", "all"], queryFn: () => listStockItems({ skip: 0, limit: 500 }) });
+  const staffQuery = useQuery({ queryKey: ["staff", "all", 200], queryFn: () => getStaff(0, 200) });
 
-      // Worklist may return { items: PrescriptionRow[] } or { items: Prescription[] }
-      const rawItems = Array.isArray(worklist?.items) ? worklist.items : [];
-      const presList = rawItems
-        .map((row) => asPrescriptionFromWorklist(row))
-        .filter((x): x is Prescription => !!x);
-      setPrescriptions(presList);
+  const prescriptions: Prescription[] = useMemo(() => {
+    const raw = worklistQuery.data?.items;
+    const rows = Array.isArray(raw) ? raw : [];
+    return rows.map((r) => asPrescriptionFromWorklist(r)).filter((x): x is Prescription => !!x);
+  }, [worklistQuery.data]);
+  const alerts: StockAlert[] = useMemo(() => asStockAlertArray(alertsQuery.data?.items), [alertsQuery.data]);
+  const stores = storesQuery.data?.items ?? [];
+  const stockItems: StockItem[] = stockQuery.data?.items ?? [];
+  const staffList: Staff[] = useMemo(() => (Array.isArray(staffQuery.data) ? staffQuery.data : []), [staffQuery.data]);
 
-      setAlerts(asStockAlertArray(alertsRes?.items));
-      setStores(storesRes?.items ?? []);
-      setStockItems(itemsRes?.items ?? []);
-      setStaffList(Array.isArray(staffRes) ? staffRes : []);
-    } catch (err: any) {
-      console.error("Failed to load pharmacy worklist", err);
-      setError(err?.response?.data?.message || "Unable to load pharmacy worklist.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const defaultStaffId = useMemo(() => defaultStaffIdFor(staffList), [staffList]);
+  const staffId = staffOverride ?? (defaultStaffId != null ? String(defaultStaffId) : "");
 
-  useEffect(() => {
-    load();
-  }, []);
+  const visible = useMemo(
+    () => prescriptions.filter((p) => (focusVisitId == null || p.visit_id === focusVisitId) && matchesSearch(p, search)),
+    [prescriptions, focusVisitId, search],
+  );
 
-  // Default the dispenser to the logged-in user's staff record once loaded
-  useEffect(() => {
-    if (dispenseStaffId != null) return;
-    const userId = readStoredUserId();
-    if (userId == null) return;
-    const match = staffList.find((s) => s.user_id === userId);
-    if (match) setDispenseStaffId(match.id);
-  }, [staffList, dispenseStaffId]);
-
-  const filteredPrescriptions = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return prescriptions;
-    return prescriptions.filter(
-      (p) =>
-        p.prescription_no?.toLowerCase().includes(q) ||
-        p.note?.toLowerCase().includes(q) ||
-        p.visit?.patient?.first_name?.toLowerCase().includes(q) ||
-        p.visit?.patient?.last_name?.toLowerCase().includes(q) ||
-        p.visit?.visit_code?.toLowerCase().includes(q),
-    );
-  }, [prescriptions, search]);
+  // The selected prescription follows the live list, but survives a refetch
+  // that drops it from the worklist (e.g. right after it was dispensed).
+  const selected = useMemo(
+    () => (selectedId == null ? null : prescriptions.find((p) => p.id === selectedId) ?? selectedSnapshot),
+    [selectedId, prescriptions, selectedSnapshot],
+  );
+  const selectedItems = useMemo(() => prescriptionItems(selected), [selected]);
+  const canDispense = !!selected && canDispensePrescription(selected);
 
   const stats = useMemo(() => {
-    const total = prescriptions.length;
-    const partial = prescriptions.filter(
-      (p) => (p.status || "").toUpperCase() === "PARTIALLY_DISPENSED",
-    ).length;
-    const active = prescriptions.filter((p) => (p.status || "").toUpperCase() === "ACTIVE").length;
-    const alertsCount = alerts.length;
-    return { total, partial, active, alertsCount };
+    const pending = prescriptions.filter(isPending);
+    const active = pending.filter((p) => prescriptionStatus(p) === "ACTIVE").length;
+    const dispensedToday = prescriptions.filter((p) => prescriptionStatus(p) === "DISPENSED" && isToday(p.updated_at)).length;
+    const lowStock = alerts.filter((a) => a.alert_type === "LOW_STOCK" || a.alert_type === "OUT_OF_STOCK").length;
+    return { total: prescriptions.length, pending: pending.length, active, partial: pending.length - active, dispensedToday, alerts: alerts.length, lowStock };
   }, [prescriptions, alerts]);
 
-  // ----- Dispense -----
-  const openDispense = (p: Prescription) => {
-    setDispenseTarget(p);
-    setDispenseStoreId(stores[0] ? String(stores[0].id) : "");
-    setDispenseNote("");
-    setDispenseError(null);
-    const items = asPrescriptionItemArray(p.items);
-    const qtyMap: Record<number, string> = {};
-    items.forEach((it) => {
-      qtyMap[it.id] = String(it.quantity ?? 0);
+  const refreshAll = () => {
+    worklistQuery.refetch();
+    alertsQuery.refetch();
+    stockQuery.refetch();
+  };
+
+  // ---------- Handlers ----------
+  const openPrescription = (p: Prescription) => {
+    // Re-clicking the open row keeps any quantities already edited.
+    if (p.id === selectedId) return;
+    setSelectedId(p.id);
+    setSelectedSnapshot(p);
+    setLines(buildLineState(prescriptionItems(p), stockItems, storeId));
+    setNote("");
+    setFormError(null);
+    if (handoff && handoff.prescriptionId !== p.id) setHandoff(null);
+  };
+
+  const closePanel = () => {
+    setSelectedId(null);
+    setSelectedSnapshot(null);
+    setHandoff(null);
+    setFormError(null);
+  };
+
+  const changeStore = (next: string) => {
+    setStoreId(next);
+    // Re-pick default batches for the open prescription in the new store.
+    if (selected) {
+      setLines((prev) => {
+        const out: Record<number, LineState> = {};
+        prescriptionItems(selected).forEach((it) => {
+          const def = defaultStockItemFor(stockItems, it.drug_id, next);
+          out[it.id] = { qty: prev[it.id]?.qty ?? String(it.quantity ?? 0), stockItemId: def ? String(def.id) : "" };
+        });
+        return out;
+      });
+    }
+  };
+
+  const setLine = (itemId: number, patch: Partial<LineState>) =>
+    setLines((prev) => {
+      const current: LineState = prev[itemId] ?? { qty: "0", stockItemId: "" };
+      return { ...prev, [itemId]: { ...current, ...patch } };
     });
-    setDispenseQuantities(qtyMap);
+
+  const clearFocus = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("visit");
+    setSearchParams(next, { replace: true });
   };
 
-  const handleDispense = async () => {
-    if (!dispenseTarget) return;
-    if (!dispenseStaffId) {
-      setDispenseError("Pick the dispensing staff member.");
-      return;
-    }
-    const items = asPrescriptionItemArray(dispenseTarget.items);
-    const dispenseItems: CreateDispenseItemPayload[] = [];
-    for (const it of items) {
-      const qty = Number(dispenseQuantities[it.id] ?? "0");
-      if (!Number.isFinite(qty) || qty <= 0) continue;
-      dispenseItems.push({
-        prescription_item_id: it.id,
-        drug_id: it.drug_id,
-        quantity_dispensed: qty,
-        unit_price: it.unit_price,
+  // ---------- Mutations ----------
+  const dispenseMutation = useMutation({
+    mutationFn: async (p: Prescription) => {
+      const items: CreateDispenseItemPayload[] = [];
+      for (const it of prescriptionItems(p)) {
+        const ls = lines[it.id];
+        const qty = Number(ls?.qty ?? "0");
+        if (!Number.isFinite(qty) || qty <= 0) continue;
+        items.push({
+          prescription_item_id: it.id,
+          drug_id: it.drug_id,
+          stock_item_id: ls?.stockItemId ? Number(ls.stockItemId) : undefined,
+          quantity_dispensed: qty,
+          unit_price: it.unit_price,
+        });
+      }
+      return createDispense({
+        prescription_id: p.id,
+        dispensed_by_staff_id: Number(staffId),
+        note: note.trim() || undefined,
+        items,
+        store_id: storeId ? Number(storeId) : undefined,
       });
-    }
+    },
+    onSuccess: (res, p) => {
+      qc.invalidateQueries({ queryKey: ["pharmacy"] });
+      qc.invalidateQueries({ queryKey: ["inventory", "items"] });
+      toast.success("Medication dispensed", res.message || `${patientNameOf(p)} — ${p.prescription_no}`);
+      setFormError(null);
+      if (p.visit_id && !embedded) setHandoff({ prescriptionId: p.id, visitId: p.visit_id, patientName: patientNameOf(p) });
+    },
+    onError: (err) => {
+      const msg = apiErrorMessage(err, "Failed to dispense.");
+      setFormError(msg);
+      toast.error("Could not dispense", msg);
+    },
+  });
 
-    if (dispenseItems.length === 0) {
-      setDispenseError("Enter quantities for at least one item.");
+  const submitDispense = () => {
+    if (!selected) return;
+    if (!staffId) {
+      setFormError("Pick the dispensing pharmacist.");
       return;
     }
-    setDispensing(true);
-    setDispenseError(null);
-    try {
-      const res = await createDispense({
-        prescription_id: dispenseTarget.id,
-        dispensed_by_staff_id: dispenseStaffId,
-        note: dispenseNote.trim() || undefined,
-        items: dispenseItems,
-        store_id: dispenseStoreId ? Number(dispenseStoreId) : undefined,
-      });
-      showFeedback("success", res.message || "Medications dispensed.");
-      setDispenseTarget(null);
-      load();
-    } catch (err: any) {
-      setDispenseError(err?.response?.data?.message || "Failed to dispense.");
-    } finally {
-      setDispensing(false);
+    const anyQty = selectedItems.some((it) => Number(lines[it.id]?.qty ?? "0") > 0);
+    if (!anyQty) {
+      setFormError("Enter a quantity for at least one item.");
+      return;
     }
+    setFormError(null);
+    dispenseMutation.mutate(selected);
   };
 
-  // ----- Cancel -----
-  const handleCancel = async () => {
-    if (!cancelTarget || !cancelReason.trim()) return;
-    setCancelling(true);
-    try {
-      const res = await cancelPrescription(cancelTarget.id, { reason: cancelReason.trim() });
-      setPrescriptions((prev) =>
-        prev.map((p) => (p.id === res.prescription.id ? res.prescription : p)),
-      );
-      showFeedback("success", res.message || "Prescription cancelled.");
+  const cancelMutation = useMutation({
+    mutationFn: (p: Prescription) => cancelPrescription(p.id, { reason: cancelReason.trim() }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["pharmacy", "worklist"] });
+      if (selectedId === res.prescription.id) setSelectedSnapshot(res.prescription);
+      toast.success("Prescription cancelled", res.message || res.prescription.prescription_no);
       setCancelTarget(null);
       setCancelReason("");
-    } catch (err: any) {
-      showFeedback("error", err?.response?.data?.message || "Failed to cancel prescription.");
-    } finally {
-      setCancelling(false);
-    }
-  };
+    },
+    onError: (err) => toast.error("Could not cancel prescription", apiErrorMessage(err, "Failed to cancel prescription.")),
+  });
 
-  return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader
-          title="Pharmacy Workspace"
-          description="Verify electronic prescriptions, dispense medications, and stay ahead of stock alerts."
-        />
-        <div className="flex items-center gap-3">
-          <Link
-            to="/inventory/items"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
-          >
-            <Boxes className="h-4 w-4" />
-            <span className="text-sm font-bold">Stock</span>
-          </Link>
-          <Link
-            to="/drugs"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
-          >
-            <Pill className="h-4 w-4" />
-            <span className="text-sm font-bold">Drugs Catalogue</span>
-          </Link>
-          <button
-            onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
-        </div>
-      </div>
+  const advanceMutation = useMutation({
+    mutationFn: (visitId: number) => advanceVisit(visitId, { action: "complete", notes: "Medication dispensed." }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["visits"] });
+      qc.invalidateQueries({ queryKey: ["queue"] });
+      const status = String(res.visit?.status ?? "").toUpperCase();
+      const nextSdp = res.visit?.current_service_delivery_point?.name;
+      toast.success(
+        "Pharmacy step completed",
+        status === "COMPLETED" || !nextSdp ? "Visit completed." : `${handoff?.patientName ?? "Patient"} routed to ${nextSdp}.`,
+      );
+      setHandoff(null);
+      navigate(routes.queues);
+    },
+    onError: (err) => {
+      const msg = apiErrorMessage(err);
+      if (isNoFlowStepsError(msg)) {
+        toast.warning("No care pathway on this visit", "Route the patient manually from the Queue page.");
+        return;
+      }
+      toast.error("Could not complete the pharmacy step", msg);
+    },
+  });
 
-      {feedback && (
-        <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
-              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-              : "bg-rose-50 text-rose-700 border-rose-100"
-            }`}
-        >
-          {feedback.tone === "success" ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-          <span className="text-sm font-bold">{feedback.message}</span>
+  const busy = dispenseMutation.isPending;
+
+  // ---------- Worklist grid ----------
+  const columns: DxGridColumn<Prescription>[] = [
+    {
+      key: "patient",
+      header: "Patient",
+      minWidth: 180,
+      sortable: true,
+      filter: true,
+      accessor: (p) => patientNameOf(p),
+      render: (p) => (
+        <div className="min-w-0">
+          <div className="dx-strong truncate">{patientNameOf(p)}</div>
+          <div className="dx-faint truncate text-[11px]">
+            {p.visit?.visit_code ? <span className="dx-mono">{p.visit.visit_code}</span> : "No visit code"}
+          </div>
         </div>
+      ),
+    },
+    {
+      key: "hospital_number",
+      header: "Hospital no.",
+      width: 130,
+      filter: true,
+      accessor: (p) => p.visit?.patient?.hospital_number ?? "",
+      render: (p) => <span className="dx-mono">{p.visit?.patient?.hospital_number ?? "—"}</span>,
+    },
+    {
+      key: "prescription_no",
+      header: "Prescription",
+      width: 150,
+      sortable: true,
+      filter: true,
+      render: (p) => <span className="dx-mono">{p.prescription_no}</span>,
+    },
+    {
+      key: "prescribed_at",
+      header: "Prescribed",
+      width: 150,
+      sortable: true,
+      accessor: (p) => p.prescribed_at || p.created_at,
+      render: (p) => <span className="dx-mono">{formatDateTime(p.prescribed_at || p.created_at)}</span>,
+    },
+    {
+      key: "items",
+      header: "Items",
+      width: 70,
+      align: "center",
+      sortable: true,
+      accessor: (p) => prescriptionItems(p).length,
+      render: (p) => <span className="dx-num">{prescriptionItems(p).length}</span>,
+    },
+    {
+      key: "prescriber",
+      header: "Prescriber",
+      minWidth: 140,
+      filter: true,
+      accessor: (p) => staffNameById(staffList, p.prescribed_by_staff_id),
+      render: (p) => staffNameById(staffList, p.prescribed_by_staff_id),
+    },
+    {
+      key: "status",
+      header: "Status",
+      width: 150,
+      sortable: true,
+      filter: { options: STATUS_FILTER_OPTIONS },
+      accessor: (p) => prescriptionStatus(p),
+      render: (p) => <DxStatusBadge status={prescriptionStatus(p)} />,
+    },
+    {
+      key: "actions",
+      header: "",
+      width: 150,
+      align: "right",
+      render: (p) =>
+        canDispensePrescription(p) ? (
+          <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <DxButton size="sm" variant="primary" leftIcon={<Pill />} onClick={() => openPrescription(p)}>
+              Dispense
+            </DxButton>
+            <DxButton
+              size="sm"
+              variant="outline-danger"
+              icon
+              title="Cancel prescription"
+              onClick={() => {
+                setCancelTarget(p);
+                setCancelReason("");
+              }}
+            >
+              <X />
+            </DxButton>
+          </span>
+        ) : (
+          <span className="dx-faint">—</span>
+        ),
+    },
+  ];
+
+  // ---------- Prescription lines grid (inside the detail panel) ----------
+  const lineColumns: DxGridColumn<PrescriptionItem>[] = [
+    {
+      key: "drug",
+      header: "Drug / regimen",
+      minWidth: 170,
+      wrap: true,
+      render: (it) => (
+        <div className="min-w-0">
+          <div className="dx-strong">{drugLabel(it)}</div>
+          <div className="dx-muted text-[11px]">{regimenOf(it)}</div>
+          {it.instructions ? <div className="dx-faint text-[11px] italic">{it.instructions}</div> : null}
+        </div>
+      ),
+    },
+    {
+      key: "quantity",
+      header: "Qty Rx",
+      width: 64,
+      align: "center",
+      render: (it) => <span className="dx-num">{it.quantity}</span>,
+    },
+    {
+      key: "stock",
+      header: "Stock item · batch · expiry",
+      minWidth: 220,
+      wrap: true,
+      render: (it) => {
+        const options = stockItemsForLine(stockItems, it.drug_id, storeId);
+        const ls = lines[it.id];
+        const chosen = options.find((s) => String(s.id) === ls?.stockItemId);
+        if (!options.length) {
+          return <DxBadge tone="danger">No stock{storeId ? " in store" : ""}</DxBadge>;
+        }
+        if (!canDispense) {
+          return <span className="dx-muted text-[11.5px]">{totalOnHand(options)} on hand across {options.length} batch{options.length === 1 ? "" : "es"}</span>;
+        }
+        return (
+          <DxSelect
+            editorSize="sm"
+            aria-label={`Stock item for ${drugLabel(it)}`}
+            value={ls?.stockItemId ?? ""}
+            onChange={(e) => setLine(it.id, { stockItemId: e.target.value })}
+            disabled={busy}
+            placeholder="— Not linked to a batch —"
+            options={options.map((s) => ({ value: String(s.id), label: stockItemOptionLabel(s) }))}
+            error={chosen && isExpired(chosen.expiry_date) ? "Selected batch has expired." : undefined}
+          />
+        );
+      },
+    },
+    {
+      key: "on_hand",
+      header: "On hand",
+      width: 76,
+      align: "center",
+      render: (it) => {
+        const options = stockItemsForLine(stockItems, it.drug_id, storeId);
+        const chosen = options.find((s) => String(s.id) === lines[it.id]?.stockItemId);
+        const onHand = chosen ? chosen.quantity_on_hand ?? 0 : totalOnHand(options);
+        const want = Number(lines[it.id]?.qty ?? it.quantity ?? 0);
+        return <DxBadge tone={onHand <= 0 ? "danger" : want > onHand ? "warning" : "success"}>{onHand}</DxBadge>;
+      },
+    },
+    {
+      key: "expiry",
+      header: "Expiry",
+      width: 100,
+      render: (it) => {
+        const chosen = stockItemsForLine(stockItems, it.drug_id, storeId).find((s) => String(s.id) === lines[it.id]?.stockItemId);
+        if (!chosen?.expiry_date) return <span className="dx-faint">—</span>;
+        return (
+          <span className={isExpired(chosen.expiry_date) ? "text-[var(--dx-danger)] dx-mono" : "dx-mono"}>{formatDate(chosen.expiry_date)}</span>
+        );
+      },
+    },
+    {
+      key: "dispense_qty",
+      header: "Dispense",
+      width: 90,
+      align: "center",
+      render: (it) =>
+        canDispense ? (
+          <DxInput
+            type="number"
+            step="any"
+            min={0}
+            editorSize="sm"
+            mono
+            aria-label={`Quantity to dispense for ${drugLabel(it)}`}
+            className="text-center"
+            value={lines[it.id]?.qty ?? "0"}
+            onChange={(e) => setLine(it.id, { qty: e.target.value })}
+            disabled={busy}
+          />
+        ) : (
+          <span className="dx-faint">—</span>
+        ),
+    },
+  ];
+
+  // ---------- Stock alerts grid ----------
+  const alertColumns: DxGridColumn<StockAlert>[] = [
+    {
+      key: "item",
+      header: "Stock item",
+      minWidth: 200,
+      sortable: true,
+      filter: true,
+      accessor: (a) => a.stock_item?.item_name ?? `Stock item #${a.stock_item_id}`,
+      render: (a) => (
+        <div className="min-w-0">
+          <div className="dx-strong truncate">{a.stock_item?.item_name ?? `Stock item #${a.stock_item_id}`}</div>
+          {a.stock_item?.batch_no ? <div className="dx-faint text-[11px]">Batch {a.stock_item.batch_no}</div> : null}
+        </div>
+      ),
+    },
+    {
+      key: "store",
+      header: "Store",
+      minWidth: 140,
+      sortable: true,
+      filter: true,
+      accessor: (a) => a.store_name ?? a.stock_item?.store?.name ?? "",
+      render: (a) => a.store_name ?? a.stock_item?.store?.name ?? "—",
+    },
+    {
+      key: "alert_type",
+      header: "Alert",
+      width: 130,
+      sortable: true,
+      filter: {
+        options: ["LOW_STOCK", "OUT_OF_STOCK", "EXPIRING", "EXPIRED"].map((v) => ({ value: v, label: humanize(v) })),
+      },
+      render: (a) => <DxBadge tone={ALERT_TONE[a.alert_type] ?? "warning"}>{humanize(a.alert_type)}</DxBadge>,
+    },
+    { key: "quantity_on_hand", header: "On hand", width: 90, align: "right", sortable: true, render: (a) => <span className="dx-num">{a.quantity_on_hand ?? a.stock_item?.quantity_on_hand ?? "—"}</span> },
+    { key: "reorder_level", header: "Reorder at", width: 90, align: "right", sortable: true, render: (a) => <span className="dx-num">{a.reorder_level ?? a.stock_item?.reorder_level ?? "—"}</span> },
+    {
+      key: "expiry_date",
+      header: "Expiry",
+      width: 120,
+      sortable: true,
+      accessor: (a) => a.expiry_date ?? a.stock_item?.expiry_date ?? "",
+      render: (a) => {
+        const d = a.expiry_date ?? a.stock_item?.expiry_date;
+        if (!d) return <span className="dx-faint">—</span>;
+        return (
+          <span className={isExpired(d) ? "dx-mono text-[var(--dx-danger)]" : "dx-mono"}>
+            {formatDate(d)}
+            {a.days_to_expiry != null ? <span className="dx-faint"> · {a.days_to_expiry}d</span> : null}
+          </span>
+        );
+      },
+    },
+  ];
+
+  const storeOptions = stores.map((s) => ({ value: String(s.id), label: `${s.name} (${s.code})` }));
+  const focusedCount = focusVisitId == null ? null : prescriptions.filter((p) => p.visit_id === focusVisitId).length;
+  const selectedStore = stores.find((s) => String(s.id) === storeId);
+
+  // ---------- Render ----------
+  const showHandoff = !!selected && !!handoff && handoff.prescriptionId === selected.id;
+
+  const body = (
+    <>
+      {!embedded && (
+      <DxPageHeader
+        crumbs={[{ label: "Queues", to: routes.queues }, { label: "Pharmacy" }]}
+        title="Pharmacy — dispensing"
+        subtitle="Verify electronic prescriptions, check stock by batch and expiry, dispense with counselling, then hand the patient on to billing."
+        actions={
+          <>
+            <DxButton leftIcon={<Boxes />} onClick={() => navigate(routes.inventoryItems)}>
+              Stock
+            </DxButton>
+            <DxButton leftIcon={<Pill />} onClick={() => navigate(routes.drugs)}>
+              Drugs catalogue
+            </DxButton>
+            <DxButton leftIcon={<RotateCcw className={worklistQuery.isFetching ? "animate-spin" : undefined} />} onClick={refreshAll}>
+              Refresh
+            </DxButton>
+          </>
+        }
+      />
       )}
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <StatCard icon={ListChecks} label="In Worklist" value={stats.total} tone="primary" />
-        <StatCard icon={Stethoscope} label="Active" value={stats.active} tone="primary" />
-        <StatCard icon={Clock} label="Partial" value={stats.partial} tone="amber" />
-        <StatCard icon={AlertTriangle} label="Stock Alerts" value={stats.alertsCount} tone="rose" />
-      </div>
+      {!embedded && focusVisitId != null ? (
+        <DxMessage
+          tone="info"
+          title={`Showing prescriptions for visit #${focusVisitId}`}
+          action={
+            <DxButton size="sm" onClick={clearFocus} leftIcon={<X />}>
+              Show all
+            </DxButton>
+          }
+        >
+          {worklistQuery.isLoading
+            ? "Loading the worklist…"
+            : focusedCount
+              ? `${focusedCount} prescription${focusedCount === 1 ? "" : "s"} on the worklist for this visit.`
+              : "No prescriptions for this visit are on the worklist — it may already be dispensed, or nothing was prescribed."}
+        </DxMessage>
+      ) : null}
 
-      {/* Tabs */}
-      <div className="glass-card rounded-[2rem] p-3 flex flex-col gap-3 bg-white/40 backdrop-blur-md">
-        <div className="flex gap-2">
-          {(["WORKLIST", "ALERTS"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${tab === t
-                  ? "bg-slate-900 text-white shadow-md"
-                  : "bg-white/60 text-secondary-600 hover:bg-white"
-                }`}
-            >
-              {t === "WORKLIST" ? <ListChecks className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-              {t === "WORKLIST" ? "Prescriptions" : "Stock Alerts"}
-              <span
-                className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${tab === t ? "bg-white/20" : "bg-secondary-100 text-secondary-500"
-                  }`}
-              >
-                {t === "WORKLIST" ? prescriptions.length : alerts.length}
-              </span>
-            </button>
-          ))}
-        </div>
-        {tab === "WORKLIST" && (
-          <div className="relative">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-secondary-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by prescription #, patient, visit..."
-              className="w-full bg-white/50 border-none rounded-2xl pl-14 pr-6 py-3.5 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
+      {!embedded && (
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <DxKpi
+          icon={ClipboardList}
+          label="Pending dispense"
+          value={stats.pending}
+          sub={`${stats.active} active · ${stats.partial} partially dispensed`}
+          tone="warning"
+          isLoading={worklistQuery.isLoading}
+          onClick={() => setTab("WORKLIST")}
+        />
+        <DxKpi icon={PackageCheck} label="Dispensed today" value={stats.dispensedToday} tone="success" isLoading={worklistQuery.isLoading} />
+        <DxKpi
+          icon={AlertTriangle}
+          label="Stock alerts"
+          value={stats.alerts}
+          sub={`${stats.lowStock} low / out of stock`}
+          tone={stats.alerts ? "danger" : "neutral"}
+          isLoading={alertsQuery.isLoading}
+          onClick={() => setTab("ALERTS")}
+        />
+        <DxKpi icon={ListChecks} label="In worklist" value={stats.total} tone="accent" isLoading={worklistQuery.isLoading} />
+      </div>
+      )}
+
+      {!embedded && (
+      <DxTabs<Tab>
+        value={tab}
+        onChange={setTab}
+        items={[
+          { key: "WORKLIST", label: "Prescriptions", icon: <ListChecks className="h-3.5 w-3.5" />, count: prescriptions.length },
+          { key: "ALERTS", label: "Stock alerts", icon: <AlertTriangle className="h-3.5 w-3.5" />, count: alerts.length },
+        ]}
+      />
+      )}
+
+      {tab === "WORKLIST" ? (
+        <div className="grid gap-4 xl:grid-cols-12">
+          <div className={selected ? "xl:col-span-7" : "xl:col-span-12"}>
+            {!embedded && (
+            <DxToolbar attached>
+              <DxSearchBox onSearch={setSearch} placeholder="Search patient, hospital no., prescription, visit…" className="w-72" />
+              <DxToolbarSeparator />
+              <DxToolbarGroup>
+                <DxToolbarLabel>Dispensing store</DxToolbarLabel>
+                <DxSelect
+                  editorSize="sm"
+                  aria-label="Dispensing store"
+                  value={storeId}
+                  onChange={(e) => changeStore(e.target.value)}
+                  placeholder="All stores"
+                  options={storeOptions}
+                  className="w-56"
+                />
+              </DxToolbarGroup>
+              <DxToolbarSpacer />
+              <DxButton size="sm" variant="text" icon title="Refresh worklist" onClick={() => worklistQuery.refetch()}>
+                <RotateCcw className={worklistQuery.isFetching ? "animate-spin" : undefined} />
+              </DxButton>
+            </DxToolbar>
+            )}
+            <DxGrid
+              attached
+              filterRow
+              columns={columns}
+              data={visible}
+              rowKey={(p) => p.id}
+              isLoading={worklistQuery.isLoading}
+              error={worklistQuery.isError ? apiErrorMessage(worklistQuery.error, "Unable to load pharmacy worklist.") : null}
+              onRetry={() => worklistQuery.refetch()}
+              onRowClick={openPrescription}
+              selectedKey={selectedId}
+              empty={{
+                icon: Pill,
+                title: prescriptions.length === 0 ? "No prescriptions in the worklist" : "No prescriptions match",
+                description:
+                  prescriptions.length === 0
+                    ? "All caught up — incoming prescriptions will appear here."
+                    : focusVisitId != null
+                      ? "Nothing on the worklist for the focused visit."
+                      : "Try a different search term.",
+                action:
+                  focusVisitId != null && prescriptions.length > 0 ? (
+                    <DxButton size="sm" onClick={clearFocus}>
+                      Show all prescriptions
+                    </DxButton>
+                  ) : undefined,
+              }}
             />
           </div>
-        )}
-      </div>
 
-      {/* Content */}
-      {isLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="glass-card rounded-[2rem] h-32 animate-pulse bg-white/40" />
-          ))}
-        </div>
-      ) : error ? (
-        <div className="glass-card rounded-[2.5rem] p-16 text-center max-w-md mx-auto">
-          <AlertCircle className="h-12 w-12 mx-auto text-rose-500/50 mb-4" />
-          <p className="text-secondary-600 font-bold mb-4">{error}</p>
-          <button onClick={load} className="btn-primary py-3 px-8">
-            Try Again
-          </button>
-        </div>
-      ) : tab === "WORKLIST" ? (
-        filteredPrescriptions.length === 0 ? (
-          <div className="glass-card rounded-[2.5rem] p-16 text-center max-w-md mx-auto">
-            <div className="h-20 w-20 bg-secondary-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
-              <Pill className="h-10 w-10 text-secondary-200" />
-            </div>
-            <h4 className="text-xl font-bold text-secondary-900">No Prescriptions in Worklist</h4>
-            <p className="text-sm text-secondary-500 mt-2">
-              {prescriptions.length === 0
-                ? "All caught up — incoming prescriptions will appear here."
-                : "No prescriptions match your search."}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredPrescriptions.map((p) => (
-              <PrescriptionCard
-                key={p.id}
-                prescription={p}
-                onDispense={() => openDispense(p)}
-                onCancel={() => {
-                  setCancelTarget(p);
-                  setCancelReason("");
-                }}
-              />
-            ))}
-          </div>
-        )
-      ) : alerts.length === 0 ? (
-        <div className="glass-card rounded-[2.5rem] p-16 text-center max-w-md mx-auto">
-          <div className="h-20 w-20 bg-emerald-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="h-10 w-10 text-emerald-300" />
-          </div>
-          <h4 className="text-xl font-bold text-secondary-900">No Stock Alerts</h4>
-          <p className="text-sm text-secondary-500 mt-2">
-            All stock levels are healthy and nothing is expiring soon.
-          </p>
+          {selected ? (
+            <DxPanel
+              className="xl:col-span-5"
+              title={`Prescription ${selected.prescription_no}`}
+              icon={<Pill />}
+              description={patientNameOf(selected)}
+              actions={
+                <>
+                  <DxStatusBadge status={prescriptionStatus(selected)} />
+                  <DxButton size="sm" variant="text" icon title="Close" onClick={closePanel}>
+                    <X />
+                  </DxButton>
+                </>
+              }
+              footer={
+                canDispense ? (
+                  <div className="flex items-center justify-end gap-2">
+                    <DxButton onClick={closePanel} disabled={busy}>
+                      Close
+                    </DxButton>
+                    <DxButton
+                      variant="outline-danger"
+                      disabled={busy}
+                      onClick={() => {
+                        setCancelTarget(selected);
+                        setCancelReason("");
+                      }}
+                    >
+                      Cancel prescription
+                    </DxButton>
+                    <DxButton variant="primary" leftIcon={<Save />} isLoading={busy} onClick={submitDispense}>
+                      Dispense
+                    </DxButton>
+                  </div>
+                ) : undefined
+              }
+            >
+              <div className="space-y-4">
+                <DxProps
+                  tight
+                  items={[
+                    { label: "Patient", value: <span className="dx-strong">{patientNameOf(selected)}</span> },
+                    { label: "Hospital no.", value: <span className="dx-mono">{selected.visit?.patient?.hospital_number ?? "—"}</span> },
+                    {
+                      label: "Visit",
+                      value: selected.visit_id ? (
+                        <Link
+                          to={routes.visitDetail.replace(":visitId", String(selected.visit_id))}
+                          className="inline-flex items-center gap-1 text-[var(--dx-accent)] hover:underline dx-mono"
+                        >
+                          {selected.visit?.visit_code ?? `#${selected.visit_id}`}
+                          <ExternalLink className="h-3 w-3" aria-hidden />
+                        </Link>
+                      ) : (
+                        "—"
+                      ),
+                    },
+                    { label: "Prescribed", value: formatDateTime(selected.prescribed_at || selected.created_at) },
+                    { label: "Prescriber", value: staffNameById(staffList, selected.prescribed_by_staff_id) },
+                    { label: "Prescriber's note", value: selected.note ? <span className="italic">{selected.note}</span> : "—" },
+                  ]}
+                />
+
+                {!embedded && showHandoff ? (
+                  <DxMessage tone="success" title="Dispensed — hand the patient on">
+                    <p>
+                      Counsel the patient, then complete the pharmacy step so {handoff?.patientName ?? "the patient"} is queued at the next
+                      service point (usually billing) or the visit is closed.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <DxButton
+                        size="sm"
+                        variant="primary"
+                        rightIcon={<ArrowRight />}
+                        isLoading={advanceMutation.isPending}
+                        onClick={() => setAdvanceOpen(true)}
+                      >
+                        Complete pharmacy step &amp; route
+                      </DxButton>
+                      <DxButton size="sm" leftIcon={<ArrowLeft />} onClick={() => navigate(routes.queues)} disabled={advanceMutation.isPending}>
+                        Back to queue
+                      </DxButton>
+                    </div>
+                  </DxMessage>
+                ) : null}
+
+                {formError ? (
+                  <DxMessage tone="danger" title="Cannot dispense">
+                    {formError}
+                  </DxMessage>
+                ) : null}
+
+                {!canDispense && !showHandoff ? (
+                  <DxMessage tone="info">
+                    This prescription is {humanize(prescriptionStatus(selected)).toLowerCase()}; there is nothing left to dispense.
+                  </DxMessage>
+                ) : null}
+
+                <DxGrid
+                  columns={lineColumns}
+                  data={selectedItems}
+                  rowKey={(it) => it.id}
+                  striped={false}
+                  isLoading={stockQuery.isLoading && selectedItems.length > 0}
+                  empty={{ title: "No items on this prescription" }}
+                  summary={{
+                    drug: <span className="dx-muted">{selectedItems.length} line{selectedItems.length === 1 ? "" : "s"}</span>,
+                    quantity: <span className="dx-num">{selectedItems.reduce((s, it) => s + (it.quantity ?? 0), 0)}</span>,
+                    dispense_qty: canDispense ? (
+                      <span className="dx-num">{selectedItems.reduce((s, it) => s + (Number(lines[it.id]?.qty) || 0), 0)}</span>
+                    ) : null,
+                  }}
+                />
+
+                {canDispense ? (
+                  <DxGroupBox caption="Dispense">
+                    <DxForm cols={2}>
+                      <DxSelect
+                        label="Pharmacy store"
+                        hint={selectedStore ? selectedStore.location_description || selectedStore.code : "Stock is drawn from the selected store."}
+                        value={storeId}
+                        onChange={(e) => changeStore(e.target.value)}
+                        placeholder="— No store linkage —"
+                        options={storeOptions}
+                        disabled={busy}
+                      />
+                      <DxSelect
+                        label="Dispensed by"
+                        required
+                        value={staffId}
+                        onChange={(e) => setStaffOverride(e.target.value)}
+                        placeholder="Pick pharmacist…"
+                        options={staffList.map((s) => ({ value: String(s.id), label: staffDisplayName(s) }))}
+                        disabled={busy}
+                        error={formError && !staffId ? "Required" : undefined}
+                      />
+                      <DxTextarea
+                        label="Counselling note (optional)"
+                        fieldClassName="dx-col-span-full"
+                        rows={2}
+                        placeholder="Counselling given, substitution rationale, partial-supply reason…"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        disabled={busy}
+                      />
+                    </DxForm>
+                  </DxGroupBox>
+                ) : null}
+              </div>
+            </DxPanel>
+          ) : null}
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {alerts.map((a, idx) => {
-            const Icon = alertIcon[a.alert_type] ?? AlertTriangle;
-            const cls = alertStyles[a.alert_type] ?? alertStyles.LOW_STOCK;
-            return (
-              <div
-                key={`${a.stock_item_id}-${idx}`}
-                className={`rounded-[2rem] p-6 border ${cls}`}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="h-11 w-11 rounded-xl bg-white/60 flex items-center justify-center shadow-sm">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <span className="px-2.5 py-0.5 rounded-md bg-white/60 text-[10px] font-bold uppercase tracking-widest">
-                    {a.alert_type.replace("_", " ")}
-                  </span>
-                </div>
-                <p className="text-sm font-black mb-1">
-                  {a.stock_item?.item_name ?? `Stock Item #${a.stock_item_id}`}
-                </p>
-                <p className="text-[11px] font-bold opacity-75 mb-3">
-                  {a.store_name ?? a.stock_item?.store?.name ?? "Unknown store"}
-                </p>
-                <div className="space-y-1 text-[11px] font-bold">
-                  {a.quantity_on_hand != null && (
-                    <p>
-                      Qty: <span className="font-mono">{a.quantity_on_hand}</span>
-                    </p>
-                  )}
-                  {a.reorder_level != null && (
-                    <p>
-                      Reorder @ <span className="font-mono">{a.reorder_level}</span>
-                    </p>
-                  )}
-                  {a.expiry_date && (
-                    <p>
-                      Exp:{" "}
-                      <span className="font-mono">
-                        {new Date(a.expiry_date).toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Dispense modal */}
-      {dispenseTarget && (
-        <DispenseModal
-          prescription={dispenseTarget}
-          quantities={dispenseQuantities}
-          onQuantitiesChange={setDispenseQuantities}
-          storeId={dispenseStoreId}
-          onStoreIdChange={setDispenseStoreId}
-          stores={stores}
-          stockItems={stockItems}
-          staffId={dispenseStaffId}
-          onStaffIdChange={setDispenseStaffId}
-          staffList={staffList}
-          note={dispenseNote}
-          onNoteChange={setDispenseNote}
-          pending={dispensing}
-          error={dispenseError}
-          onClose={() => !dispensing && setDispenseTarget(null)}
-          onSubmit={handleDispense}
-        />
-      )}
-
-      {/* Cancel modal */}
-      {cancelTarget && (
-        <Modal
-          title="Cancel Prescription"
-          subtitle="Provide A Reason"
-          onClose={() => !cancelling && setCancelTarget(null)}
-          tone="rose"
+        <DxPanel
+          title="Stock alerts"
+          icon={<AlertTriangle />}
+          description="Low or exhausted stock and batches that are expiring or expired."
+          flush
+          actions={
+            <>
+              <DxButton size="sm" onClick={() => navigate(routes.inventoryItems)} leftIcon={<Boxes />}>
+                Manage stock
+              </DxButton>
+              <DxButton size="sm" variant="text" icon title="Refresh alerts" onClick={() => alertsQuery.refetch()}>
+                <RotateCcw className={alertsQuery.isFetching ? "animate-spin" : undefined} />
+              </DxButton>
+            </>
+          }
         >
-          <div className="mb-5 p-4 rounded-2xl bg-secondary-50 border border-secondary-400">
-            <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase mb-1">
-              {cancelTarget.prescription_no}
-            </p>
-            <p className="text-sm font-bold text-secondary-900">
-              {asPrescriptionItemArray(cancelTarget.items).length} items
-            </p>
-          </div>
-          <textarea
-            value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
-            placeholder="Why is this prescription being cancelled?"
-            className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3 mb-6"
+          <DxGrid
+            borderless
+            filterRow
+            columns={alertColumns}
+            data={alerts}
+            rowKey={(a, i) => `${a.stock_item_id}-${a.alert_type}-${i}`}
+            isLoading={alertsQuery.isLoading}
+            error={alertsQuery.isError ? apiErrorMessage(alertsQuery.error, "Unable to load stock alerts.") : null}
+            onRetry={() => alertsQuery.refetch()}
+            empty={{ icon: CheckCircle2, title: "No stock alerts", description: "All stock levels are healthy and nothing is expiring soon." }}
           />
-          <div className="flex gap-4">
-            <button
-              onClick={() => setCancelTarget(null)}
-              disabled={cancelling}
-              className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
-            >
+        </DxPanel>
+      )}
+
+      <DxStatusBar>
+        <DxStatusItem>
+          Worklist: <b>{prescriptions.length}</b>
+          {visible.length !== prescriptions.length ? <span className="dx-faint"> ({visible.length} shown)</span> : null}
+        </DxStatusItem>
+        <DxStatusItem>
+          Pending: <b>{stats.pending}</b>
+        </DxStatusItem>
+        <DxStatusItem>
+          Store: <b>{selectedStore?.name ?? "All stores"}</b>
+        </DxStatusItem>
+        <DxStatusItem>
+          Dispensing as: <b>{staffNameById(staffList, staffId ? Number(staffId) : null)}</b>
+        </DxStatusItem>
+        <span className="ml-auto">Pharmacy is usually the last clinical stop before billing closes the visit.</span>
+      </DxStatusBar>
+
+      {/* Cancel prescription */}
+      <DxPopup
+        isOpen={!!cancelTarget}
+        onClose={() => !cancelMutation.isPending && setCancelTarget(null)}
+        title="Cancel prescription"
+        size="sm"
+        locked={cancelMutation.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setCancelTarget(null)} disabled={cancelMutation.isPending}>
               Close
-            </button>
-            <button
-              onClick={handleCancel}
-              disabled={cancelling || !cancelReason.trim()}
-              className="flex-[2] py-4 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-black tracking-tight shadow-xl shadow-rose-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
+            </DxButton>
+            <DxButton
+              variant="danger"
+              disabled={!cancelReason.trim()}
+              isLoading={cancelMutation.isPending}
+              onClick={() => cancelTarget && cancelMutation.mutate(cancelTarget)}
             >
-              {cancelling ? "Cancelling..." : "Cancel Prescription"}
-            </button>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// Sub-components
-// ============================================================
-
-function PrescriptionCard({
-  prescription,
-  onDispense,
-  onCancel,
-}: {
-  prescription: Prescription;
-  onDispense: () => void;
-  onCancel: () => void;
-}) {
-  const statusKey = (prescription.status || "ACTIVE").toUpperCase();
-  const statusClass = presStatusStyles[statusKey] ?? presStatusStyles.ACTIVE;
-  const items = asPrescriptionItemArray(prescription.items);
-  const canDispense = !["DISPENSED", "CANCELLED"].includes(statusKey);
-
-  return (
-    <div className="glass-card rounded-[2rem] p-7 bg-white border border-secondary-400 hover:border-emerald-200 transition-all">
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="h-12 w-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md">
-            <Pill className="h-6 w-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-secondary-100 text-secondary-600 text-[10px] font-mono font-bold">
-                <Hash className="h-2.5 w-2.5" />
-                {prescription.prescription_no}
-              </span>
-              <span
-                className={`px-3 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest ${statusClass}`}
-              >
-                {statusKey.replace("_", " ")}
-              </span>
-            </div>
-            <div className="flex items-center gap-3 mt-1.5 text-[11px] font-bold text-secondary-500 flex-wrap">
-              {prescription.visit?.patient && (
-                <span className="inline-flex items-center gap-1.5">
-                  <User className="h-3 w-3" />
-                  {prescription.visit.patient.first_name} {prescription.visit.patient.last_name}
-                </span>
-              )}
-              {prescription.visit?.visit_code && (
-                <Link
-                  to={`/visits/${prescription.visit_id}`}
-                  className="inline-flex items-center gap-1 font-mono hover:text-primary-500"
-                >
-                  {prescription.visit.visit_code}
-                  <ExternalLink className="h-2.5 w-2.5" />
-                </Link>
-              )}
-              <span className="inline-flex items-center gap-1.5">
-                <Clock className="h-3 w-3" />
-                {formatDateTime(prescription.prescribed_at || prescription.created_at)}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {canDispense && (
-            <button
-              onClick={onDispense}
-              className="btn-primary gap-2 px-5 py-2.5 text-xs bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
-            >
-              <Pill className="h-3.5 w-3.5" />
-              Dispense
-            </button>
-          )}
-          {canDispense && (
-            <button
-              onClick={onCancel}
-              className="p-2.5 hover:bg-rose-50 text-rose-500 rounded-xl transition-all"
-              title="Cancel"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {prescription.note && (
-        <p className="text-xs text-secondary-600 italic bg-amber-50/50 border border-amber-100 rounded-xl p-3 mb-3">
-          {prescription.note}
-        </p>
-      )}
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        {items.map((it: PrescriptionItem) => (
-          <div
-            key={it.id}
-            className="flex items-start gap-3 p-3 rounded-xl bg-secondary-50/50 border border-secondary-400"
-          >
-            <div className="h-9 w-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-              <Pill className="h-4 w-4" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-black text-secondary-900 truncate">
-                {it.drug?.name ?? `Drug #${it.drug_id}`}
-              </p>
-              <p className="text-[11px] font-bold text-secondary-500 mt-0.5">
-                {it.dose} · {it.route ?? "PO"} · {it.frequency ?? "—"} · Qty {it.quantity}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DispenseModal({
-  prescription,
-  quantities,
-  onQuantitiesChange,
-  storeId,
-  onStoreIdChange,
-  stores,
-  stockItems,
-  staffId,
-  onStaffIdChange,
-  staffList,
-  note,
-  onNoteChange,
-  pending,
-  error,
-  onClose,
-  onSubmit,
-}: {
-  prescription: Prescription;
-  quantities: Record<number, string>;
-  onQuantitiesChange: (q: Record<number, string>) => void;
-  storeId: string;
-  onStoreIdChange: (s: string) => void;
-  stores: Store[];
-  stockItems: StockItem[];
-  staffId: number | null;
-  onStaffIdChange: (s: number | null) => void;
-  staffList: Staff[];
-  note: string;
-  onNoteChange: (n: string) => void;
-  pending: boolean;
-  error: string | null;
-  onClose: () => void;
-  onSubmit: () => void;
-}) {
-  const items = asPrescriptionItemArray(prescription.items);
-
-  const findStockFor = (drugId?: number) =>
-    stockItems.find(
-      (s) =>
-        s.drug_id === drugId &&
-        (!storeId || s.store_id === Number(storeId)) &&
-        (s.quantity_on_hand ?? 0) > 0,
-    );
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] p-10 max-w-2xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          disabled={pending}
-          className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"
-        >
-          <X className="h-5 w-5 text-secondary-400" />
-        </button>
-        <div className="flex items-center gap-5 mb-8">
-          <div className="h-14 w-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-xl shadow-emerald-500/20">
-            <Pill className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-black font-display tracking-tight">Dispense Medication</h3>
-            <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-              Verify And Fulfil The Prescription
-            </p>
-          </div>
-        </div>
-
-        <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-400">
-          <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase mb-1">
-            {prescription.prescription_no}
-          </p>
-          {prescription.visit?.patient && (
-            <p className="text-sm font-bold text-secondary-900">
-              {prescription.visit.patient.first_name} {prescription.visit.patient.last_name}
-            </p>
-          )}
-        </div>
-
-        {error && (
-          <div className="mb-5 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-            <AlertCircle className="h-5 w-5" />
-            <span className="text-sm font-bold">{error}</span>
-          </div>
-        )}
-
-        <div className="space-y-5">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                Pharmacy Store
-              </label>
-              <select
-                value={storeId}
-                onChange={(e) => onStoreIdChange(e.target.value)}
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-              >
-                <option value="">— No store linkage —</option>
-                {stores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                Dispensed By *
-              </label>
-              <select
-                value={staffId ?? ""}
-                onChange={(e) => onStaffIdChange(e.target.value ? Number(e.target.value) : null)}
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-              >
-                <option value="">Pick pharmacist...</option>
-                {staffList.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {staffDisplayName(s)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
+              Cancel prescription
+            </DxButton>
+          </>
+        }
+      >
+        {cancelTarget ? (
           <div className="space-y-3">
-            <h4 className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              Items
-            </h4>
-            {items.map((it) => {
-              const stock = findStockFor(it.drug_id);
-              const qtyRequested = it.quantity ?? 0;
-              const onHand = stock?.quantity_on_hand ?? 0;
-              return (
-                <div
-                  key={it.id}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-secondary-50 border border-secondary-400"
-                >
-                  <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                    <Pill className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-black text-secondary-900 truncate">
-                      {it.drug?.name ?? `Drug #${it.drug_id}`}
-                    </p>
-                    <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mt-0.5">
-                      Requested {qtyRequested} · On hand {onHand}
-                    </p>
-                  </div>
-                  <input
-                    type="number"
-                    step="any"
-                    value={quantities[it.id] ?? "0"}
-                    onChange={(e) =>
-                      onQuantitiesChange({ ...quantities, [it.id]: e.target.value })
-                    }
-                    placeholder="Qty"
-                    className="w-20 h-10 rounded-lg bg-white border border-secondary-200 text-center font-mono text-sm focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              Note (Optional)
-            </label>
-            <textarea
-              value={note}
-              onChange={(e) => onNoteChange(e.target.value)}
-              placeholder="Counselling notes, substitution rationale..."
-              className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
+            <DxProps
+              tight
+              items={[
+                { label: "Prescription", value: <span className="dx-mono">{cancelTarget.prescription_no}</span> },
+                { label: "Patient", value: patientNameOf(cancelTarget) },
+                { label: "Items", value: prescriptionItems(cancelTarget).length },
+              ]}
+            />
+            <DxTextarea
+              label="Reason"
+              required
+              rows={3}
+              placeholder="Why is this prescription being cancelled?"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              disabled={cancelMutation.isPending}
             />
           </div>
-        </div>
+        ) : null}
+      </DxPopup>
 
-        <div className="pt-6 flex gap-4">
-          <button
-            onClick={onClose}
-            disabled={pending}
-            className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onSubmit}
-            disabled={pending}
-            className="flex-[2] py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black tracking-tight shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            {pending ? "Dispensing..." : "Dispense"}
-          </button>
-        </div>
-      </div>
-    </div>
+      {/* Complete the pharmacy step on the visit pathway */}
+      {!embedded && (
+      <DxConfirm
+        isOpen={advanceOpen}
+        onClose={() => setAdvanceOpen(false)}
+        tone="primary"
+        title="Complete pharmacy step"
+        confirmLabel="Complete & route"
+        description={
+          <>
+            This closes the pharmacy stage for <b className="dx-strong">{handoff?.patientName ?? "the patient"}</b> and queues them at the next
+            service point on their pathway — or completes the visit when pharmacy was the last stop.
+          </>
+        }
+        onConfirm={async () => {
+          if (handoff) await advanceMutation.mutateAsync(handoff.visitId).catch(() => undefined);
+        }}
+      />
+      )}
+    </>
   );
-}
 
-function Modal({
-  title,
-  subtitle,
-  onClose,
-  children,
-  tone = "primary",
-}: {
-  title: string;
-  subtitle: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  tone?: "primary" | "rose";
-}) {
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] p-10 max-w-xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"
-        >
-          <X className="h-5 w-5 text-secondary-400" />
-        </button>
-        <div className="flex items-center gap-5 mb-8">
-          <div
-            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${tone === "rose" ? "bg-rose-500 shadow-rose-500/20" : "bg-emerald-500 shadow-emerald-500/20"
-              }`}
-          >
-            {tone === "rose" ? <X className="h-6 w-6" /> : <Pill className="h-6 w-6" />}
-          </div>
-          <div>
-            <h3 className="text-xl font-black font-display tracking-tight">{title}</h3>
-            <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-              {subtitle}
-            </p>
-          </div>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-type StatTone = "primary" | "emerald" | "amber" | "rose";
-const statToneStyles: Record<StatTone, string> = {
-  primary: "bg-primary-50 text-primary-600 border-primary-100",
-  emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  amber: "bg-amber-50 text-amber-600 border-amber-100",
-  rose: "bg-rose-50 text-rose-600 border-rose-100",
-};
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: typeof Pill;
-  label: string;
-  value: number;
-  tone: StatTone;
-}) {
-  return (
-    <div className={`glass-card rounded-[2rem] p-6 border ${statToneStyles[tone]} bg-white/60 backdrop-blur-md`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">{label}</span>
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="text-3xl font-black tracking-tight">{value}</div>
-    </div>
-  );
+  return embedded ? <div className="space-y-4">{body}</div> : <DxPage>{body}</DxPage>;
 }

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { apiClient } from "@/lib/api/api-client";
 import { apiErrorMessage } from "@/lib/api/api-error";
-import { isAbnormal } from "@/features/clinical/components/ConsultationLabPanel";
+import { isAbnormal } from "@/features/clinical/lib/lab-results";
 import type { BaselineProfile } from "./BaselineProfileCard";
 
 type DiagnosticRow = {
@@ -67,7 +67,7 @@ export function DiagnosticResultsPanel({
     refetchInterval: 120_000,
   });
 
-  const orders = diagnostics.data?.lab_history ?? [];
+  const orders = useMemo(() => diagnostics.data?.lab_history ?? [], [diagnostics.data]);
   const baseline = diagnostics.data?.baseline;
 
   const effectiveOpen = useMemo(() => {

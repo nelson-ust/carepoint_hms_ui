@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Building2, Mail, Phone, User, Lock, Globe, MapPin, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Building2, Mail, Phone, User, Lock, Globe, MapPin, ChevronRight, CheckCircle2, Server, Cloud, HardDrive } from "lucide-react";
 import { registerTenant, listSubscriptionPlans } from "../api/tenants.api";
 import type { TenantRegistrationPayload, SubscriptionPlan } from "../api/tenants.api";
 import { useState, useEffect } from "react";
@@ -17,6 +17,7 @@ const registrationSchema = z.object({
   billing_contact_name: z.string().min(3, "Contact name is required"),
   billing_address: z.string().min(5, "Billing address is required"),
   tax_id: z.string().optional(),
+  deployment_model: z.enum(["ON_PREMISE", "CLOUD_DEDICATED", "CLOUD_PLATFORM"]),
   plan_code: z.string().min(1, "Please select a plan"),
   admin_email: z.string().email("Invalid admin email"),
   admin_username: z.string().min(3, "Admin username is required"),
@@ -35,10 +36,11 @@ export function TenantRegistrationForm() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { register, handleSubmit, formState: { errors }, trigger, setValue } = useForm<FormData>({
+  const { register, handleSubmit, formState: { errors }, trigger, setValue, watch } = useForm<FormData>({
     resolver: zodResolver(registrationSchema) as unknown as Resolver<FormData>,
     defaultValues: {
       plan_code: "",
+      deployment_model: "CLOUD_PLATFORM",
     },
   });
 
@@ -62,7 +64,8 @@ export function TenantRegistrationForm() {
     if (step === 1) fieldsToValidate = ["tenant_name", "tenant_code"];
     if (step === 2) fieldsToValidate = ["billing_contact_name", "billing_email", "billing_phone", "billing_address"];
     if (step === 3) fieldsToValidate = ["admin_first_name", "admin_last_name", "admin_email", "admin_username", "admin_password"];
-    if (step === 4) fieldsToValidate = ["plan_code"];
+    if (step === 4) fieldsToValidate = ["deployment_model"];
+    if (step === 5) fieldsToValidate = ["plan_code"];
 
     const isValid = await trigger(fieldsToValidate);
     if (isValid) setStep(step + 1);
@@ -139,14 +142,14 @@ export function TenantRegistrationForm() {
     <div className="max-w-6xl mx-auto  py-12 md:py-16">
       {/* Progress Stepper */}
       <div className="flex items-center justify-between mb-12">
-        {[1, 2, 3, 4].map((i) => (
+        {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="flex items-center">
             <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ${step >= i ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "bg-slate-200 text-slate-500"
               }`}>
               {i}
             </div>
-            {i < 4 && (
-              <div className={`h-1 w-36 mx-2 rounded-full transition-all duration-500 ${step > i ? "bg-emerald-500" : "bg-slate-200"
+            {i < 5 && (
+              <div className={`h-1 w-20 mx-2 rounded-full transition-all duration-500 ${step > i ? "bg-emerald-500" : "bg-slate-200"
                 }`} />
             )}
           </div>
@@ -266,8 +269,83 @@ export function TenantRegistrationForm() {
           {step === 4 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
               <div className="border-b border-slate-100 pb-4">
+                <h3 className="text-xl font-bold">Deployment Approach</h3>
+                <p className="text-sm text-slate-500">Choose how your hospital&apos;s infrastructure will be hosted and provisioned</p>
+              </div>
+              <div className="grid gap-5 md:grid-cols-3">
+                {([
+                  {
+                    value: "CLOUD_PLATFORM",
+                    icon: Cloud,
+                    title: "Cloud \u2013 Platform",
+                    tagline: "Shared platform infrastructure",
+                    desc: "Run on Carepoint\u2019s managed backend, frontend and storage. Only your tenant database is provisioned and managed for you \u2013 the fastest way to go live with the least to maintain.",
+                    badge: "Recommended",
+                  },
+                  {
+                    value: "CLOUD_DEDICATED",
+                    icon: Server,
+                    title: "Cloud \u2013 Dedicated",
+                    tagline: "Isolated cloud stack",
+                    desc: "A dedicated backend, database, frontend and storage are provisioned specifically for your hospital in the cloud \u2013 full isolation, provisioned much like an on-premise deployment.",
+                    badge: null,
+                  },
+                  {
+                    value: "ON_PREMISE",
+                    icon: HardDrive,
+                    title: "On-premise",
+                    tagline: "Hosted on your own servers",
+                    desc: "The full stack runs on your own hardware on-site, with offline-capable operation. Cross-hospital features require internet connectivity.",
+                    badge: null,
+                  },
+                ] as const).map((opt) => {
+                  const selected = watch("deployment_model") === opt.value;
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      type="button"
+                      key={opt.value}
+                      onClick={() => setValue("deployment_model", opt.value, { shouldValidate: true })}
+                      className={`relative text-left p-6 rounded-[2rem] border-2 transition-all overflow-hidden flex flex-col ${selected
+                        ? "bg-emerald-50/50 border-emerald-500 shadow-xl shadow-emerald-500/10 scale-[1.02]"
+                        : "bg-white border-slate-100 hover:border-emerald-200"
+                        }`}
+                    >
+                      {opt.badge && (
+                        <span className="absolute top-4 right-4 text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-full">
+                          {opt.badge}
+                        </span>
+                      )}
+                      <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mb-4 ${selected ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-500"}`}>
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <h4 className={`text-lg font-black ${selected ? "text-emerald-900" : "text-slate-900"}`}>{opt.title}</h4>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">{opt.tagline}</p>
+                      <p className="text-xs text-slate-500 leading-relaxed flex-1">{opt.desc}</p>
+                      {selected && (
+                        <div className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Selected
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {errors.deployment_model && <p className="text-xs text-rose-500 text-center font-bold">{errors.deployment_model.message}</p>}
+            </div>
+          )}
+
+          {step === 5 && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+              <div className="border-b border-slate-100 pb-4">
                 <h3 className="text-xl font-bold">Select Subscription Plan</h3>
                 <p className="text-sm text-slate-500">Choose the tier that fits your facility's needs</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-5 py-4 flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-emerald-900 leading-relaxed">
+                  <span className="font-black">30-day free trial, all features included.</span> Every new hospital starts with full access to the entire platform for 30 days \u2013 regardless of the plan picked here. After the trial you continue on this plan (or change it anytime).
+                </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {plans.map((p) => (
@@ -356,7 +434,7 @@ export function TenantRegistrationForm() {
               <div />
             )}
 
-            {step < 4 ? (
+            {step < 5 ? (
               <button
                 type="button"
                 onClick={nextStep}

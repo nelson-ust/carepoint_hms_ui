@@ -1,20 +1,22 @@
-import { Badge, type BadgeProps } from "@/components/ui/Badge";
+import { DxBadge, humanize, type DxBadgeTone } from "@/components/dx";
 
-const STATUS_VARIANTS: Record<string, BadgeProps["variant"]> = {
-  PAID: "soft-success",
-  PARTIALLY_PAID: "soft-warning",
-  ISSUED: "soft-info",
-  DRAFT: "secondary",
-  WAIVED: "secondary",
-  VOIDED: "soft-danger",
-  CANCELLED: "soft-danger",
+const STATUS_TONES: Record<string, DxBadgeTone> = {
+  PAID: "success",
+  PARTIALLY_PAID: "warning",
+  ISSUED: "info",
+  OVERDUE: "danger",
+  DRAFT: "neutral",
+  WAIVED: "neutral",
+  VOIDED: "danger",
+  CANCELLED: "danger",
 };
 
+/** Invoice status tag on the DX kit. Unknown statuses fall back to neutral. */
 export function InvoiceStatusBadge({ status }: { status: string }) {
   const normalized = (status || "").toUpperCase();
   return (
-    <Badge variant={STATUS_VARIANTS[normalized] ?? "secondary"}>
-      {normalized.replace(/_/g, " ") || "UNKNOWN"}
-    </Badge>
+    <DxBadge tone={STATUS_TONES[normalized] ?? "neutral"} dot>
+      {normalized ? humanize(normalized) : "Unknown"}
+    </DxBadge>
   );
 }

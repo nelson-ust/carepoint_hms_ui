@@ -9,6 +9,7 @@ import {
   getMyWorklist,
   getQueueStats,
   getServicePointWorklist,
+  getMyServicePoints,
   getTicket,
   listServicePointTickets,
   listBillableServices,
@@ -104,6 +105,14 @@ export function useQueueStats(dateFrom?: string, dateTo?: string) {
 }
 
 /** Active SDPs for scope/target selects (read-only cross-feature import). */
+export function useMyServicePoints() {
+  return useQuery({
+    queryKey: ["queue", "my-service-points"],
+    queryFn: getMyServicePoints,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useActiveServicePoints() {
   return useQuery({
     queryKey: ["service-delivery-points", "active", "queue-select"],

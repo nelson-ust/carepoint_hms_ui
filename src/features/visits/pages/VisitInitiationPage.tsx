@@ -1,764 +1,555 @@
-import { PageHeader } from "@/components/layout/PageHeader";
-import { useState, useEffect, useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Search,
-  User,
-  ArrowRight,
-  Clock,
   AlertCircle,
-  ChevronRight,
-  ClipboardList,
-  Flame,
-  CheckCircle2,
+  ArrowRight,
   Building2,
-  RefreshCw,
-  FileText,
-  GitBranch,
-  CalendarClock,
   CalendarCheck,
-  Stethoscope,
-  Loader2,
+  CalendarClock,
+  CheckCircle2,
+  ClipboardList,
+  Clock,
+  Flame,
   Footprints,
+  GitBranch,
+  RefreshCw,
+  Stethoscope,
+  User,
+  X,
 } from "lucide-react";
-import { searchPatients } from "@/features/patients/api/patients.api";
-import type { Patient } from "@/features/patients/api/patients.api";
-import { initiateVisit, getServiceDeliveryPoints, getVisits } from "../api/visits.api";
-import type { ServiceDeliveryPoint } from "../api/visits.api";
-import { getVisitTemplates } from "../api/visit-flows.api";
-import type { VisitTemplate } from "../api/visit-flows.api";
 import {
-  appointmentsApi,
-  isAppointmentToday,
-  type Appointment,
-} from "@/features/appointments/api/appointments.api";
+  DxAvatar,
+  DxBadge,
+  DxButton,
+  DxChoice,
+  DxField,
+  DxForm,
+  DxGrid,
+  DxGroupBox,
+  DxMessage,
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxProps,
+  DxSearchBox,
+  DxSegmented,
+  DxSelect,
+  DxStatusBar,
+  DxStatusItem,
+  DxSteps,
+  DxTextarea,
+  ageFrom,
+  apiErrorMessage,
+  formatDate,
+  formatTime,
+  humanize,
+  type DxGridColumn,
+  type DxStepItem,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
-import { useNavigate, useLocation, Link } from "react-router-dom";
 import { routes } from "@/config/routes";
+import { searchPatients, type Patient } from "@/features/patients/api/patients.api";
+import { appointmentsApi, isAppointmentToday, type Appointment } from "@/features/appointments/api/appointments.api";
+import { getServiceDeliveryPoints, getVisits, initiateVisit, type ServiceDeliveryPoint } from "../api/visits.api";
+import { getVisitTemplates, type VisitTemplate } from "../api/visit-flows.api";
+import { sdpTypeLabel } from "../lib/clinic-flow";
 
 type Mode = "APPOINTMENT" | "WALK_IN";
+type Priority = "ROUTINE" | "URGENT" | "EMERGENCY";
 
-const PRIORITY_OPTIONS = [
-  { value: "ROUTINE", label: "Routine", color: "bg-emerald-500", icon: CheckCircle2 },
-  { value: "URGENT", label: "Urgent", color: "bg-amber-500", icon: Clock },
-  { value: "EMERGENCY", label: "Emergency", color: "bg-rose-500", icon: Flame },
+const PRIORITIES: { value: Priority; label: string; hint: string; tone: "success" | "warning" | "danger" }[] = [
+  { value: "ROUTINE", label: "Routine", hint: "Normal queue order", tone: "success" },
+  { value: "URGENT", label: "Urgent", hint: "Ahead of routine patients", tone: "warning" },
+  { value: "EMERGENCY", label: "Emergency", hint: "Fast-tracked to the front", tone: "danger" },
 ];
 
-function apptTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-}
-
+/**
+ * Visit Initiation — the front desk starts an encounter: pick up today's
+ * appointment or start a walk-in, choose priority and the care pathway, and
+ * raise the first queue ticket.
+ */
 export function VisitInitiationPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
-  const patientFromState = location.state?.patient as Patient | undefined;
+  const patientFromState = (location.state as { patient?: Patient } | null)?.patient;
 
-  // ----- Patient search -----
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Patient[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [search, setSearch] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(patientFromState ?? null);
-
-  // ----- Context -----
-  const [sdps, setSdps] = useState<ServiceDeliveryPoint[]>([]);
-  const [templates, setTemplates] = useState<VisitTemplate[]>([]);
-  const [selectedSdp, setSelectedSdp] = useState<number | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
-
-  // ----- Per-patient context -----
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loadingCtx, setLoadingCtx] = useState(false);
-  const [activeVisit, setActiveVisit] = useState<{ id: number; visit_code?: string } | null>(null);
-  const [mode, setMode] = useState<Mode>("WALK_IN");
+  const [mode, setMode] = useState<Mode | null>(null);
   const [selectedAppt, setSelectedAppt] = useState<number | null>(null);
-
-  const [priority, setPriority] = useState("ROUTINE");
+  const [selectedSdp, setSelectedSdp] = useState<string>("");
+  const [templateChoice, setTemplateChoice] = useState<number | null | "unset">("unset");
+  const [priority, setPriority] = useState<Priority>("ROUTINE");
   const [reason, setReason] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<ReactNode | null>(null);
 
-  // Load service points + templates once.
-  useEffect(() => {
-    (async () => {
-      const [sdpData, templateData] = await Promise.all([
-        getServiceDeliveryPoints().catch(() => [] as ServiceDeliveryPoint[]),
-        getVisitTemplates().catch(() => null),
-      ]);
-      const activeSdps = (Array.isArray(sdpData) ? sdpData : []).filter((s) => s.is_active !== false);
-      setSdps(activeSdps);
-      const templateItems = Array.isArray(templateData?.items) ? templateData!.items : [];
-      setTemplates(templateItems);
-      if (activeSdps.length > 0) setSelectedSdp(activeSdps[0].id);
-      if (templateItems.length > 0) setSelectedTemplate(templateItems[0].id);
-    })();
-  }, []);
+  // ---------- Reference data ----------
+  const sdpQuery = useQuery({
+    queryKey: ["service-delivery-points", "active", "visit-initiation"],
+    queryFn: () => getServiceDeliveryPoints({ limit: 200 }),
+    staleTime: 5 * 60_000,
+  });
+  const templatesQuery = useQuery({
+    queryKey: ["visit-flow-templates"],
+    queryFn: () => getVisitTemplates(),
+    staleTime: 5 * 60_000,
+  });
+  const sdps = useMemo(() => (sdpQuery.data ?? []).filter((s) => s.is_active !== false), [sdpQuery.data]);
+  const templates: VisitTemplate[] = useMemo(() => templatesQuery.data?.items ?? [], [templatesQuery.data]);
+  const defaultTemplate = useMemo(() => templates.find((t) => t.is_default) ?? templates[0] ?? null, [templates]);
+  const selectedTemplateId: number | null = templateChoice === "unset" ? (defaultTemplate?.id ?? null) : templateChoice;
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null;
 
-  // Debounced patient search (name, hospital number, phone, or id).
-  useEffect(() => {
-    if (searchQuery.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    const t = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const res = await searchPatients(searchQuery.trim());
-        setSearchResults((res as any).items ?? []);
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
+  // Starting point: the pathway's first checkpoint if a template is chosen, else a registration desk.
+  const defaultSdpId = useMemo(() => {
+    const first = [...(selectedTemplate?.associated_visit_flow_templates_steps ?? [])].sort((a, b) => a.step_order - b.step_order)[0];
+    if (first) return String(first.service_delivery_point_id);
+    const reg = sdps.find((s) => String(s.service_point_type).toUpperCase().endsWith("REGISTRATION") && s.supports_walk_in !== false);
+    return reg ? String(reg.id) : sdps[0] ? String(sdps[0].id) : "";
+  }, [selectedTemplate, sdps]);
+  const effectiveSdp = selectedSdp || defaultSdpId;
 
-  // When a patient is chosen, load today's appointments + any active visit.
-  useEffect(() => {
-    if (!selectedPatient) {
-      setAppointments([]);
-      setActiveVisit(null);
-      setSelectedAppt(null);
-      setMode("WALK_IN");
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      setLoadingCtx(true);
-      setError(null);
-      try {
-        const [apptRes, visitRes] = await Promise.all([
-          appointmentsApi.list({ patient_id: selectedPatient.id, limit: 50 }).catch(() => ({
-            items: [] as Appointment[],
-          })),
-          getVisits({ patient_id: selectedPatient.id, status: "ACTIVE" }).catch(() => ({
-            items: [] as any[],
-          })),
-        ]);
-        if (cancelled) return;
-        const todays = (apptRes.items ?? [])
-          .filter((a) => isAppointmentToday(a) && (a.status === "SCHEDULED" || a.status === "ARRIVED"))
-          .sort(
-            (a, b) =>
-              new Date(a.scheduled_start_at).getTime() - new Date(b.scheduled_start_at).getTime(),
-          );
-        setAppointments(todays);
-        const av = (visitRes.items ?? [])[0];
-        setActiveVisit(av ? { id: av.id, visit_code: av.visit_code } : null);
-        if (todays.length > 0) {
-          setMode("APPOINTMENT");
-          setSelectedAppt(todays[0].id);
-        } else {
-          setMode("WALK_IN");
-          setSelectedAppt(null);
-        }
-      } finally {
-        if (!cancelled) setLoadingCtx(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedPatient]);
+  // ---------- Patient search ----------
+  const searchQuery = useQuery({
+    queryKey: ["patients", "search", search],
+    queryFn: () => searchPatients(search, 20),
+    enabled: search.trim().length >= 2 && !selectedPatient,
+  });
+  const results: Patient[] = searchQuery.data?.items ?? [];
 
-  const selectedAppointment = useMemo(
-    () => appointments.find((a) => a.id === selectedAppt) ?? null,
-    [appointments, selectedAppt],
+  // ---------- Per-patient context ----------
+  const apptQuery = useQuery({
+    queryKey: ["appointments", "today", selectedPatient?.id],
+    queryFn: () => appointmentsApi.list({ patient_id: selectedPatient!.id, limit: 50 }),
+    enabled: !!selectedPatient,
+  });
+  const activeVisitQuery = useQuery({
+    queryKey: ["visits", "active", selectedPatient?.id],
+    queryFn: () => getVisits({ patient_id: selectedPatient!.id, status: "ACTIVE" }),
+    enabled: !!selectedPatient,
+  });
+  const todaysAppointments: Appointment[] = useMemo(
+    () =>
+      (apptQuery.data?.items ?? [])
+        .filter((a) => isAppointmentToday(a) && (a.status === "SCHEDULED" || a.status === "ARRIVED"))
+        .sort((a, b) => new Date(a.scheduled_start_at).getTime() - new Date(b.scheduled_start_at).getTime()),
+    [apptQuery.data],
+  );
+  const activeVisit = activeVisitQuery.data?.items?.[0] ?? null;
+  const loadingCtx = apptQuery.isLoading || activeVisitQuery.isLoading;
+
+  const effectiveMode: Mode = mode ?? (todaysAppointments.length > 0 ? "APPOINTMENT" : "WALK_IN");
+  const effectiveAppt = selectedAppt ?? todaysAppointments[0]?.id ?? null;
+  const selectedAppointment = todaysAppointments.find((a) => a.id === effectiveAppt) ?? null;
+
+  const pathwayPreview: DxStepItem[] = useMemo(
+    () =>
+      [...(selectedTemplate?.associated_visit_flow_templates_steps ?? [])]
+        .sort((a, b) => a.step_order - b.step_order)
+        .map((s, i) => ({
+          key: s.id,
+          label: s.service_delivery_point_name ?? s.service_delivery_point?.name ?? `Step ${s.step_order}`,
+          sub: s.is_required === false ? "optional" : undefined,
+          status: i === 0 ? "current" : "pending",
+        })),
+    [selectedTemplate],
   );
 
-  const canSubmit =
-    !!selectedPatient &&
-    !activeVisit &&
-    !isSubmitting &&
-    (mode === "APPOINTMENT" ? !!selectedAppt : !!selectedSdp);
-
+  const choosePatient = (p: Patient) => {
+    setSelectedPatient(p);
+    setMode(null);
+    setSelectedAppt(null);
+    setError(null);
+  };
   const resetPatient = () => {
     setSelectedPatient(null);
-    setSearchQuery("");
-    setSearchResults([]);
+    setSearch("");
+    setMode(null);
+    setSelectedAppt(null);
     setError(null);
   };
 
-  const handleInitiate = async () => {
-    if (!selectedPatient) {
-      setError("Select a patient first.");
-      return;
-    }
-    if (activeVisit) {
-      setError("This patient already has an active visit.");
-      return;
-    }
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      let visitId: number | undefined;
-      let code: string | undefined;
-
-      if (mode === "APPOINTMENT" && selectedAppt) {
-        // Patient with a same-day appointment has presented → check them in and
-        // start the visit at the appointment's service point in one step.
-        const res = await appointmentsApi.checkIn(selectedAppt, {
+  // ---------- Submit ----------
+  const initiate = useMutation({
+    mutationFn: async () => {
+      if (!selectedPatient) throw new Error("Select a patient first.");
+      if (activeVisit) throw new Error("This patient already has an active visit.");
+      if (effectiveMode === "APPOINTMENT" && effectiveAppt) {
+        const res = await appointmentsApi.checkIn(effectiveAppt, {
           initiate_visit: true,
           use_appointment_service_point: true,
           visit_reason: reason.trim() || undefined,
           fast_track: priority === "EMERGENCY",
-          visit_flow_template_id: selectedTemplate ?? undefined,
+          visit_flow_template_id: selectedTemplateId ?? undefined,
         });
-        visitId = res.visit_id ?? undefined;
-        code = res.visit_code ?? undefined;
-      } else {
-        if (!selectedSdp) {
-          setError("Pick a starting service point.");
-          setIsSubmitting(false);
-          return;
-        }
-        const now = new Date().toISOString();
-        const res = await initiateVisit({
-          patient_id: selectedPatient.id,
-          priority,
-          first_service_delivery_point_id: selectedSdp,
-          use_appointment_service_point: false,
-          visit_date: now,
-          check_in_time: now,
-          create_first_flow_step: true,
-          create_queue_ticket: true,
-          first_step_status: "PENDING",
-          first_queue_status: "WAITING",
-          mark_visit_waiting: true,
-          fast_track: priority === "EMERGENCY",
-          queue_position: 1,
-          visit_reason: reason.trim() || undefined,
-          visit_flow_template_id: selectedTemplate ?? undefined,
-        });
-        visitId = res.visit?.id;
-        code = res.visit?.visit_code;
+        return { visitId: res.visit_id ?? undefined, code: res.visit_code ?? undefined };
       }
-
-      toast.success(
-        "Visit initiated",
-        code ? `Visit ${code} started for ${selectedPatient.first_name}.` : "The visit has started.",
-      );
-      if (visitId) navigate(routes.visitDetail.replace(":visitId", String(visitId)));
-      else navigate(routes.visits);
-    } catch (err: any) {
-      const data = err?.response?.data;
-      let message: string =
-        (typeof data?.message === "string" && data.message) ||
-        (typeof data?.detail === "string" && data.detail) ||
-        (Array.isArray(data?.detail) &&
-          data.detail
-            .map((d: any) => `${d.loc?.join(".") ?? "field"}: ${d.msg ?? "invalid"}`)
-            .join(" · ")) ||
-        "Visit initiation failed. Please try again.";
-
+      if (!effectiveSdp) throw new Error("Pick a starting service point.");
+      const now = new Date().toISOString();
+      const res = await initiateVisit({
+        patient_id: selectedPatient.id,
+        priority,
+        first_service_delivery_point_id: Number(effectiveSdp),
+        use_appointment_service_point: false,
+        visit_date: now,
+        check_in_time: now,
+        create_first_flow_step: true,
+        create_queue_ticket: true,
+        first_step_status: "PENDING",
+        first_queue_status: "WAITING",
+        mark_visit_waiting: true,
+        fast_track: priority === "EMERGENCY",
+        queue_position: 1,
+        visit_reason: reason.trim() || undefined,
+        visit_flow_template_id: selectedTemplateId ?? undefined,
+      });
+      return { visitId: res.visit?.id, code: res.visit?.visit_code };
+    },
+    onSuccess: ({ visitId, code }) => {
+      toast.success("Visit initiated", code ? `Visit ${code} started for ${selectedPatient?.first_name}. A queue ticket has been raised.` : "The visit has started.");
+      navigate(visitId ? routes.visitDetail.replace(":visitId", String(visitId)) : routes.visits);
+    },
+    onError: async (err: unknown) => {
+      const message = err instanceof Error && !("response" in err) ? err.message : apiErrorMessage(err, "Visit initiation failed. Please try again.");
       if (message.toLowerCase().includes("already has an active visit") && selectedPatient) {
-        try {
-          const visits = await getVisits({ patient_id: selectedPatient.id, status: "ACTIVE" });
-          const active = visits.items?.[0];
-          if (active) {
-            setActiveVisit({ id: active.id, visit_code: active.visit_code });
-            setError(
-              <span>
-                {message}{" "}
-                <Link
-                  to={routes.visitDetail.replace(":visitId", String(active.id))}
-                  className="ml-1 font-black underline hover:text-rose-700"
-                >
-                  View active visit {active.visit_code}
-                </Link>
-              </span>,
-            );
-            return;
-          }
-        } catch {
-          /* fall through to plain message */
+        const visits = await getVisits({ patient_id: selectedPatient.id, status: "ACTIVE" }).catch(() => null);
+        const active = visits?.items?.[0];
+        if (active) {
+          setError(
+            <span>
+              {message}{" "}
+              <Link to={routes.visitDetail.replace(":visitId", String(active.id))} className="dx-link font-semibold">
+                Open visit {active.visit_code}
+              </Link>
+            </span>,
+          );
+          return;
         }
       }
       setError(message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    },
+  });
 
-  return (
-    <div className="mx-auto max-w-7xl space-y-8 animate-fade-in pb-20">
-      <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
-        <PageHeader
-          title="Start a Patient Visit"
-          description="Find the patient, pick up their appointment for today or start a walk-in, and route them into care."
-        />
-        <button onClick={() => navigate(-1)} className="btn-secondary rounded-2xl px-6 py-3">
-          Cancel
-        </button>
-      </div>
+  const canSubmit =
+    !!selectedPatient && !activeVisit && !initiate.isPending && (effectiveMode === "APPOINTMENT" ? !!effectiveAppt : !!effectiveSdp);
 
-      <div className="grid gap-8 lg:grid-cols-12">
-        {/* ---------- Left: patient ---------- */}
-        <div className="lg:col-span-4">
-          <div className="glass-card flex min-h-[560px] flex-col rounded-[2.5rem] border border-secondary-400 bg-white/50 p-8 shadow-premium backdrop-blur-xl">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg">
-                <User className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="font-display text-xl font-black tracking-tight">Patient</h3>
-                <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                  Who is presenting?
-                </p>
-              </div>
-            </div>
-
-            {!selectedPatient ? (
-              <div className="flex-1 space-y-5">
-                <div className="group relative">
-                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400 transition-colors group-focus-within:text-primary-500" />
-                  <input
-                    type="text"
-                    autoFocus
-                    placeholder="Search name, hospital number, phone, or ID…"
-                    className="input-field h-14 border-secondary-400 bg-white/80 pl-12 text-sm"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-
-                <div className="custom-scrollbar max-h-[430px] space-y-3 overflow-y-auto pr-1">
-                  {isSearching ? (
-                    <div className="flex flex-col items-center justify-center gap-3 py-16">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-secondary-400">
-                        Searching…
-                      </p>
-                    </div>
-                  ) : searchResults.length > 0 ? (
-                    searchResults.map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => setSelectedPatient(p)}
-                        className="group flex w-full items-center justify-between rounded-[1.5rem] border border-secondary-100 bg-white p-4 transition-all hover:border-primary-200 hover:shadow-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary-50 text-sm font-black text-secondary-600 transition-all group-hover:bg-primary-500 group-hover:text-white">
-                            {p.first_name?.[0]}
-                            {p.last_name?.[0]}
-                          </div>
-                          <div className="text-left">
-                            <p className="text-sm font-black text-secondary-900 group-hover:text-primary-600">
-                              {p.first_name} {p.last_name}
-                            </p>
-                            <p className="mt-0.5 font-mono text-[10px] font-bold uppercase text-secondary-400">
-                              {p.hospital_number}
-                              {p.phone_number ? ` · ${p.phone_number}` : ""}
-                            </p>
-                          </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-secondary-300 transition-all group-hover:translate-x-1 group-hover:text-primary-500" />
-                      </button>
-                    ))
-                  ) : searchQuery.trim().length >= 2 ? (
-                    <div className="py-16 text-center">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-secondary-300">
-                        No patients match “{searchQuery.trim()}”
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="py-16 text-center">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-secondary-300">
-                        Type at least 2 characters to search
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 animate-slide-up space-y-6">
-                <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-7 text-white shadow-2xl">
-                  <div className="absolute right-0 top-0 h-32 w-32 -translate-y-1/2 translate-x-1/2 rounded-full bg-primary-500/20 blur-3xl" />
-                  <button
-                    onClick={resetPatient}
-                    className="absolute right-5 top-5 rounded-2xl bg-white/10 p-2.5 transition-all hover:bg-white/20"
-                    title="Choose a different patient"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </button>
-                  <div className="flex flex-col items-center gap-5 text-center">
-                    <div className="flex h-20 w-20 items-center justify-center rounded-[2rem] bg-gradient-to-br from-primary-400 to-primary-600 text-2xl font-black shadow-2xl">
-                      {selectedPatient.first_name?.[0]}
-                      {selectedPatient.last_name?.[0]}
-                    </div>
-                    <div>
-                      <h4 className="text-xl font-black tracking-tight">
-                        {selectedPatient.first_name} {selectedPatient.last_name}
-                      </h4>
-                      <div className="mt-2 inline-flex rounded-full bg-white/10 px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest">
-                        {selectedPatient.hospital_number}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-7 space-y-3">
-                    <div className="flex items-center justify-between rounded-2xl bg-white/5 p-4">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">
-                        Gender
-                      </span>
-                      <span className="text-xs font-black uppercase">{selectedPatient.gender || "—"}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-2xl bg-white/5 p-4">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">
-                        Date of birth
-                      </span>
-                      <span className="text-xs font-black">{selectedPatient.date_of_birth || "—"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Today's appointment / active-visit signals */}
-                {loadingCtx ? (
-                  <div className="flex items-center gap-2 rounded-2xl border border-secondary-200 px-4 py-3 text-xs font-bold text-secondary-400">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Checking appointments…
-                  </div>
-                ) : activeVisit ? (
-                  <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-                    <p className="text-xs font-bold text-amber-700">
-                      Already has an active visit.{" "}
-                      <Link
-                        to={routes.visitDetail.replace(":visitId", String(activeVisit.id))}
-                        className="underline"
-                      >
-                        Open {activeVisit.visit_code}
-                      </Link>
-                    </p>
-                  </div>
-                ) : appointments.length > 0 ? (
-                  <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700">
-                    <CalendarCheck className="h-4 w-4" />
-                    {appointments.length} appointment{appointments.length > 1 ? "s" : ""} scheduled today
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 rounded-2xl border border-secondary-200 px-4 py-3 text-xs font-bold text-secondary-400">
-                    <Footprints className="h-4 w-4" /> No appointment today — walk-in
-                  </div>
-                )}
-              </div>
-            )}
+  // ---------- Grids ----------
+  const resultColumns: DxGridColumn<Patient>[] = [
+    { key: "hospital_number", header: "Hospital no.", width: 120, render: (p) => <span className="dx-mono font-semibold">{p.hospital_number}</span> },
+    {
+      key: "name",
+      header: "Patient",
+      render: (p) => (
+        <div className="min-w-0">
+          <div className="dx-row-primary truncate">
+            {p.first_name} {p.last_name}
+          </div>
+          <div className="dx-row-secondary">
+            {humanize(p.gender)} · {ageFrom(p.date_of_birth)}
+            {p.phone_number ? ` · ${p.phone_number}` : ""}
           </div>
         </div>
+      ),
+    },
+    { key: "payer", header: "Payer", width: 100, render: (p) => <DxBadge tone="outline">{humanize(p.patient_class ?? p.payer_type)}</DxBadge> },
+    { key: "pick", header: "", width: 90, align: "right", render: () => <DxButton size="sm" variant="accent-text" rightIcon={<ArrowRight />}>Select</DxButton> },
+  ];
 
-        {/* ---------- Right: encounter setup ---------- */}
-        <div className="lg:col-span-8 space-y-6">
-          {error && (
-            <div className="flex items-center gap-4 rounded-[2rem] border border-rose-100 bg-rose-50 p-6 text-rose-600 shadow-sm">
-              <AlertCircle className="h-7 w-7 shrink-0" />
+  return (
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Patients", to: routes.patients }, { label: "Visit initiation" }]}
+        title="Start a patient visit"
+        subtitle="Find the patient, pick up today's appointment or start a walk-in, set priority and pathway, then raise the first queue ticket."
+        actions={
+          <DxButton leftIcon={<X />} onClick={() => navigate(-1)}>
+            Cancel
+          </DxButton>
+        }
+      />
+
+      <div className="grid gap-4 xl:grid-cols-12">
+        {/* ---------- Patient ---------- */}
+        <div className="space-y-4 xl:col-span-4">
+          <DxPanel
+            title="Patient"
+            icon={<User />}
+            description={selectedPatient ? "Who is presenting" : "Search the registry"}
+            flush={!selectedPatient}
+            actions={
+              selectedPatient ? (
+                <DxButton size="sm" variant="text" leftIcon={<RefreshCw />} onClick={resetPatient}>
+                  Change
+                </DxButton>
+              ) : null
+            }
+          >
+            {!selectedPatient ? (
               <div>
-                <p className="text-base font-black tracking-tight">Couldn’t start the visit</p>
-                <p className="text-sm font-medium text-rose-500/90">{error}</p>
-              </div>
-            </div>
-          )}
-
-          {!selectedPatient ? (
-            <div className="glass-card flex min-h-[560px] flex-col items-center justify-center gap-4 rounded-[3rem] border border-dashed border-secondary-300 bg-white/40 p-14 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-[1.75rem] bg-secondary-100 text-secondary-400">
-                <ClipboardList className="h-8 w-8" />
-              </div>
-              <div>
-                <h3 className="font-display text-2xl font-black tracking-tight text-secondary-900">
-                  Select a patient to begin
-                </h3>
-                <p className="mx-auto mt-2 max-w-md text-sm text-secondary-400">
-                  Search on the left. If they have an appointment today, you’ll be able to check them
-                  in and start the visit in one step.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="glass-card space-y-10 overflow-hidden rounded-[3rem] bg-white/80 p-8 shadow-premium md:p-12">
-              <div className="flex items-center gap-5 border-b border-secondary-400 pb-8">
-                <div className="flex h-14 w-14 items-center justify-center rounded-[1.5rem] bg-primary-600 text-white shadow-xl">
-                  <ClipboardList className="h-7 w-7" />
+                <div className="border-b border-[var(--dx-border)] p-2">
+                  <DxSearchBox onSearch={setSearch} placeholder="Name, hospital number, phone or ID…" autoFocus />
                 </div>
-                <div>
-                  <h3 className="font-display text-2xl font-black tracking-tight text-secondary-900">
-                    Encounter Setup
-                  </h3>
-                  <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.3em] text-secondary-400">
-                    How is this patient starting?
-                  </p>
-                </div>
-              </div>
-
-              {/* Mode toggle */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => appointments.length > 0 && setMode("APPOINTMENT")}
-                  disabled={appointments.length === 0}
-                  className={`flex items-center gap-3 rounded-[1.5rem] border-2 p-5 text-left transition-all ${
-                    mode === "APPOINTMENT"
-                      ? "border-primary-600 bg-primary-50 text-primary-700"
-                      : "border-secondary-300 text-secondary-500 hover:border-primary-200"
-                  } ${appointments.length === 0 ? "cursor-not-allowed opacity-40" : ""}`}
-                >
-                  <CalendarClock className="h-6 w-6 shrink-0" />
-                  <div>
-                    <p className="text-sm font-black">From appointment</p>
-                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">
-                      {appointments.length > 0
-                        ? `${appointments.length} today`
-                        : "None today"}
-                    </p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode("WALK_IN")}
-                  className={`flex items-center gap-3 rounded-[1.5rem] border-2 p-5 text-left transition-all ${
-                    mode === "WALK_IN"
-                      ? "border-primary-600 bg-primary-50 text-primary-700"
-                      : "border-secondary-300 text-secondary-500 hover:border-primary-200"
-                  }`}
-                >
-                  <Footprints className="h-6 w-6 shrink-0" />
-                  <div>
-                    <p className="text-sm font-black">Walk-in</p>
-                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">
-                      No appointment
-                    </p>
-                  </div>
-                </button>
-              </div>
-
-              {/* Appointment picker */}
-              {mode === "APPOINTMENT" && (
-                <div className="space-y-4">
-                  <label className="ml-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-secondary-500">
-                    <CalendarClock className="h-4 w-4 text-primary-500" />
-                    Today’s Appointment
-                  </label>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {appointments.map((a) => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        onClick={() => setSelectedAppt(a.id)}
-                        aria-pressed={selectedAppt === a.id}
-                        className={`rounded-[1.5rem] border-2 p-5 text-left transition-all ${
-                          selectedAppt === a.id
-                            ? "border-primary-500 bg-primary-600 text-white shadow-xl shadow-primary-500/30 ring-2 ring-primary-400/40"
-                            : "border-secondary-300 bg-white text-secondary-700 hover:border-primary-300 hover:bg-primary-50/40"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1.5 text-sm font-black">
-                            <Clock className="h-3.5 w-3.5" />
-                            {apptTime(a.scheduled_start_at)}
-                          </span>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
-                              selectedAppt === a.id ? "bg-white/15" : "bg-secondary-100 text-secondary-500"
-                            }`}
-                          >
-                            {a.status}
-                          </span>
-                        </div>
-                        <p
-                          className={`mt-2 flex items-center gap-1.5 text-xs font-bold ${
-                            selectedAppt === a.id ? "text-white/80" : "text-secondary-500"
-                          }`}
-                        >
-                          <Building2 className="h-3.5 w-3.5" />
-                          {a.service_delivery_point_name || "Service point from appointment"}
-                        </p>
-                        {a.staff_name ? (
-                          <p
-                            className={`mt-1 flex items-center gap-1.5 text-[11px] ${
-                              selectedAppt === a.id ? "text-white/60" : "text-secondary-400"
-                            }`}
-                          >
-                            <Stethoscope className="h-3 w-3" />
-                            {a.staff_name}
-                          </p>
-                        ) : null}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="ml-1 text-[11px] font-medium text-secondary-400">
-                    Starting the visit checks the patient in as{" "}
-                    <span className="font-bold">Arrived</span> and routes them to the appointment’s
-                    service point.
-                  </p>
-                </div>
-              )}
-
-              {/* Walk-in routing */}
-              {mode === "WALK_IN" && (
-                <div className="space-y-4">
-                  <label className="ml-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-secondary-500">
-                    <Building2 className="h-4 w-4 text-primary-500" />
-                    Starting Service Point
-                  </label>
-                  <select
-                    value={selectedSdp || ""}
-                    onChange={(e) => setSelectedSdp(Number(e.target.value))}
-                    className="input-field h-14 border-secondary-400 bg-white/60 pl-5 text-sm font-bold"
-                  >
-                    <option value="" disabled>
-                      Select where the patient starts…
-                    </option>
-                    {sdps.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Priority */}
-              <div className="space-y-4">
-                <label className="ml-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-secondary-500">
-                  <Flame className="h-4 w-4 text-amber-500" />
-                  Priority
-                </label>
-                <div className="flex gap-3">
-                  {PRIORITY_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setPriority(opt.value)}
-                      className={`flex flex-1 flex-col items-center gap-2 rounded-[1.5rem] border-2 px-4 py-5 transition-all ${
-                        priority === opt.value
-                          ? `${opt.color} border-transparent text-white shadow-xl`
-                          : "border-secondary-400 bg-white text-secondary-400 hover:border-primary-200"
-                      }`}
-                    >
-                      <opt.icon
-                        className={`h-5 w-5 ${priority === opt.value ? "text-white" : "text-secondary-300"}`}
-                      />
-                      <span className="text-[10px] font-black uppercase tracking-widest">{opt.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Template (both modes) */}
-              <div className="space-y-4">
-                <label className="ml-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-secondary-500">
-                  <GitBranch className="h-4 w-4 text-primary-500" />
-                  Care Pathway (optional)
-                </label>
-                <p className="ml-1 -mt-2 text-xs text-secondary-400">
-                  A pathway routes the patient through a preset sequence of service points and sets
-                  the starting point. Choose <span className="font-semibold">No template</span> to route
-                  manually{mode === "APPOINTMENT" ? " from the appointment's service point" : ""}.
-                </p>
-                {templates.length === 0 && (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700">
-                    No care pathways are configured yet. An administrator can create one under
-                    Visit Flow Management, or the standard outpatient pathway will be set up
-                    automatically once service points exist.
-                  </div>
-                )}
-                <div className="grid gap-3 md:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedTemplate(null)}
-                    aria-pressed={selectedTemplate === null}
-                    className={`relative rounded-[1.5rem] border-2 p-5 text-left transition-all ${
-                      selectedTemplate === null
-                        ? "border-primary-500 bg-primary-600 text-white shadow-xl shadow-primary-500/30 ring-2 ring-primary-400/40"
-                        : "border-secondary-400 bg-white text-secondary-600 hover:border-primary-300 hover:bg-primary-50/40"
-                    }`}
-                  >
-                    {selectedTemplate === null && (
-                      <CheckCircle2 className="absolute right-4 top-4 h-5 w-5 text-white" />
-                    )}
-                    <h5 className="text-sm font-black">No template</h5>
-                    <p
-                      className={`text-[10px] font-bold uppercase tracking-widest ${
-                        selectedTemplate === null ? "text-white/60" : "text-secondary-400"
-                      }`}
-                    >
-                      Route manually
-                    </p>
-                  </button>
-                  {templates.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setSelectedTemplate(t.id)}
-                      aria-pressed={selectedTemplate === t.id}
-                      className={`relative rounded-[1.5rem] border-2 p-5 text-left transition-all ${
-                        selectedTemplate === t.id
-                          ? "border-primary-500 bg-primary-600 text-white shadow-xl shadow-primary-500/30 ring-2 ring-primary-400/40"
-                          : "border-secondary-400 bg-white text-secondary-600 hover:border-primary-300 hover:bg-primary-50/40"
-                      }`}
-                    >
-                      {selectedTemplate === t.id && (
-                        <CheckCircle2 className="absolute right-4 top-4 h-5 w-5 text-white" />
-                      )}
-                      <h5 className="text-sm font-black pr-7">{t.name}</h5>
-                      <p
-                        className={`text-[10px] font-bold uppercase tracking-widest ${
-                          selectedTemplate === t.id ? "text-white/60" : "text-secondary-400"
-                        }`}
-                      >
-                        {Array.isArray(t.associated_visit_flow_templates_steps)
-                          ? t.associated_visit_flow_templates_steps.length
-                          : 0}{" "}
-                        checkpoints
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Reason */}
-              <div className="space-y-4">
-                <label className="ml-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-secondary-500">
-                  <FileText className="h-4 w-4 text-emerald-500" />
-                  Reason / Chief Complaint (optional)
-                </label>
-                <textarea
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  rows={3}
-                  className="input-field resize-none border-secondary-400 bg-white px-6 py-4 text-sm"
-                  placeholder="Why is the patient here today?"
+                <DxGrid
+                  columns={resultColumns}
+                  data={search.trim().length >= 2 ? results : []}
+                  rowKey={(p) => p.id}
+                  isLoading={searchQuery.isLoading && search.trim().length >= 2}
+                  error={searchQuery.isError ? apiErrorMessage(searchQuery.error, "Search failed.") : null}
+                  onRetry={() => searchQuery.refetch()}
+                  onRowClick={choosePatient}
+                  borderless
+                  striped={false}
+                  verticalLines={false}
+                  maxHeight={440}
+                  empty={{
+                    icon: User,
+                    title: search.trim().length >= 2 ? `No patients match “${search.trim()}”` : "Type at least 2 characters",
+                    description:
+                      search.trim().length >= 2 ? (
+                        <Link to={routes.patientRegister} className="dx-link">
+                          Register a new patient
+                        </Link>
+                      ) : (
+                        "Search by name, hospital number or phone."
+                      ),
+                  }}
                 />
               </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <DxAvatar name={`${selectedPatient.first_name} ${selectedPatient.last_name}`} size="lg" />
+                  <div className="min-w-0">
+                    <p className="truncate text-[15px] font-semibold">
+                      {selectedPatient.first_name} {selectedPatient.last_name}
+                    </p>
+                    <p className="dx-mono dx-muted text-[12px]">{selectedPatient.hospital_number}</p>
+                  </div>
+                </div>
+                <DxProps
+                  tight
+                  items={[
+                    { label: "Gender", value: humanize(selectedPatient.gender) },
+                    { label: "Date of birth", value: `${formatDate(selectedPatient.date_of_birth)} · ${ageFrom(selectedPatient.date_of_birth)}` },
+                    { label: "Phone", value: <span className="dx-mono">{selectedPatient.phone_number || "—"}</span> },
+                    { label: "Payer", value: <DxBadge tone="outline">{humanize(selectedPatient.patient_class ?? selectedPatient.payer_type)}</DxBadge> },
+                    { label: "Address", value: [selectedPatient.city, selectedPatient.state].filter(Boolean).join(", ") || "—" },
+                  ]}
+                />
 
-              {/* Submit */}
-              <div className="flex flex-col items-center justify-between gap-6 border-t border-secondary-400 pt-8 md:flex-row">
-                <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-secondary-400">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  {mode === "APPOINTMENT" && selectedAppointment
-                    ? `Appointment at ${apptTime(selectedAppointment.scheduled_start_at)}`
-                    : "Walk-in encounter"}
-                </p>
-                <button
-                  onClick={handleInitiate}
-                  disabled={!canSubmit}
-                  className="group flex w-full items-center justify-center gap-4 rounded-[1.75rem] bg-slate-900 px-12 py-5 text-base font-black tracking-tight text-white shadow-2xl transition-all hover:bg-black active:scale-95 disabled:opacity-30 md:w-auto"
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  ) : (
-                    <>
-                      <span>
-                        {mode === "APPOINTMENT" ? "Check In & Start Visit" : "Start Visit"}
-                      </span>
-                      <ArrowRight className="h-6 w-6 transition-transform group-hover:translate-x-1" />
-                    </>
-                  )}
-                </button>
+                {loadingCtx ? (
+                  <div className="dx-skeleton h-9" />
+                ) : activeVisit ? (
+                  <DxMessage tone="warning" title="Already has an active visit">
+                    <Link to={routes.visitDetail.replace(":visitId", String(activeVisit.id))} className="dx-link font-semibold">
+                      Open {activeVisit.visit_code}
+                    </Link>
+                  </DxMessage>
+                ) : todaysAppointments.length > 0 ? (
+                  <DxMessage tone="success">
+                    <span className="inline-flex items-center gap-1.5">
+                      <CalendarCheck className="h-3.5 w-3.5" aria-hidden />
+                      {todaysAppointments.length} appointment{todaysAppointments.length > 1 ? "s" : ""} scheduled today
+                    </span>
+                  </DxMessage>
+                ) : (
+                  <DxMessage tone="info">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Footprints className="h-3.5 w-3.5" aria-hidden />
+                      No appointment today — walk-in encounter
+                    </span>
+                  </DxMessage>
+                )}
+                <Link to={routes.patientDetail.replace(":patientId", String(selectedPatient.id))} className="dx-link text-[12px]">
+                  View full patient record →
+                </Link>
               </div>
-            </div>
+            )}
+          </DxPanel>
+        </div>
+
+        {/* ---------- Encounter setup ---------- */}
+        <div className="space-y-4 xl:col-span-8">
+          {error ? (
+            <DxMessage tone="danger" title="Couldn't start the visit">
+              {error}
+            </DxMessage>
+          ) : null}
+
+          {!selectedPatient ? (
+            <DxPanel title="Encounter setup" icon={<ClipboardList />}>
+              <div className="dx-grid-state py-16">
+                <ClipboardList aria-hidden />
+                <p className="dx-grid-state-title">Select a patient to begin</p>
+                <p>If they have an appointment today you can check them in and start the visit in one step.</p>
+              </div>
+            </DxPanel>
+          ) : (
+            <DxPanel
+              title="Encounter setup"
+              icon={<ClipboardList />}
+              description="How is this patient starting?"
+              footer={
+                <>
+                  <span className="mr-auto inline-flex items-center gap-1.5 text-[12px] text-[var(--dx-text-muted)]">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[var(--dx-success)]" aria-hidden />
+                    {effectiveMode === "APPOINTMENT" && selectedAppointment
+                      ? `Appointment at ${formatTime(selectedAppointment.scheduled_start_at)} · ${selectedAppointment.service_delivery_point_name ?? "appointment's service point"}`
+                      : `Walk-in · starts at ${sdps.find((s) => String(s.id) === effectiveSdp)?.name ?? "—"}`}
+                  </span>
+                  <DxButton variant="primary" size="lg" rightIcon={<ArrowRight />} disabled={!canSubmit} isLoading={initiate.isPending} onClick={() => initiate.mutate()}>
+                    {effectiveMode === "APPOINTMENT" ? "Check in & start visit" : "Start visit"}
+                  </DxButton>
+                </>
+              }
+            >
+              <div className="space-y-5">
+                <DxGroupBox caption="Encounter type">
+                  <DxSegmented<Mode>
+                    value={effectiveMode}
+                    onChange={setMode}
+                    items={[
+                      { key: "APPOINTMENT", label: `From appointment${todaysAppointments.length ? ` (${todaysAppointments.length} today)` : ""}`, icon: <CalendarClock />, disabled: todaysAppointments.length === 0 },
+                      { key: "WALK_IN", label: "Walk-in", icon: <Footprints /> },
+                    ]}
+                  />
+
+                  {effectiveMode === "APPOINTMENT" ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="dx-caption">Today's appointment</p>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {todaysAppointments.map((a) => (
+                          <DxChoice
+                            key={a.id}
+                            selected={effectiveAppt === a.id}
+                            onClick={() => setSelectedAppt(a.id)}
+                            icon={<Clock />}
+                            title={
+                              <span className="inline-flex items-center gap-2">
+                                {formatTime(a.scheduled_start_at)}
+                                <DxBadge tone="outline">{humanize(a.status)}</DxBadge>
+                              </span>
+                            }
+                            subtitle={
+                              <span className="inline-flex flex-wrap items-center gap-x-2">
+                                <span className="inline-flex items-center gap-1">
+                                  <Building2 className="h-3 w-3" aria-hidden />
+                                  {a.service_delivery_point_name || "Service point from appointment"}
+                                </span>
+                                {a.staff_name ? (
+                                  <span className="inline-flex items-center gap-1">
+                                    <Stethoscope className="h-3 w-3" aria-hidden />
+                                    {a.staff_name}
+                                  </span>
+                                ) : null}
+                              </span>
+                            }
+                          />
+                        ))}
+                      </div>
+                      <p className="dx-field-hint">
+                        Starting the visit checks the patient in as <b>Arrived</b> and routes them to the appointment's service point.
+                      </p>
+                    </div>
+                  ) : (
+                    <DxForm cols={2} className="mt-3">
+                      <DxSelect
+                        label="Starting service point"
+                        required
+                        value={effectiveSdp}
+                        onChange={(e) => setSelectedSdp(e.target.value)}
+                        placeholder={sdpQuery.isLoading ? "Loading…" : "Select where the patient starts…"}
+                        options={sdps.map((s: ServiceDeliveryPoint) => ({ value: String(s.id), label: `${s.name} (${s.code}) — ${sdpTypeLabel(s.service_point_type)}` }))}
+                        hint={selectedTemplate ? "Defaults to the pathway's first checkpoint." : undefined}
+                      />
+                    </DxForm>
+                  )}
+                </DxGroupBox>
+
+                <DxGroupBox caption="Priority">
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {PRIORITIES.map((p) => (
+                      <DxChoice
+                        key={p.value}
+                        selected={priority === p.value}
+                        onClick={() => setPriority(p.value)}
+                        icon={<Flame />}
+                        title={
+                          <span className="inline-flex items-center gap-2">
+                            {p.label}
+                            <DxBadge tone={p.tone} dot>
+                              {p.value === "ROUTINE" ? "P0" : p.value === "URGENT" ? "P1" : "P2"}
+                            </DxBadge>
+                          </span>
+                        }
+                        subtitle={p.hint}
+                      />
+                    ))}
+                  </div>
+                </DxGroupBox>
+
+                <DxGroupBox caption="Care pathway">
+                  {templates.length === 0 && !templatesQuery.isLoading ? (
+                    <DxMessage tone="warning" className="mb-3">
+                      No care pathways are configured yet. An administrator can create one under{" "}
+                      <Link to={routes.visitFlows} className="dx-link">
+                        Visit Flow Management
+                      </Link>
+                      ; the patient will be routed manually.
+                    </DxMessage>
+                  ) : null}
+                  <DxForm cols={2}>
+                    <DxSelect
+                      label="Pathway template"
+                      value={selectedTemplateId == null ? "" : String(selectedTemplateId)}
+                      onChange={(e) => {
+                        setTemplateChoice(e.target.value ? Number(e.target.value) : null);
+                        setSelectedSdp("");
+                      }}
+                      options={[
+                        { value: "", label: "No template — route manually" },
+                        ...templates.map((t) => ({
+                          value: String(t.id),
+                          label: `${t.name}${t.is_default ? " (default)" : ""} · ${t.associated_visit_flow_templates_steps?.length ?? 0} checkpoints`,
+                        })),
+                      ]}
+                      hint="A pathway routes the patient through a preset sequence of service points; each stop raises a queue ticket."
+                    />
+                    <DxField label="Checkpoints">
+                      {pathwayPreview.length ? (
+                        <div className="rounded border border-[var(--dx-border)] bg-[var(--dx-surface-alt)] px-1 py-0.5">
+                          <DxSteps items={pathwayPreview} />
+                        </div>
+                      ) : (
+                        <div className="dx-editor dx-editor-trigger text-[var(--dx-text-faint)]">
+                          <GitBranch className="mr-2 h-3.5 w-3.5" aria-hidden /> Manual routing at each desk
+                        </div>
+                      )}
+                    </DxField>
+                  </DxForm>
+                </DxGroupBox>
+
+                <DxTextarea
+                  label="Reason / chief complaint"
+                  placeholder="Why is the patient here today?"
+                  rows={2}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              </div>
+            </DxPanel>
           )}
         </div>
       </div>
-    </div>
+
+      <DxStatusBar>
+        <DxStatusItem icon={<AlertCircle />}>
+          Emergency priority fast-tracks the ticket to the front of every queue.
+        </DxStatusItem>
+        <span className="ml-auto">{templates.length ? `${templates.length} pathway template${templates.length === 1 ? "" : "s"} available` : "No pathway templates configured"}</span>
+      </DxStatusBar>
+    </DxPage>
   );
 }

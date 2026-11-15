@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { UIProvider } from "./UIProvider";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { ToastProvider } from "@/components/feedback/ToastProvider";
+import { ConnectivityProvider } from "@/lib/connectivity/ConnectivityProvider";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,7 +29,9 @@ export function AppProviders() {
         <UIProvider>
           <ThemeProvider onPersist={persistThemePreference}>
             <ToastProvider>
-              <AppRouter />
+              <ConnectivityProvider>
+                <AppRouter />
+              </ConnectivityProvider>
             </ToastProvider>
           </ThemeProvider>
         </UIProvider>

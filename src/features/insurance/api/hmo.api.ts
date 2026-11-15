@@ -42,10 +42,30 @@ export type HmoTariff = {
 
 export type Enrollee = {
   id: number; patient_id: number; patient_name?: string | null;
+  hospital_number?: string | null;
+  insurance_provider_id?: number | null; provider_name?: string | null;
   policy_number: string; member_id?: string | null;
   plan_id?: number | null; plan_name?: string | null;
+  plan_tier?: string | null; coverage_type?: string | null;
+  /** Coverage terms from the linked plan (null when no plan is linked). */
+  coverage_percent?: number | null; copay_percent?: number | null; copay_flat?: number | null;
+  annual_limit?: number | null; per_visit_limit?: number | null; requires_referral?: boolean;
   policy_status: string; verification_status: string;
-  valid_to?: string | null; is_primary: boolean;
+  last_verified_at?: string | null;
+  valid_from?: string | null; valid_to?: string | null; is_primary: boolean;
+  principal_patient_insurance_id?: number | null; relationship_to_principal?: string | null;
+};
+
+export type EligibilityCheck = {
+  id: number; patient_insurance_id: number; visit_id?: number | null;
+  result: string; method: string; authorization_code?: string | null;
+  notes?: string | null; checked_at: string; checked_by_user_id?: number | null;
+  checked_by?: string | null;
+};
+
+export type EligibilityCheckResult = {
+  id: number; patient_insurance_id: number; result: string; method: string;
+  authorization_code?: string | null; verification_status: string; checked_at: string;
 };
 
 export type CapitationContract = {
@@ -121,15 +141,17 @@ export const hmoApi = {
   },
 
   // enrollees & eligibility
-  listEnrollees: (params: { provider_id?: number; plan_id?: number; status?: string;
+  listEnrollees: (params: { provider_id?: number; plan_id?: number; patient_id?: number; status?: string;
                             search?: string; page?: number; page_size?: number }) =>
     g<{ total: number; items: Enrollee[] }>("/hmo/enrollees", params),
+  listEligibilityChecks: (params: { patient_insurance_id?: number; visit_id?: number }) =>
+    g<{ items: EligibilityCheck[] }>("/hmo/eligibility-checks", params).then((d) => d.items ?? []),
   linkToPlan: (patientInsuranceId: number, hmoPlanId: number) =>
     p<{ plan_name: string }>(`/hmo/enrollees/${patientInsuranceId}/link-plan`,
       { hmo_plan_id: hmoPlanId }),
   recordEligibility: (body: { patient_insurance_id: number; result: string; method?: string;
                               visit_id?: number; authorization_code?: string; notes?: string }) =>
-    p<{ check: object }>("/hmo/eligibility-checks", body),
+    p<{ check: EligibilityCheckResult }>("/hmo/eligibility-checks", body),
   expiringPolicies: (days = 30) =>
     g<{ items: object[] }>("/hmo/enrollees/expiring", { days }).then((d) => d.items),
 
@@ -203,10 +225,11 @@ export const hmoApi = {
   settlement: (provider_id?: number) =>
     g<{ paid_claims: number; avg_days_to_settlement: number | null }>(
       "/hmo/reports/settlement", { provider_id }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dashboard: () => g<Record<string, any>>("/hmo/dashboard"),
   coveragePreview: (body: { patient_id: number; unit_price: number; quantity?: number;
                             billable_service_id?: number; category?: string }) =>
-    p<{ insured: boolean; decision: Record<string, any> }>("/hmo/coverage/preview", body),
+    p<{ insured: boolean; decision: Record<string, unknown> }>("/hmo/coverage/preview", body),
 };
 
 export function fmtNaira(v?: string | number | null): string {

@@ -1,258 +1,299 @@
-import { PageHeader } from "@/components/layout/PageHeader";
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, ArrowRight, RotateCcw, Waypoints } from "lucide-react";
 import {
-  ArrowRight,
-  Activity,
-  Clock,
-  ShieldCheck,
-  Stethoscope,
-  AlertCircle,
-  ChevronRight,
-  ClipboardList,
-  Flame,
-  CheckCircle2,
-  Building2,
-  RefreshCw,
-  FileText,
-  User,
-  History,
-  MoveHorizontal,
-  MapPin,
-  ArrowUpRight
-} from "lucide-react";
-import { useParams, useNavigate } from "react-router-dom";
-import { getVisitDetails, getServiceDeliveryPoints, rerouteVisit, ServiceDeliveryPoint, Visit } from "../api/visits.api";
-import { getCurrentStaff } from "@/features/staff/api/staff.api";
+  DxButton,
+  DxCheckbox,
+  DxForm,
+  DxMessage,
+  DxPage,
+  DxPageHeader,
+  DxPageLoading,
+  DxPanel,
+  DxProps,
+  DxSelect,
+  DxStatusBar,
+  DxStatusItem,
+  DxTextarea,
+  apiErrorMessage,
+} from "@/components/dx";
+import { useToast } from "@/components/feedback/ToastProvider";
 import { routes } from "@/config/routes";
+import { getCurrentStaff } from "@/features/staff/api/staff.api";
+import { getServiceDeliveryPoints, getVisitDetails, rerouteVisit } from "../api/visits.api";
+import type { ServiceDeliveryPoint } from "../api/visits.api";
+import { VisitBanner } from "../components/VisitBanner";
+import { nextPathwayStep, patientDisplayName, sdpTypeLabel } from "../lib/clinic-flow";
 
+/**
+ * Re-route a visit to any service point, outside (or ahead of) its pathway.
+ * Raises a queue ticket at the destination and, by default, makes it the
+ * patient's current stop.
+ */
 export function VisitReRoutePage() {
   const { visitId } = useParams<{ visitId: string }>();
+  const id = Number(visitId);
   const navigate = useNavigate();
+  const toast = useToast();
+  const qc = useQueryClient();
 
-  const [visit, setVisit] = useState<any>(null);
-  const [sdps, setSdps] = useState<ServiceDeliveryPoint[]>([]);
-  const [selectedSdp, setSelectedSdp] = useState<number | null>(null);
+  const [targetId, setTargetId] = useState("");
   const [reason, setReason] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [createTicket, setCreateTicket] = useState(true);
+  const [markCurrent, setMarkCurrent] = useState(true);
+  const [fieldError, setFieldError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!visitId) return;
-      setIsLoading(true);
-      try {
-        const [visitData, sdpData] = await Promise.all([
-          getVisitDetails(Number(visitId)),
-          getServiceDeliveryPoints()
-        ]);
-        setVisit(visitData);
-        const activeSdps = sdpData.filter(s => s.is_active && s.id !== visitData.current_service_delivery_point_id);
-        setSdps(activeSdps);
-        if (activeSdps.length > 0) setSelectedSdp(activeSdps[0].id);
-      } catch (err: any) {
-        setError("Failed to load visit context. Please ensure the visit ID is valid.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadData();
-  }, [visitId]);
+  const visitQuery = useQuery({
+    queryKey: ["visits", "detail", id],
+    queryFn: () => getVisitDetails(id),
+    enabled: Number.isFinite(id),
+  });
+  const sdpQuery = useQuery({
+    queryKey: ["service-delivery-points", "active", "reroute"],
+    queryFn: () => getServiceDeliveryPoints({ limit: 200 }),
+    enabled: Number.isFinite(id),
+  });
 
-  const handleReroute = async () => {
-    if (!visitId || !selectedSdp) return;
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      const currentStaff = await getCurrentStaff();
-      if (!currentStaff) {
-        setError("Unable to identify current clinician. Please re-login.");
-        return;
-      }
+  const visit = visitQuery.data ?? null;
+  const currentSdpId = visit?.current_service_delivery_point_id;
 
-      await rerouteVisit(Number(visitId), {
-        service_delivery_point_id: selectedSdp,
-        routed_by_id: currentStaff.id,
-        reason: reason,
-        create_queue_ticket: true,
-        queue_status: "WAITING",
-        queue_position: 1,
-        mark_as_current: true
+  // Active service points other than the one the patient is at, grouped by desk type.
+  const groups = useMemo(() => {
+    const options = (sdpQuery.data ?? []).filter((s) => s.is_active && s.id !== currentSdpId);
+    const byType = new Map<string, ServiceDeliveryPoint[]>();
+    options.forEach((s) => {
+      const label = sdpTypeLabel(s.service_point_type);
+      byType.set(label, [...(byType.get(label) ?? []), s]);
+    });
+    return [...byType.entries()]
+      .map(([label, items]) => ({ label, items: items.sort((a, b) => a.name.localeCompare(b.name)) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [sdpQuery.data, currentSdpId]);
+  const allOptions = useMemo(() => groups.flatMap((g) => g.items), [groups]);
+
+  // Default to the next pathway step when it is a valid target, else the first option.
+  const suggested = nextPathwayStep(visit);
+  const defaultTarget =
+    allOptions.find((s) => s.id === suggested?.service_delivery_point_id)?.id ?? allOptions[0]?.id ?? null;
+  const effectiveTargetId = targetId !== "" ? Number(targetId) : defaultTarget;
+  const target = allOptions.find((s) => s.id === effectiveTargetId) ?? null;
+
+  const rerouteMutation = useMutation({
+    mutationFn: async () => {
+      if (!target) throw new Error("Select a destination service point.");
+      const staff = await getCurrentStaff();
+      if (!staff) throw new Error("Unable to identify the current clinician. Please sign in again.");
+      return rerouteVisit(id, {
+        service_delivery_point_id: target.id,
+        routed_by_id: staff.id,
+        reason: reason.trim() || undefined,
+        create_queue_ticket: createTicket,
+        queue_status: createTicket ? "WAITING" : undefined,
+        queue_position: createTicket ? 1 : undefined,
+        mark_as_current: markCurrent,
       });
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["visits"] });
+      qc.invalidateQueries({ queryKey: ["queue"] });
+      toast.success(
+        "Patient re-routed",
+        res.message || `${patientDisplayName(visit?.patient)} sent to ${target?.name ?? "the selected service point"}.`,
+      );
       navigate(routes.visits);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Rerouting failed. The target service point may be at capacity.");
-    } finally {
-      setIsSubmitting(false);
+    },
+    onError: (err) => toast.error("Re-route failed", apiErrorMessage(err, "The target service point may be at capacity.")),
+  });
+
+  const submit = () => {
+    if (!target) {
+      setFieldError("Select a destination service point.");
+      return;
     }
+    setFieldError(null);
+    rerouteMutation.mutate();
   };
 
-  if (isLoading) {
+  if (!Number.isFinite(id)) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
-        <div className="h-16 w-16 border-4 border-primary-500 border-t-transparent rounded-[2rem] animate-spin shadow-2xl shadow-primary-500/20" />
-        <p className="text-sm font-black text-secondary-400 uppercase tracking-[0.3em] animate-pulse">Initializing Reroute Context...</p>
-      </div>
+      <DxPage>
+        <DxMessage tone="danger" title="Invalid visit">
+          The re-route page needs a visit identifier. Open a visit from the registry.
+        </DxMessage>
+      </DxPage>
+    );
+  }
+  if (visitQuery.isLoading) return <DxPageLoading label="Loading encounter…" />;
+  if (visitQuery.isError || !visit) {
+    return (
+      <DxPage>
+        <DxMessage
+          tone="danger"
+          title="Could not load the visit"
+          action={
+            <DxButton size="sm" onClick={() => visitQuery.refetch()} leftIcon={<RotateCcw />}>
+              Retry
+            </DxButton>
+          }
+        >
+          {apiErrorMessage(visitQuery.error, "Please verify the visit record and try again.")}
+        </DxMessage>
+      </DxPage>
     );
   }
 
-  if (!visit) {
-    return (
-      <div className="max-w-2xl mx-auto py-20 text-center space-y-8 animate-fade-in">
-        <div className="h-24 w-24 bg-rose-50 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner">
-          <AlertCircle className="h-12 w-12 text-rose-500" />
-        </div>
-        <div>
-          <h3 className="text-3xl font-black text-secondary-900 tracking-tight">Visit Not Resolved</h3>
-          <p className="text-secondary-500 mt-4 leading-relaxed max-w-md mx-auto">The requested visit identifier could not be located in the active registry. Please verify the visit record and try again.</p>
-        </div>
-        <button onClick={() => navigate(routes.visits)} className="btn-secondary px-8 py-4">Return to Registry</button>
-      </div>
-    );
-  }
+  const detailPath = routes.visitDetail.replace(":visitId", String(visit.id));
+  const currentSdp = visit.current_service_delivery_point ?? visit.first_service_delivery_point;
+  const busy = rerouteMutation.isPending;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-12 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-        <PageHeader
-          title="Clinical Rerouting"
-          description="Transition patients between service delivery points to continue their care lifecycle."
-        />
-        <div className="flex items-center gap-4 bg-secondary-900/5 px-6 py-3 rounded-2xl border border-secondary-900/10">
-          <History className="h-4 w-4 text-secondary-400" />
-          <span className="text-[11px] font-mono font-bold text-secondary-600 uppercase tracking-widest">Encounter: {visit.visit_number}</span>
-        </div>
-      </div>
+    <DxPage>
+      <DxPageHeader
+        crumbs={[
+          { label: "Visits", to: routes.visits },
+          { label: visit.visit_code || `#${visit.id}`, to: detailPath },
+          { label: "Re-route" },
+        ]}
+        title="Re-route visit"
+        subtitle="Send the patient to another service point. A queue ticket is raised at the destination."
+        actions={
+          <DxButton leftIcon={<ArrowLeft />} onClick={() => navigate(detailPath)}>
+            Back to visit
+          </DxButton>
+        }
+      />
 
-      <div className="grid gap-10 lg:grid-cols-12">
-        {/* Left: Active Status */}
-        <div className="lg:col-span-5 space-y-8">
-          <div className="glass-card rounded-[3rem] p-10 border border-secondary-400 shadow-premium bg-white/50 backdrop-blur-2xl">
-            <div className="flex items-center gap-5 mb-12">
-              <div className="h-14 w-14 rounded-2xl bg-primary-600 text-white flex items-center justify-center shadow-xl shadow-primary-500/20">
-                <User className="h-7 w-7" />
-              </div>
-              <div>
-                <h4 className="text-2xl font-black font-display tracking-tight text-secondary-900">{visit.patient?.first_name} {visit.patient?.last_name}</h4>
-                <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-[0.25em] mt-1 flex items-center gap-2">
-                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                  Currently In Progress
-                </p>
-              </div>
+      <VisitBanner visit={visit} />
+
+      <div className="grid gap-4 xl:grid-cols-12">
+        <DxPanel
+          className="xl:col-span-8"
+          title="Destination"
+          icon={<Waypoints />}
+          description="Pick the service point to route the patient to and record why."
+          footer={
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[12px] text-[var(--dx-text-muted)]">
+                {target ? (
+                  <>
+                    {currentSdp?.name ?? "Current point"} <ArrowRight className="inline h-3 w-3" aria-hidden /> <b className="dx-strong">{target.name}</b>
+                  </>
+                ) : (
+                  "No destination selected."
+                )}
+              </span>
+              <span className="flex items-center gap-2">
+                <DxButton onClick={() => navigate(detailPath)} disabled={busy}>
+                  Cancel
+                </DxButton>
+                <DxButton variant="primary" leftIcon={<ArrowRight />} onClick={submit} isLoading={busy} disabled={!target && !sdpQuery.isLoading}>
+                  Re-route patient
+                </DxButton>
+              </span>
             </div>
+          }
+        >
+          {sdpQuery.isError ? (
+            <DxMessage
+              tone="danger"
+              title="Could not load service points"
+              className="mb-3"
+              action={
+                <DxButton size="sm" onClick={() => sdpQuery.refetch()} leftIcon={<RotateCcw />}>
+                  Retry
+                </DxButton>
+              }
+            >
+              {apiErrorMessage(sdpQuery.error)}
+            </DxMessage>
+          ) : null}
+          {!sdpQuery.isLoading && !sdpQuery.isError && allOptions.length === 0 ? (
+            <DxMessage tone="warning" title="No other active service points" className="mb-3">
+              Every active service point is either the patient's current stop or inactive.
+            </DxMessage>
+          ) : null}
 
-            <div className="space-y-10">
-              <div className="p-8 rounded-[2rem] bg-slate-900 text-white shadow-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-700" />
-                <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-4">Active Service Point</p>
-                <div className="flex items-center gap-6">
-                  <div className="h-16 w-16 rounded-[1.25rem] bg-white/10 flex items-center justify-center border border-white/10">
-                    <Building2 className="h-8 w-8 text-primary-400" />
-                  </div>
-                  <div>
-                    <h5 className="text-xl font-black tracking-tight leading-none mb-2">{visit.current_sdp_name || "Triaging / Registration"}</h5>
-                    <p className="text-[10px] font-mono font-bold text-white/40 uppercase tracking-tighter">SDP-ID: {visit.current_service_delivery_point_id || "N/A"}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div className="flex items-center gap-3 text-secondary-900">
-                  <Activity className="h-5 w-5 text-emerald-500" />
-                  <h6 className="font-black text-sm uppercase tracking-widest">Initial Clinical Reason</h6>
-                </div>
-                <div className="p-6 rounded-3xl bg-secondary-50 border border-secondary-400 italic text-sm text-secondary-600 leading-relaxed shadow-inner">
-                  "{visit.visit_reason || "No clinical indication provided at admission."}"
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Reroute Form */}
-        <div className="lg:col-span-7 space-y-8">
-          {error && (
-            <div className="p-8 bg-rose-50 border border-rose-100 text-rose-600 rounded-[2.5rem] flex items-center gap-6 animate-shake shadow-lg shadow-rose-500/5">
-              <div className="h-16 w-16 rounded-[1.5rem] bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
-                <AlertCircle className="h-8 w-8" />
-              </div>
-              <p className="font-bold text-sm leading-relaxed">{error}</p>
-            </div>
-          )}
-
-          <div className="glass-card rounded-[3rem] p-12 md:p-14 space-y-14 bg-white/80 shadow-premium relative">
-            <div className="flex items-center gap-6 border-b border-secondary-400 pb-10">
-              <div className="h-16 w-16 rounded-[1.75rem] bg-slate-900 text-white flex items-center justify-center shadow-2xl">
-                <MoveHorizontal className="h-8 w-8" />
-              </div>
-              <div>
-                <h3 className="text-3xl font-black font-display tracking-tight text-secondary-900">Transition Flow</h3>
-                <p className="text-secondary-400 font-bold text-[11px] uppercase tracking-[0.3em] mt-1.5">New Clinical Checkpoint</p>
-              </div>
-            </div>
-
-            <div className="space-y-12">
-              <div className="space-y-6">
-                <label className="text-[11px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-2 ml-1">
-                  <MapPin className="h-4 w-4 text-primary-500" />
-                  Destination Service Point
-                </label>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {sdps.map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => setSelectedSdp(s.id)}
-                      className={`flex items-center justify-between p-6 rounded-[1.5rem] border-2 transition-all duration-300 group ${selectedSdp === s.id
-                          ? "bg-secondary-900 border-secondary-900 text-white shadow-2xl shadow-primary-500/10 scale-105"
-                          : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-200"
-                        }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${selectedSdp === s.id ? "bg-white/10" : "bg-secondary-50"}`}>
-                          <Building2 className="h-5 w-5" />
-                        </div>
-                        <div className="text-left">
-                          <p className="text-sm font-black tracking-tight leading-none mb-1">{s.name}</p>
-                          <p className={`text-[10px] font-bold uppercase tracking-tighter ${selectedSdp === s.id ? "text-white/40" : "text-secondary-400"}`}>{s.code}</p>
-                        </div>
-                      </div>
-                      <ArrowUpRight className={`h-5 w-5 transition-transform ${selectedSdp === s.id ? "text-white translate-x-1 -translate-y-1" : "text-secondary-200"}`} />
-                    </button>
+          <DxForm cols={2}>
+            <DxSelect
+              label="Target service point"
+              required
+              fieldClassName="dx-col-span-full"
+              value={effectiveTargetId != null ? String(effectiveTargetId) : ""}
+              onChange={(e) => {
+                setTargetId(e.target.value);
+                setFieldError(null);
+              }}
+              disabled={busy || sdpQuery.isLoading}
+              error={fieldError}
+              hint={
+                suggested && target?.id === suggested.service_delivery_point_id
+                  ? "This is the next step on the patient's pathway."
+                  : "Routing outside the pathway inserts a new step after the current one."
+              }
+            >
+              {sdpQuery.isLoading ? <option value="">Loading service points…</option> : null}
+              {!sdpQuery.isLoading && allOptions.length === 0 ? <option value="">No service points available</option> : null}
+              {groups.map((g) => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.items.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.code})
+                    </option>
                   ))}
-                </div>
-              </div>
+                </optgroup>
+              ))}
+            </DxSelect>
+            <DxTextarea
+              label="Reason for re-route"
+              fieldClassName="dx-col-span-full"
+              rows={4}
+              placeholder="e.g. Clinical referral, investigations completed, wrong desk at registration…"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              disabled={busy}
+              hint="Recorded on the new flow step and in the visit activity."
+            />
+            <DxCheckbox
+              label="Create a queue ticket at the destination"
+              description="The patient joins the destination queue as waiting."
+              checked={createTicket}
+              onChange={(e) => setCreateTicket(e.target.checked)}
+              disabled={busy}
+            />
+            <DxCheckbox
+              label="Mark destination as the current service point"
+              description="Closes the current stop and makes the destination the active step."
+              checked={markCurrent}
+              onChange={(e) => setMarkCurrent(e.target.checked)}
+              disabled={busy}
+            />
+          </DxForm>
+        </DxPanel>
 
-              <div className="space-y-6">
-                <label className="text-[11px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-2 ml-1">
-                  <FileText className="h-4 w-4 text-emerald-500" />
-                  Transition Rationale
-                </label>
-                <textarea
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className="input-field h-40 pt-6 px-8 bg-white/50 border-secondary-400 text-base font-medium placeholder:text-secondary-300 resize-none rounded-[2rem]"
-                  placeholder="Summarize the reason for rerouting (e.g., Clinical referral, Lab investigations completed...)"
-                />
-              </div>
-            </div>
-
-            <div className="pt-10 flex flex-col md:flex-row items-center justify-between gap-10">
-              <div className="flex items-center gap-4 text-secondary-400">
-                <ShieldCheck className="h-6 w-6 text-emerald-500" />
-                <p className="text-[11px] font-bold uppercase tracking-widest leading-none">Security Cleared</p>
-              </div>
-              <button
-                onClick={handleReroute}
-                disabled={!selectedSdp || isSubmitting}
-                className="w-full md:w-auto btn-primary bg-primary-600 hover:bg-primary-700 px-16 py-6 rounded-[2rem] font-black text-sm tracking-tight shadow-2xl shadow-primary-500/20 flex items-center justify-center gap-5 group disabled:opacity-30 transition-all active:scale-95"
-              >
-                <span>{isSubmitting ? "Processing Flow Transition..." : "Execute Rerouting"}</span>
-                <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <DxPanel className="xl:col-span-4" title="Routing context" flush>
+          <DxProps
+            items={[
+              { label: "Current point", value: currentSdp?.name ?? "—" },
+              { label: "Desk type", value: currentSdp ? sdpTypeLabel(currentSdp.service_point_type) : "—" },
+              { label: "Next on pathway", value: suggested?.service_delivery_point?.name ?? "No pathway step pending" },
+              { label: "Destination", value: target?.name ?? "—" },
+              { label: "Destination type", value: target ? sdpTypeLabel(target.service_point_type) : "—" },
+              { label: "Reason", value: visit.visit_reason || "—" },
+            ]}
+          />
+        </DxPanel>
       </div>
-    </div>
+
+      <DxStatusBar>
+        <DxStatusItem>
+          Visit <b className="dx-mono">{visit.visit_code}</b>
+        </DxStatusItem>
+        <DxStatusItem>
+          Service points available: <b>{allOptions.length}</b>
+        </DxStatusItem>
+        <span className="ml-auto">Use "Advance to next step" on the visit to follow the pathway instead.</span>
+      </DxStatusBar>
+    </DxPage>
   );
 }

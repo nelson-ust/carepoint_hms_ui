@@ -1,34 +1,53 @@
-import { PageHeader } from "@/components/layout/PageHeader";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
-  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Ban,
-  Building2,
-  CheckCircle2,
-  ClipboardList,
-  Clock,
   FileText,
   History,
+  LayoutTemplate,
+  LogOut,
   Plus,
-  RefreshCw,
+  RotateCcw,
   Save,
   Stethoscope,
-  User,
-  X,
 } from "lucide-react";
+import {
+  DxBadge,
+  DxButton,
+  DxCheckbox,
+  DxConfirm,
+  DxGrid,
+  DxGroupBox,
+  DxMessage,
+  DxPage,
+  DxPageHeader,
+  DxPageLoading,
+  DxPanel,
+  DxPopup,
+  DxProps,
+  DxSelect,
+  DxStatusBadge,
+  DxStatusBar,
+  DxStatusItem,
+  DxTextarea,
+  DxToolbar,
+  DxToolbarGroup,
+  DxToolbarSeparator,
+  DxToolbarSpacer,
+  apiErrorMessage,
+  formatDateTime,
+  humanize,
+  type DxGridColumn,
+} from "@/components/dx";
+import { useToast } from "@/components/feedback/ToastProvider";
 import { routes } from "@/config/routes";
-import { getVisitDetails } from "@/features/visits/api/visits.api";
-import type { Visit } from "@/features/visits/api/visits.api";
+import { getVisitDetails, type PaginatedResponse, type ServiceDeliveryPoint } from "@/features/visits/api/visits.api";
 import { listActiveServiceDeliveryPoints } from "@/features/service-delivery-points/api/service-delivery-points.api";
-import type { ServiceDeliveryPoint } from "@/features/service-delivery-points/api/service-delivery-points.api";
-import { getStaff, staffDisplayName } from "@/features/staff/api/staff.api";
-import type { Staff } from "@/features/staff/api/staff.api";
-import { getLatestVitalSignForVisit } from "@/features/vital-signs/api/vital-signs.api";
-import type { VitalSign } from "@/features/vital-signs/api/vital-signs.api";
+import { getStaff, staffDisplayName, type Staff } from "@/features/staff/api/staff.api";
 import {
   cancelConsultation,
   createConsultation,
@@ -36,1064 +55,849 @@ import {
   isFinalConsultationStatus,
   listConsultationsForVisit,
   updateConsultation,
-} from "../../consultations/api/consultations.api";
-import type {
-  Consultation,
-  FinalizeConsultationPayload,
-} from "../../consultations/api/consultations.api";
-import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
+  type Consultation,
+  type FinalizeConsultationPayload,
+} from "@/features/consultations/api/consultations.api";
+import { VisitBanner } from "@/features/visits/components/VisitBanner";
+import { nextPathwayStep, patientDisplayName } from "@/features/visits/lib/clinic-flow";
 import { DiagnosesPanel } from "@/features/diagnoses/components/DiagnosesPanel";
 import { PrescriptionsPanel } from "@/features/prescriptions/components/PrescriptionsPanel";
+import { clinicalTemplatesApi, type ClinicalTemplate } from "../api/clinical-templates.api";
+import { getLatestVitalSigns, mewsBand, type VitalSign } from "../api/vital-signs.api";
 import { ConsultationLabPanel } from "../components/ConsultationLabPanel";
 import { Patient360Panel } from "../components/Patient360Panel";
+import {
+  SOAP_LABELS,
+  applyTemplateMapping,
+  mapTemplateToSoap,
+  overwriteTemplateConflicts,
+  readStoredUserId,
+  soapFromConsultation,
+  soapIsEqual,
+  sortConsultations,
+  type SoapForm,
+  type SoapTextKey,
+  type TemplateMapping,
+} from "../lib/consultation-soap";
 
-const statusStyles: Record<string, string> = {
-  DRAFT: "bg-amber-50 text-amber-600 border-amber-100",
-  IN_PROGRESS: "bg-primary-50 text-primary-600 border-primary-100",
-  ACTIVE: "bg-primary-50 text-primary-600 border-primary-100",
-  FINALIZED: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  COMPLETED: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  CANCELLED: "bg-rose-50 text-rose-600 border-rose-100",
-};
+// ============================================================
+// Local types
+// ============================================================
 
-function formatDateTime(value?: string) {
-  if (!value) return "—";
-  try {
-    return new Date(value).toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return value;
-  }
-}
-
-function readStoredUserId(): number | null {
-  try {
-    const raw = localStorageService.get(storageKeys.user);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return typeof parsed?.id === "number" ? parsed.id : null;
-  } catch {
-    return null;
-  }
-}
-
-type SoapForm = {
+type StartForm = {
+  clinician_staff_id: number | null;
   subjective_note: string;
   objective_note: string;
   assessment_note: string;
   plan_note: string;
-  recommends_admission: boolean;
-  admission_recommendation_note: string;
 };
 
-const emptySoap: SoapForm = {
+const EMPTY_START: StartForm = {
+  clinician_staff_id: null,
   subjective_note: "",
   objective_note: "",
   assessment_note: "",
   plan_note: "",
-  recommends_admission: false,
-  admission_recommendation_note: "",
 };
 
-function soapFromConsultation(c?: Consultation | null): SoapForm {
-  if (!c) return emptySoap;
-  return {
-    subjective_note: c.subjective_note ?? "",
-    objective_note: c.objective_note ?? "",
-    assessment_note: c.assessment_note ?? "",
-    plan_note: c.plan_note ?? "",
-    recommends_admission: c.recommends_admission ?? false,
-    admission_recommendation_note: c.admission_recommendation_note ?? "",
-  };
-}
+type FinalizeForm = {
+  next_service_delivery_point_id: number | null;
+  end_visit: boolean;
+  closing_note: string;
+};
 
-export function ConsultationPage() {
-  const { visitId } = useParams<{ visitId: string }>();
-  const visitIdNum = Number(visitId);
+type Draft = { forId: number; form: SoapForm };
+
+type ConfirmState =
+  | { kind: "switch"; id: number }
+  | { kind: "cancel" }
+  | { kind: "overwrite"; template: ClinicalTemplate; mapping: TemplateMapping; conflicts: SoapTextKey[] };
+
+const SOAP_HINTS: Record<SoapTextKey, string> = {
+  subjective_note: "Patient's description of the complaint, history, symptoms",
+  objective_note: "Physical exam findings, vitals, observations",
+  assessment_note: "Clinical impression, working diagnosis, differentials",
+  plan_note: "Investigations, prescriptions, follow-up, patient education",
+};
+
+const fmtNum = (v: number | string | null | undefined, digits = 0): string | null => {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(digits) : null;
+};
+
+// ============================================================
+// Page
+// ============================================================
+
+/**
+ * Consultation workstation. The clinician opens (or resumes) a consultation on
+ * the visit, documents it as a SOAP note, records diagnoses / investigations /
+ * prescriptions in context, then "Save & Route" finalises the encounter and
+ * moves the patient to the next checkpoint on their care pathway.
+ */
+export function ConsultationPage(props: { visitId?: number; embedded?: boolean } = {}) {
+  const embedded = props.embedded ?? false;
   const navigate = useNavigate();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const { visitId: visitIdParam } = useParams<{ visitId: string }>();
+  const id = props.visitId ?? Number(visitIdParam);
+  const validId = Number.isFinite(id);
 
-  const [visit, setVisit] = useState<Visit | null>(null);
-  const [latestVital, setLatestVital] = useState<VitalSign | null>(null);
-  const [consultations, setConsultations] = useState<Consultation[]>([]);
-  const [activeId, setActiveId] = useState<number | null>(null);
-  const [staffList, setStaffList] = useState<Staff[]>([]);
-  const [sdps, setSdps] = useState<ServiceDeliveryPoint[]>([]);
+  // ---------- UI state ----------
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [startPopup, setStartPopup] = useState<"auto" | "open" | "closed">("auto");
+  const [startForm, setStartForm] = useState<StartForm>(EMPTY_START);
+  const [finalizeOpen, setFinalizeOpen] = useState(false);
+  const [finalizeForm, setFinalizeForm] = useState<FinalizeForm>({ next_service_delivery_point_id: null, end_visit: false, closing_note: "" });
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<
-    { tone: "success" | "error"; message: string } | null
-  >(null);
-
-  const [soap, setSoap] = useState<SoapForm>(emptySoap);
-  const [isDirty, setIsDirty] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
-
-  // Start consultation modal
-  const [isStartOpen, setStartOpen] = useState(false);
-  const [startForm, setStartForm] = useState<{
-    clinician_staff_id: number | null;
-    subjective_note: string;
-    objective_note: string;
-    assessment_note: string;
-    plan_note: string;
-  }>({
-    clinician_staff_id: null,
-    subjective_note: "",
-    objective_note: "",
-    assessment_note: "",
-    plan_note: "",
+  // ---------- Data ----------
+  const consultationsKey = ["consultations", "visit", id] as const;
+  const visitQuery = useQuery({
+    queryKey: ["visits", "detail", id],
+    queryFn: () => getVisitDetails(id),
+    enabled: validId,
   });
-  const [startError, setStartError] = useState<string | null>(null);
-  const [isStarting, setIsStarting] = useState(false);
-
-  // Finalize modal
-  const [isFinalizeOpen, setFinalizeOpen] = useState(false);
-  const [finalizeForm, setFinalizeForm] = useState<{
-    next_service_delivery_point_id: number | null;
-    end_visit: boolean;
-    closing_note: string;
-  }>({
-    next_service_delivery_point_id: null,
-    end_visit: false,
-    closing_note: "",
+  const consultationsQuery = useQuery({
+    queryKey: consultationsKey,
+    queryFn: () => listConsultationsForVisit(id),
+    enabled: validId,
   });
-  const [finalizeError, setFinalizeError] = useState<string | null>(null);
-  const [isFinalizing, setIsFinalizing] = useState(false);
+  const vitalsQuery = useQuery({
+    queryKey: ["vital-signs", "visit", id, "latest"],
+    queryFn: () => getLatestVitalSigns(id).catch(() => null),
+    enabled: validId,
+  });
+  const staffQuery = useQuery({
+    queryKey: ["staff", "all", 200],
+    queryFn: () => getStaff(0, 200).catch(() => [] as Staff[]),
+  });
+  const sdpQuery = useQuery({
+    queryKey: ["service-delivery-points", "active", 200],
+    queryFn: () => listActiveServiceDeliveryPoints({ skip: 0, limit: 200 }).catch(() => null),
+  });
+  const templatesQuery = useQuery({
+    queryKey: ["clinical-templates", "for-consultation"],
+    queryFn: async () => {
+      const soap = await clinicalTemplatesApi.list({ template_type: "SOAP" });
+      return soap.length ? soap : clinicalTemplatesApi.list();
+    },
+    enabled: templateOpen,
+  });
 
-  // ---------- Data loading ----------
+  const visit = visitQuery.data ?? null;
+  const latestVital: VitalSign | null = vitalsQuery.data ?? null;
+  const staffList: Staff[] = useMemo(() => (Array.isArray(staffQuery.data) ? staffQuery.data : []), [staffQuery.data]);
+  const sdps: ServiceDeliveryPoint[] = useMemo(() => sdpQuery.data?.items ?? [], [sdpQuery.data]);
+  const consultations = useMemo(() => sortConsultations(consultationsQuery.data?.items ?? []), [consultationsQuery.data]);
 
-  const loadAll = async () => {
-    if (!visitId || Number.isNaN(visitIdNum)) {
-      setError("Invalid visit identifier.");
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      const [visitData, consults, vital, staff, sdpData] = await Promise.all([
-        getVisitDetails(visitIdNum),
-        listConsultationsForVisit(visitIdNum).catch(() => null),
-        getLatestVitalSignForVisit(visitIdNum).catch(() => null),
-        getStaff(0, 200).catch(() => [] as Staff[]),
-        listActiveServiceDeliveryPoints({ skip: 0, limit: 200 }).catch(() => null),
-      ]);
+  // ---------- Derived selection / form ----------
+  const defaultActive = consultations.find((c) => !isFinalConsultationStatus(c.status)) ?? consultations[0] ?? null;
+  const activeConsultation: Consultation | null =
+    (selectedId != null ? consultations.find((c) => c.id === selectedId) : null) ?? defaultActive;
+  const activeId = activeConsultation?.id ?? null;
+  const baseSoap = useMemo(() => soapFromConsultation(activeConsultation), [activeConsultation]);
+  const soap: SoapForm = draft && draft.forId === activeId ? draft.form : baseSoap;
+  const isDirty = !!draft && draft.forId === activeId && !soapIsEqual(draft.form, baseSoap);
+  const isReadOnly = !activeConsultation || isFinalConsultationStatus(activeConsultation.status);
 
-      setVisit(visitData);
-      setLatestVital(vital ?? null);
-      setStaffList(Array.isArray(staff) ? staff : []);
-      setSdps(sdpData?.items ?? []);
+  const storedUserId = readStoredUserId();
+  const defaultClinicianId = staffList.find((s) => s.user_id === storedUserId)?.id ?? null;
+  const effectiveClinicianId = startForm.clinician_staff_id ?? defaultClinicianId;
 
-      const items = Array.isArray(consults?.items) ? consults!.items : [];
-      const sorted = [...items].sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      );
-      setConsultations(sorted);
-
-      const editable =
-        sorted.find((c) => !isFinalConsultationStatus(c.status)) ?? sorted[0] ?? null;
-      setActiveId(editable?.id ?? null);
-      setSoap(soapFromConsultation(editable));
-      setIsDirty(false);
-    } catch (err: any) {
-      console.error("Failed to load consultation context", err);
-      setError(
-        err?.response?.data?.message ||
-        "Unable to load this visit. The record may have been removed or the registry is offline.",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visitId]);
-
-  // Default the clinician staff selection in the Start modal to the staff
-  // record matching the logged-in user (if any).
-  useEffect(() => {
-    if (startForm.clinician_staff_id != null) return;
-    const userId = readStoredUserId();
-    if (userId == null) return;
-    const match = staffList.find((s) => s.user_id === userId);
-    if (match) {
-      setStartForm((prev) => ({ ...prev, clinician_staff_id: match.id }));
-    }
-  }, [staffList, startForm.clinician_staff_id]);
-
-  // Auto-open the Start modal once a clinician arrives at a visit that has no
-  // consultations yet — saves them a click coming from the queue or visit page.
-  const [hasAutoOpened, setHasAutoOpened] = useState(false);
-  useEffect(() => {
-    if (hasAutoOpened) return;
-    if (isLoading) return;
-    if (consultations.length > 0) return;
-    if (startForm.clinician_staff_id == null) return;
-    setStartOpen(true);
-    setHasAutoOpened(true);
-  }, [
-    hasAutoOpened,
-    isLoading,
-    consultations.length,
-    startForm.clinician_staff_id,
-  ]);
-
-  const activeConsultation = useMemo(
-    () => consultations.find((c) => c.id === activeId) ?? null,
-    [consultations, activeId],
-  );
-
-  const isReadOnly = useMemo(
-    () => !activeConsultation || isFinalConsultationStatus(activeConsultation.status),
-    [activeConsultation],
-  );
+  const isStartOpen =
+    startPopup === "open" ||
+    (startPopup === "auto" && !consultationsQuery.isLoading && !!visit && consultations.length === 0 && effectiveClinicianId != null);
 
   const currentSdp = visit?.current_service_delivery_point ?? visit?.first_service_delivery_point;
-
-  const showFeedback = (tone: "success" | "error", message: string) => {
-    setFeedback({ tone, message });
-    window.setTimeout(() => setFeedback(null), 3500);
+  const nextStep = nextPathwayStep(visit);
+  const clinicianOf = (c: Consultation | null) => {
+    if (!c) return null;
+    const s = staffList.find((x) => x.id === c.clinician_staff_id);
+    return s ? staffDisplayName(s) : `Clinician #${c.clinician_staff_id}`;
   };
 
-  const replaceConsultationInList = (updated: Consultation) => {
-    setConsultations((prev) => {
-      const others = prev.filter((c) => c.id !== updated.id);
-      return [updated, ...others].sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      );
+  const updateSoap = (patch: Partial<SoapForm>) => {
+    if (activeId == null || isReadOnly) return;
+    setDraft({ forId: activeId, form: { ...soap, ...patch } });
+  };
+
+  const replaceInCache = (updated: Consultation) => {
+    qc.setQueryData<PaginatedResponse<Consultation>>(consultationsKey, (old) => {
+      const items = (old?.items ?? []).filter((c) => c.id !== updated.id);
+      return {
+        success: old?.success ?? true,
+        message: old?.message ?? "",
+        count: (old?.count ?? items.length) + (old?.items?.some((c) => c.id === updated.id) ? 0 : 1),
+        meta: old?.meta ?? ({} as PaginatedResponse<Consultation>["meta"]),
+        items: [updated, ...items],
+      };
     });
   };
 
-  const handleSelectConsultation = (id: number) => {
-    if (isDirty) {
-      if (!confirm("Discard unsaved changes?")) return;
-    }
-    setActiveId(id);
-    const c = consultations.find((x) => x.id === id) ?? null;
-    setSoap(soapFromConsultation(c));
-    setIsDirty(false);
-  };
+  // ---------- Mutations ----------
+  const saveMutation = useMutation({
+    mutationFn: () => updateConsultation(activeId as number, soap),
+    onSuccess: (res) => {
+      replaceInCache(res.consultation);
+      setDraft(null);
+      toast.success("Notes saved", res.message || "Consultation notes saved.");
+    },
+    onError: (err) => toast.error("Could not save notes", apiErrorMessage(err)),
+  });
 
-  // ---------- Actions ----------
-
-  const handleSaveDraft = async () => {
-    if (!activeConsultation) return;
-    setIsSaving(true);
-    try {
-      const result = await updateConsultation(activeConsultation.id, soap);
-      replaceConsultationInList(result.consultation);
-      setSoap(soapFromConsultation(result.consultation));
-      setIsDirty(false);
-      showFeedback("success", result.message || "Consultation notes saved.");
-    } catch (err: any) {
-      showFeedback("error", err?.response?.data?.message || "Failed to save notes.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleStartConsultation = async () => {
-    if (!visit) return;
-    if (!startForm.clinician_staff_id) {
-      setStartError("Pick the clinician for this consultation.");
-      return;
-    }
-    setIsStarting(true);
-    setStartError(null);
-    try {
-      const result = await createConsultation({
-        visit_id: visit.id,
-        clinician_staff_id: startForm.clinician_staff_id,
+  const startMutation = useMutation({
+    mutationFn: () =>
+      createConsultation({
+        visit_id: id,
+        clinician_staff_id: effectiveClinicianId as number,
         subjective_note: startForm.subjective_note || undefined,
         objective_note: startForm.objective_note || undefined,
         assessment_note: startForm.assessment_note || undefined,
         plan_note: startForm.plan_note || undefined,
-      });
-      replaceConsultationInList(result.consultation);
-      setActiveId(result.consultation.id);
-      setSoap(soapFromConsultation(result.consultation));
-      setIsDirty(false);
-      setStartOpen(false);
-      setStartForm({
-        clinician_staff_id: startForm.clinician_staff_id, // remember clinician
-        subjective_note: "",
-        objective_note: "",
-        assessment_note: "",
-        plan_note: "",
-      });
-      showFeedback("success", result.message || "Consultation started.");
-    } catch (err: any) {
-      setStartError(err?.response?.data?.message || "Failed to start consultation.");
-    } finally {
-      setIsStarting(false);
-    }
-  };
+      }),
+    onSuccess: (res) => {
+      replaceInCache(res.consultation);
+      setSelectedId(res.consultation.id);
+      setDraft(null);
+      setStartPopup("closed");
+      setStartForm({ ...EMPTY_START, clinician_staff_id: effectiveClinicianId });
+      toast.success("Consultation started", res.message || undefined);
+    },
+  });
 
-  const handleFinalize = async () => {
-    if (!activeConsultation) return;
-    if (isDirty) {
-      if (
-        !confirm(
-          "You have unsaved notes. Save them before finalizing? (Press OK to save, Cancel to abort.)",
-        )
-      )
-        return;
-      await handleSaveDraft();
-    }
-    setIsFinalizing(true);
-    setFinalizeError(null);
-    try {
-      const payload: FinalizeConsultationPayload = {
-        next_service_delivery_point_id:
-          finalizeForm.next_service_delivery_point_id ?? undefined,
-        end_visit: finalizeForm.end_visit,
-        closing_note: finalizeForm.closing_note || undefined,
-      };
-      const result = await finalizeConsultation(activeConsultation.id, payload);
-      replaceConsultationInList(result.consultation);
-      setSoap(soapFromConsultation(result.consultation));
-      setIsDirty(false);
-      setFinalizeOpen(false);
-      showFeedback("success", result.message || "Consultation finalized.");
-      // If end_visit was selected, return to visits list
-      if (finalizeForm.end_visit) {
-        window.setTimeout(() => navigate(routes.visits), 800);
+  const finalizeMutation = useMutation({
+    mutationFn: async () => {
+      const cid = activeId as number;
+      if (isDirty) {
+        const saved = await updateConsultation(cid, soap);
+        replaceInCache(saved.consultation);
       }
-    } catch (err: any) {
-      setFinalizeError(err?.response?.data?.message || "Failed to finalize consultation.");
-    } finally {
-      setIsFinalizing(false);
+      const payload: FinalizeConsultationPayload = {
+        next_service_delivery_point_id: finalizeForm.end_visit ? undefined : finalizeForm.next_service_delivery_point_id ?? undefined,
+        end_visit: finalizeForm.end_visit,
+        closing_note: finalizeForm.closing_note.trim() || undefined,
+      };
+      return finalizeConsultation(cid, payload);
+    },
+    onSuccess: (res) => {
+      replaceInCache(res.consultation);
+      setDraft(null);
+      setFinalizeOpen(false);
+      qc.invalidateQueries({ queryKey: ["visits"] });
+      qc.invalidateQueries({ queryKey: ["queue"] });
+      const target = finalizeForm.end_visit
+        ? "visit ended"
+        : sdps.find((s) => s.id === finalizeForm.next_service_delivery_point_id)?.name ?? null;
+      toast.success(
+        "Consultation finalized",
+        res.message || (target ? `${patientDisplayName(visit?.patient)} — ${target}.` : undefined),
+      );
+      if (!embedded && finalizeForm.end_visit) window.setTimeout(() => navigate(routes.visits), 800);
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelConsultation(activeId as number),
+    onSuccess: (res) => {
+      replaceInCache(res.consultation);
+      setDraft(null);
+      toast.success("Consultation cancelled", res.message || undefined);
+    },
+    onError: (err) => toast.error("Could not cancel consultation", apiErrorMessage(err)),
+  });
+
+  const busy = saveMutation.isPending || finalizeMutation.isPending || cancelMutation.isPending;
+
+  // ---------- Handlers ----------
+  const openStart = () => {
+    startMutation.reset();
+    setStartPopup("open");
+  };
+
+  const selectConsultation = (cid: number) => {
+    if (cid === activeId) return;
+    if (isDirty) {
+      setConfirm({ kind: "switch", id: cid });
+      return;
+    }
+    setSelectedId(cid);
+    setDraft(null);
+  };
+
+  const openFinalize = (endVisit: boolean) => {
+    if (isReadOnly) return;
+    finalizeMutation.reset();
+    setFinalizeForm({
+      next_service_delivery_point_id: endVisit ? null : nextStep?.service_delivery_point_id ?? null,
+      end_visit: endVisit,
+      closing_note: "",
+    });
+    setFinalizeOpen(true);
+  };
+
+  const applyTemplate = (t: ClinicalTemplate) => {
+    if (activeId == null || isReadOnly) return;
+    const mapping = mapTemplateToSoap(t);
+    const { next, conflicts } = applyTemplateMapping(soap, mapping);
+    setDraft({ forId: activeId, form: next });
+    setTemplateOpen(false);
+    clinicalTemplatesApi.recordUse(t.id).catch(() => undefined);
+    if (conflicts.length) {
+      setConfirm({ kind: "overwrite", template: t, mapping, conflicts });
+    } else {
+      toast.success("Template applied", `${t.name} — review the note before saving.`);
     }
   };
 
-  const handleCancel = async () => {
-    if (!activeConsultation) return;
-    if (
-      !confirm(
-        `Cancel consultation #${activeConsultation.id}? This cannot be undone.`,
-      )
-    )
-      return;
-    setIsCancelling(true);
-    try {
-      const result = await cancelConsultation(activeConsultation.id);
-      replaceConsultationInList(result.consultation);
-      setSoap(soapFromConsultation(result.consultation));
-      setIsDirty(false);
-      showFeedback("success", result.message || "Consultation cancelled.");
-    } catch (err: any) {
-      showFeedback("error", err?.response?.data?.message || "Failed to cancel consultation.");
-    } finally {
-      setIsCancelling(false);
-    }
+  const refreshAll = () => {
+    visitQuery.refetch();
+    consultationsQuery.refetch();
+    vitalsQuery.refetch();
   };
+
+  // ---------- Grid columns ----------
+  const consultationColumns: DxGridColumn<Consultation>[] = [
+    {
+      key: "started",
+      header: "Started",
+      width: 130,
+      sortable: true,
+      accessor: (c) => c.consultation_started_at || c.created_at,
+      render: (c) => <span className="dx-mono">{formatDateTime(c.consultation_started_at || c.created_at)}</span>,
+    },
+    {
+      key: "clinician",
+      header: "Clinician",
+      accessor: (c) => clinicianOf(c),
+      render: (c) => <span className="truncate">{clinicianOf(c)}</span>,
+    },
+    { key: "status", header: "Status", width: 110, render: (c) => <DxStatusBadge status={c.status} /> },
+  ];
+
+  const templateColumns: DxGridColumn<ClinicalTemplate>[] = [
+    {
+      key: "name",
+      header: "Template",
+      sortable: true,
+      filter: true,
+      wrap: true,
+      render: (t) => (
+        <div className="min-w-0">
+          <div className="font-medium">{t.name}</div>
+          {t.description ? <div className="dx-muted truncate text-[11.5px]">{t.description}</div> : null}
+        </div>
+      ),
+    },
+    { key: "specialty", header: "Specialty", width: 140, sortable: true, filter: true, render: (t) => t.specialty || <span className="dx-faint">General</span> },
+    { key: "template_type", header: "Type", width: 100, render: (t) => <DxBadge tone="outline">{humanize(t.template_type)}</DxBadge> },
+    { key: "sections_count", header: "Sections", width: 80, align: "center", sortable: true, accessor: (t) => t.sections_count ?? t.sections?.length ?? 0, render: (t) => t.sections_count ?? t.sections?.length ?? 0 },
+    { key: "usage_count", header: "Usage", width: 70, align: "center", sortable: true },
+    {
+      key: "apply",
+      header: "",
+      width: 80,
+      align: "right",
+      render: (t) => (
+        <DxButton size="sm" variant="accent-text" onClick={(e) => { e.stopPropagation(); applyTemplate(t); }}>
+          Apply
+        </DxButton>
+      ),
+    },
+  ];
 
   // ---------- Render guards ----------
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
-        <div className="h-16 w-16 border-4 border-primary-500 border-t-transparent rounded-[2rem] animate-spin shadow-2xl shadow-primary-500/20" />
-        <p className="text-sm font-black text-secondary-400 uppercase tracking-[0.3em] animate-pulse">
-          Preparing Consultation Workspace...
-        </p>
-      </div>
+  if (!validId) {
+    const invalid = (
+      <DxMessage tone="danger" title="Invalid visit">
+        The consultation workstation needs a visit identifier. Open a patient from the queue.
+      </DxMessage>
     );
+    return embedded ? <div className="space-y-4">{invalid}</div> : <DxPage>{invalid}</DxPage>;
+  }
+  if (visitQuery.isLoading)
+    return embedded ? (
+      <div className="space-y-4">
+        <div className="dx-skeleton h-24 w-full" />
+        <div className="dx-skeleton h-64 w-full" />
+      </div>
+    ) : (
+      <DxPageLoading label="Preparing consultation workspace…" />
+    );
+  if (visitQuery.isError || !visit) {
+    const errored = (
+      <DxMessage
+        tone="danger"
+        title="Could not load the visit"
+        action={
+          <DxButton size="sm" onClick={() => visitQuery.refetch()} leftIcon={<RotateCcw />}>
+            Retry
+          </DxButton>
+        }
+      >
+        {apiErrorMessage(visitQuery.error, "The record may have been removed or the registry is offline.")}
+      </DxMessage>
+    );
+    return embedded ? <div className="space-y-4">{errored}</div> : <DxPage>{errored}</DxPage>;
   }
 
-  if (error || !visit) {
-    return (
-      <div className="max-w-2xl mx-auto py-20 text-center space-y-8 animate-fade-in">
-        <div className="h-24 w-24 bg-rose-50 rounded-[2.5rem] flex items-center justify-center mx-auto">
-          <AlertCircle className="h-12 w-12 text-rose-500" />
-        </div>
-        <div>
-          <h3 className="text-3xl font-black text-secondary-900 tracking-tight">
-            Visit Not Resolved
-          </h3>
-          <p className="text-secondary-500 mt-4 leading-relaxed max-w-md mx-auto">
-            {error ?? "We couldn't locate this visit in the registry."}
-          </p>
-        </div>
-        <button onClick={() => navigate(routes.visits)} className="btn-secondary px-8 py-4">
-          Return to Visits
-        </button>
-      </div>
-    );
-  }
+  const mews = latestVital?.mews_score ?? null;
+  const band = mewsBand(mews);
+  const vitalsItems = latestVital
+    ? [
+        { label: "Blood pressure", value: latestVital.systolic_bp != null ? <span className="dx-mono">{latestVital.systolic_bp}/{latestVital.diastolic_bp ?? "—"} mmHg</span> : "—" },
+        { label: "Temperature", value: fmtNum(latestVital.temperature_celsius, 1) ? `${fmtNum(latestVital.temperature_celsius, 1)} °C` : "—" },
+        { label: "Pulse", value: latestVital.pulse_rate != null ? `${latestVital.pulse_rate} bpm` : "—" },
+        { label: "Respiratory rate", value: latestVital.respiratory_rate != null ? `${latestVital.respiratory_rate} cpm` : "—" },
+        { label: "SpO₂", value: fmtNum(latestVital.oxygen_saturation) ? `${fmtNum(latestVital.oxygen_saturation)} %` : "—" },
+        { label: "Weight / Height", value: latestVital.weight_kg != null || latestVital.height_cm != null ? `${fmtNum(latestVital.weight_kg, 1) ?? "—"} kg · ${fmtNum(latestVital.height_cm) ?? "—"} cm` : "—" },
+        { label: "BMI", value: fmtNum(latestVital.bmi, 1) ?? "—" },
+        { label: "Pain score", value: latestVital.pain_score != null ? `${latestVital.pain_score}/10` : "—" },
+        { label: "MEWS", value: mews != null ? <span className="inline-flex items-center gap-2"><DxBadge tone={band.tone}>{mews}</DxBadge><span className="dx-muted">{band.label}</span></span> : "—" },
+        { label: "Recorded", value: <span className="dx-mono">{formatDateTime(latestVital.recorded_at)}</span> },
+      ]
+    : [];
 
-  const visitStatusKey = (visit.status || "ACTIVE").toUpperCase();
-  const consultationStatusKey = (activeConsultation?.status || "").toUpperCase();
+  const sdpOptions = (() => {
+    const list = sdps.filter((s) => s.id !== currentSdp?.id);
+    const nextSdp = nextStep?.service_delivery_point;
+    if (nextSdp && !list.some((s) => s.id === nextSdp.id) && nextSdp.id !== currentSdp?.id) list.unshift(nextSdp);
+    return list.map((s) => ({ value: String(s.id), label: `${s.name} (${s.code})` }));
+  })();
 
-  return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-fade-in pb-20">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-3">
-          <button
-            onClick={() => navigate(`/visits/${visit.id}`)}
-            className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.25em] text-secondary-400 hover:text-secondary-700 transition-colors"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to Visit
-          </button>
-          <PageHeader
-            title="Clinical Consultation"
-            description="Document the clinical encounter using the SOAP framework, then finalize and route."
-          />
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={loadAll}
-            className="btn-secondary p-3 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
-            title="Refresh"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => {
-              setStartError(null);
-              setStartOpen(true);
-            }}
-            className="btn-primary gap-2 px-6 py-3 rounded-2xl shadow-lg shadow-primary-500/20"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="text-sm font-bold">New Consultation</span>
-          </button>
-        </div>
-      </div>
+  const consultationStatus = activeConsultation?.status ?? null;
 
-      {feedback && (
-        <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
-              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-              : "bg-rose-50 text-rose-700 border-rose-100"
-            }`}
-        >
-          {feedback.tone === "success" ? (
-            <CheckCircle2 className="h-5 w-5" />
-          ) : (
-            <AlertCircle className="h-5 w-5" />
-          )}
-          <span className="text-sm font-bold">{feedback.message}</span>
-        </div>
+  const content = (
+    <>
+      {!embedded && (
+        <DxPageHeader
+          crumbs={[{ label: "Queues", to: routes.queues }, { label: "Consultation" }]}
+          title="Consultation"
+          subtitle="Document the encounter as a SOAP note, record diagnoses, investigations and prescriptions, then save and route the patient onward."
+          actions={
+            <DxButton leftIcon={<ArrowLeft />} onClick={() => navigate(routes.queues)}>
+              Back to queue
+            </DxButton>
+          }
+        />
       )}
 
-      {/* Patient mini-header */}
-      <div className="glass-card rounded-[2rem] p-6 flex flex-wrap items-center justify-between gap-6 bg-secondary-900 text-white border-none shadow-premium">
-        <div className="flex items-center gap-6">
-          <div className="h-16 w-16 rounded-[1.5rem] bg-white/10 flex items-center justify-center border border-white/10">
-            <User className="h-8 w-8 text-primary-400" />
-          </div>
-          <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h2 className="text-2xl font-bold font-display">
-                {visit.patient
-                  ? `${visit.patient.first_name} ${visit.patient.last_name}`
-                  : `Patient #${visit.patient_id}`}
-              </h2>
-              <span className="px-3 py-1 rounded-full bg-primary-500 text-[10px] font-bold uppercase tracking-widest">
-                {visitStatusKey}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-secondary-400 font-medium">
-              {visit.patient?.hospital_number && (
-                <>
-                  <span className="font-mono">{visit.patient.hospital_number}</span>
-                  <span>•</span>
-                </>
-              )}
-              {visit.patient?.gender && (
-                <>
-                  <span className="uppercase">{visit.patient.gender}</span>
-                  <span>•</span>
-                </>
-              )}
-              <span className="font-mono">{visit.visit_code || `VISIT-${visit.id}`}</span>
-              {currentSdp && (
-                <>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1">
-                    <Building2 className="h-3 w-3" />
-                    {currentSdp.name}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+      {!embedded && <VisitBanner visit={visit} />}
 
-        {latestVital && (
-          <div className="px-6 py-3 rounded-2xl bg-white/5 border border-white/10">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-              Latest Vitals
-            </p>
-            <p className="text-sm font-bold mt-1 text-primary-400">
-              {latestVital.systolic_bp != null && latestVital.diastolic_bp != null
-                ? `${latestVital.systolic_bp}/${latestVital.diastolic_bp} mmHg`
-                : null}
-              {latestVital.temperature_celsius != null
-                ? ` • ${latestVital.temperature_celsius}°C`
-                : null}
-              {latestVital.oxygen_saturation != null
-                ? ` • ${latestVital.oxygen_saturation}% SpO₂`
-                : null}
-            </p>
-          </div>
-        )}
-      </div>
+      {/* Command bar */}
+      <DxToolbar>
+        <DxToolbarGroup>
+          <DxButton leftIcon={<Plus />} onClick={openStart} disabled={busy}>
+            Start consultation
+          </DxButton>
+          <DxButton
+            leftIcon={<LayoutTemplate />}
+            disabled={isReadOnly || busy}
+            onClick={() => setTemplateOpen(true)}
+            title={isReadOnly ? "Start or select an open consultation first" : "Fill the SOAP note from a clinical template"}
+          >
+            Apply template
+          </DxButton>
+        </DxToolbarGroup>
+        <DxToolbarSeparator />
+        <DxToolbarGroup>
+          <DxButton
+            leftIcon={<Save />}
+            isLoading={saveMutation.isPending}
+            disabled={isReadOnly || !isDirty || busy}
+            onClick={() => saveMutation.mutate()}
+          >
+            Save draft
+          </DxButton>
+          {!embedded && (
+            <>
+              <DxButton
+                variant="primary"
+                rightIcon={<ArrowRight />}
+                disabled={isReadOnly || busy}
+                onClick={() => openFinalize(false)}
+                title={nextStep ? `Finalises the consultation and queues the patient at ${nextStep.service_delivery_point?.name}` : "Finalises the consultation and routes the patient onward"}
+              >
+                {nextStep?.service_delivery_point?.name ? `Save & Route to ${nextStep.service_delivery_point.name}` : "Save & Route"}
+              </DxButton>
+              <DxButton leftIcon={<LogOut />} disabled={isReadOnly || busy} onClick={() => openFinalize(true)}>
+                End visit
+              </DxButton>
+            </>
+          )}
+        </DxToolbarGroup>
+        <DxToolbarSpacer />
+        <DxToolbarGroup>
+          <DxButton
+            variant="outline-danger"
+            leftIcon={<Ban />}
+            disabled={isReadOnly || busy}
+            isLoading={cancelMutation.isPending}
+            onClick={() => setConfirm({ kind: "cancel" })}
+          >
+            Cancel consultation
+          </DxButton>
+          <DxButton variant="text" icon title="Refresh" onClick={refreshAll}>
+            <RotateCcw className={visitQuery.isFetching || consultationsQuery.isFetching ? "animate-spin" : undefined} />
+          </DxButton>
+        </DxToolbarGroup>
+      </DxToolbar>
 
-      <div className="grid gap-8 lg:grid-cols-12">
-        {/* LEFT: History */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="glass-card rounded-[2rem] p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-sm font-black flex items-center gap-2">
-                <History className="h-4 w-4 text-secondary-500" />
-                <span>Consultation History</span>
-              </h3>
-              <span className="px-2.5 py-1 rounded-lg bg-secondary-100 text-secondary-600 text-[9px] font-bold uppercase tracking-widest">
-                {consultations.length}
-              </span>
-            </div>
-
-            {consultations.length === 0 ? (
-              <div className="py-10 text-center">
-                <FileText className="h-10 w-10 mx-auto text-secondary-300 mb-3" />
-                <p className="text-xs text-secondary-500 font-bold">
-                  No consultations recorded for this visit yet.
-                </p>
-                <button
-                  onClick={() => setStartOpen(true)}
-                  className="btn-primary mt-5 gap-2 px-5 py-2 text-xs"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Start First Consultation</span>
-                </button>
-              </div>
+      <div className="grid gap-4 xl:grid-cols-12">
+        {/* ---------- SOAP + clinical panels ---------- */}
+        <div className="space-y-4 xl:col-span-8">
+          <DxPanel
+            title="SOAP note"
+            icon={<FileText />}
+            description={
+              activeConsultation
+                ? `Consultation #${activeConsultation.id} · started ${formatDateTime(activeConsultation.consultation_started_at || activeConsultation.created_at)}`
+                : "No consultation is open on this visit yet."
+            }
+            actions={
+              activeConsultation ? (
+                <>
+                  {isDirty ? <DxBadge tone="warning" dot>Unsaved changes</DxBadge> : null}
+                  <DxStatusBadge status={activeConsultation.status} />
+                </>
+              ) : undefined
+            }
+          >
+            {!activeConsultation ? (
+              <DxMessage
+                tone="info"
+                title="No active consultation"
+                action={
+                  <DxButton size="sm" variant="primary" leftIcon={<Plus />} onClick={openStart}>
+                    Start consultation
+                  </DxButton>
+                }
+              >
+                Start a consultation to begin documenting the encounter using the SOAP framework.
+              </DxMessage>
             ) : (
-              <div className="space-y-2">
-                {consultations.map((c) => {
-                  const statusKey = (c.status || "DRAFT").toUpperCase();
-                  const statusClass = statusStyles[statusKey] ?? statusStyles.DRAFT;
-                  const isActive = c.id === activeId;
-                  const clinician = staffList.find((s) => s.id === c.clinician_staff_id);
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => handleSelectConsultation(c.id)}
-                      className={`w-full text-left p-4 rounded-2xl border transition-all ${isActive
-                          ? "bg-primary-50 border-primary-200 shadow-md"
-                          : "bg-white border-secondary-400 hover:border-primary-200"
-                        }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-mono font-bold text-secondary-400 uppercase">
-                          #{c.id}
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-widest border ${statusClass}`}
-                        >
-                          {statusKey}
-                        </span>
-                      </div>
-                      <p className="text-xs font-black text-secondary-900 truncate">
-                        {clinician
-                          ? `Dr. ${staffDisplayName(clinician)}`
-                          : `Clinician #${c.clinician_staff_id}`}
-                      </p>
-                      <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mt-1 flex items-center gap-1.5">
-                        <Clock className="h-3 w-3" />
-                        {formatDateTime(c.created_at)}
-                      </p>
-                    </button>
-                  );
-                })}
+              <div className="space-y-4">
+                {isReadOnly ? (
+                  <DxMessage tone={String(consultationStatus).toUpperCase() === "CANCELLED" ? "warning" : "success"}>
+                    This consultation is {String(consultationStatus).toUpperCase() === "CANCELLED" ? "cancelled" : "finalized"} and is read-only.
+                  </DxMessage>
+                ) : null}
+
+                {(Object.keys(SOAP_LABELS) as SoapTextKey[]).map((key) => (
+                  <DxGroupBox key={key} caption={SOAP_LABELS[key]}>
+                    <DxTextarea
+                      aria-label={`${SOAP_LABELS[key]} note`}
+                      hint={SOAP_HINTS[key]}
+                      rows={key === "plan_note" ? 5 : 4}
+                      placeholder={`${SOAP_LABELS[key]} note…`}
+                      value={soap[key]}
+                      disabled={isReadOnly || busy}
+                      onChange={(e) => updateSoap({ [key]: e.target.value } as Partial<SoapForm>)}
+                    />
+                  </DxGroupBox>
+                ))}
+
+                {/* A patient can only be admitted on a doctor's recommendation
+                    (recorded here) or on emergency. */}
+                <DxGroupBox caption="Admission">
+                  <DxCheckbox
+                    label="Recommend inpatient admission"
+                    description="Required before this patient can be admitted to a ward (emergencies excepted)."
+                    checked={soap.recommends_admission}
+                    disabled={isReadOnly || busy}
+                    onChange={(e) => updateSoap({ recommends_admission: e.target.checked })}
+                  />
+                  {soap.recommends_admission ? (
+                    <DxTextarea
+                      className="mt-3"
+                      aria-label="Reason for admission"
+                      rows={2}
+                      placeholder="Reason for admission (optional)"
+                      value={soap.admission_recommendation_note}
+                      disabled={isReadOnly || busy}
+                      onChange={(e) => updateSoap({ admission_recommendation_note: e.target.value })}
+                    />
+                  ) : null}
+                </DxGroupBox>
               </div>
             )}
-          </div>
+          </DxPanel>
 
-          {/* Patient 360: chronic problems, progress analytics, baseline, history */}
-          {visit?.patient_id ? (
-            <Patient360Panel patientId={visit.patient_id} />
-          ) : null}
+          {/* Always visible so history shows before a consultation is started;
+              add/edit is gated by an active, non-finalized consultation. */}
+          <DiagnosesPanel visitId={visit.id} consultationId={activeConsultation?.id ?? null} disabled={isReadOnly} />
+          <ConsultationLabPanel visitId={visit.id} consultationId={activeConsultation?.id ?? null} disabled={isReadOnly} />
+          <PrescriptionsPanel visitId={visit.id} consultationId={activeConsultation?.id ?? null} disabled={isReadOnly} />
         </div>
 
-        {/* RIGHT: SOAP Editor + Diagnoses */}
-        <div className="lg:col-span-8 space-y-8">
-          {!activeConsultation ? (
-            <div className="glass-card rounded-[2.5rem] p-16 text-center">
-              <div className="h-16 w-16 mx-auto bg-secondary-50 rounded-3xl flex items-center justify-center mb-4">
-                <Stethoscope className="h-8 w-8 text-secondary-300" />
+        {/* ---------- Context column ---------- */}
+        <div className="space-y-4 xl:col-span-4">
+          <DxPanel
+            title="Latest vitals"
+            icon={<Activity />}
+            actions={
+              <DxButton size="sm" variant="text" icon title="Refresh vitals" onClick={() => vitalsQuery.refetch()}>
+                <RotateCcw className={vitalsQuery.isFetching ? "animate-spin" : undefined} />
+              </DxButton>
+            }
+          >
+            {vitalsQuery.isLoading ? (
+              <div className="space-y-2">
+                <div className="dx-skeleton h-3.5 w-3/4" />
+                <div className="dx-skeleton h-3.5 w-1/2" />
+                <div className="dx-skeleton h-3.5 w-2/3" />
               </div>
-              <h4 className="text-lg font-bold text-secondary-900">No Active Consultation</h4>
-              <p className="text-sm text-secondary-500 mt-2 max-w-md mx-auto">
-                Start a new consultation to begin documenting the clinical encounter using the
-                SOAP framework.
-              </p>
-              <button
-                onClick={() => setStartOpen(true)}
-                className="btn-primary mt-6 gap-2 px-6 py-3"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Start Consultation</span>
-              </button>
-            </div>
-          ) : (
-            <div className="glass-card rounded-[2.5rem] p-10 md:p-12 space-y-8">
-              <div className="flex items-center justify-between border-b border-secondary-400 pb-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md">
-                    <Stethoscope className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black font-display tracking-tight">
-                      Consultation #{activeConsultation.id}
-                    </h3>
-                    <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.25em] mt-0.5 flex items-center gap-2">
-                      <Activity className="h-3 w-3" />
-                      Started {formatDateTime(activeConsultation.consultation_started_at || activeConsultation.created_at)}
-                      {isDirty && !isReadOnly && (
-                        <span className="text-amber-600">• Unsaved Changes</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <span
-                  className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${statusStyles[consultationStatusKey] ?? statusStyles.DRAFT
-                    }`}
-                >
-                  {consultationStatusKey || "DRAFT"}
-                </span>
-              </div>
+            ) : latestVital ? (
+              <DxProps tight items={vitalsItems} />
+            ) : (
+              <DxMessage tone="info">No vital signs recorded for this visit yet.</DxMessage>
+            )}
+          </DxPanel>
 
-              {isReadOnly && (
-                <div className="p-4 rounded-2xl bg-secondary-50 border border-secondary-400 text-secondary-600 text-xs font-bold flex items-center gap-3">
-                  <CheckCircle2 className="h-4 w-4" />
-                  This consultation is{" "}
-                  {consultationStatusKey === "CANCELLED" ? "cancelled" : "finalized"} and is now
-                  read-only.
-                </div>
-              )}
+          <DxPanel
+            title="Consultations"
+            icon={<History />}
+            description={consultations.length ? `${consultations.length} on this visit` : undefined}
+            flush
+          >
+            <DxGrid
+              columns={consultationColumns}
+              data={consultations}
+              rowKey={(c) => c.id}
+              isLoading={consultationsQuery.isLoading}
+              error={consultationsQuery.isError ? apiErrorMessage(consultationsQuery.error, "Could not load consultations.") : null}
+              onRetry={() => consultationsQuery.refetch()}
+              onRowClick={(c) => selectConsultation(c.id)}
+              selectedKey={activeId}
+              borderless
+              maxHeight={260}
+              empty={{
+                icon: Stethoscope,
+                title: "No consultations yet",
+                description: "Start the first consultation for this visit.",
+                action: (
+                  <DxButton size="sm" variant="primary" leftIcon={<Plus />} onClick={openStart}>
+                    Start consultation
+                  </DxButton>
+                ),
+              }}
+            />
+          </DxPanel>
 
-              <SoapField
-                label="Subjective"
-                hint="Patient's description of the complaint, history, symptoms"
-                value={soap.subjective_note}
-                onChange={(v) => {
-                  setSoap({ ...soap, subjective_note: v });
-                  setIsDirty(true);
-                }}
-                disabled={isReadOnly}
-              />
-              <SoapField
-                label="Objective"
-                hint="Physical exam findings, vitals, observations"
-                value={soap.objective_note}
-                onChange={(v) => {
-                  setSoap({ ...soap, objective_note: v });
-                  setIsDirty(true);
-                }}
-                disabled={isReadOnly}
-              />
-              <SoapField
-                label="Assessment"
-                hint="Clinical impression, working diagnosis, differentials"
-                value={soap.assessment_note}
-                onChange={(v) => {
-                  setSoap({ ...soap, assessment_note: v });
-                  setIsDirty(true);
-                }}
-                disabled={isReadOnly}
-              />
-              <SoapField
-                label="Plan"
-                hint="Investigations, prescriptions, follow-up, patient education"
-                value={soap.plan_note}
-                onChange={(v) => {
-                  setSoap({ ...soap, plan_note: v });
-                  setIsDirty(true);
-                }}
-                disabled={isReadOnly}
-              />
-
-              {/* Inpatient-admission recommendation. A patient can only be
-                  admitted on a doctor's recommendation (recorded here) or on
-                  emergency. */}
-              <div className="rounded-2xl border border-secondary-300 bg-secondary-50/60 p-5 dark:border-white/10 dark:bg-white/5">
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-5 w-5 rounded accent-primary-600"
-                    checked={soap.recommends_admission}
-                    disabled={isReadOnly}
-                    onChange={(e) => {
-                      setSoap({ ...soap, recommends_admission: e.target.checked });
-                      setIsDirty(true);
-                    }}
-                  />
-                  <span>
-                    <span className="block text-sm font-bold text-secondary-900 dark:text-secondary-100">
-                      Recommend inpatient admission
-                    </span>
-                    <span className="block text-xs text-secondary-500">
-                      Required before this patient can be admitted to a ward (emergencies excepted).
-                    </span>
-                  </span>
-                </label>
-                {soap.recommends_admission && (
-                  <textarea
-                    className="input-field mt-3 w-full resize-none"
-                    rows={2}
-                    placeholder="Reason for admission (optional)"
-                    value={soap.admission_recommendation_note}
-                    disabled={isReadOnly}
-                    onChange={(e) => {
-                      setSoap({ ...soap, admission_recommendation_note: e.target.value });
-                      setIsDirty(true);
-                    }}
-                  />
-                )}
-              </div>
-
-              {!isReadOnly && (
-                <div className="flex flex-wrap items-center justify-between pt-6 border-t border-secondary-400 gap-3">
-                  <button
-                    onClick={handleCancel}
-                    disabled={isCancelling}
-                    className="btn-secondary gap-2 px-6 text-rose-600 border-rose-100 hover:bg-rose-50 disabled:opacity-50"
-                  >
-                    <Ban className="h-4 w-4" />
-                    {isCancelling ? "Cancelling..." : "Cancel Consultation"}
-                  </button>
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      onClick={handleSaveDraft}
-                      disabled={isSaving || !isDirty}
-                      className="btn-secondary gap-2 px-6 disabled:opacity-50"
-                    >
-                      <Save className="h-4 w-4" />
-                      {isSaving ? "Saving..." : "Save Draft"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFinalizeError(null);
-                        setFinalizeForm({
-                          next_service_delivery_point_id: null,
-                          end_visit: false,
-                          closing_note: "",
-                        });
-                        setFinalizeOpen(true);
-                      }}
-                      className="btn-primary gap-2 px-8 shadow-lg shadow-primary-500/20"
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Finalize
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Diagnoses panel — always visible so historical impressions show
-              even before a consultation is started. Add/Edit is gated by
-              having an active, non-finalized consultation. */}
-          <DiagnosesPanel
-            visitId={visit.id}
-            consultationId={activeConsultation?.id ?? null}
-            disabled={isReadOnly}
-          />
-
-          {/* Laboratory panel — order investigations and review released
-              results (abnormals highlighted) without leaving the encounter. */}
-          <ConsultationLabPanel
-            visitId={visit.id}
-            consultationId={activeConsultation?.id ?? null}
-            disabled={isReadOnly}
-          />
-
-          {/* Prescriptions panel — same pattern: always visible, gated by an
-              active non-finalized consultation. */}
-          <PrescriptionsPanel
-            visitId={visit.id}
-            consultationId={activeConsultation?.id ?? null}
-            disabled={isReadOnly}
-          />
+          {visit.patient_id ? <Patient360Panel patientId={visit.patient_id} /> : null}
         </div>
       </div>
 
-      {/* Start Consultation Modal */}
-      {isStartOpen && (
-        <Modal title="Start Consultation" subtitle="Open A New Clinical Encounter" onClose={() => setStartOpen(false)}>
-          {startError && (
-            <div className="mb-5 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-              <AlertCircle className="h-5 w-5" />
-              <span className="text-sm font-bold">{startError}</span>
-            </div>
-          )}
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                Clinician *
-              </label>
-              <select
-                value={startForm.clinician_staff_id ?? ""}
-                onChange={(e) =>
-                  setStartForm({
-                    ...startForm,
-                    clinician_staff_id: e.target.value ? Number(e.target.value) : null,
-                  })
-                }
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-              >
-                <option value="">Select clinician...</option>
-                {staffList.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    Dr. {staffDisplayName(s)}
-                    {s.designation ? ` · ${s.designation}` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <details className="rounded-2xl border border-secondary-400 bg-secondary-50/50">
-              <summary className="cursor-pointer p-4 text-[10px] font-bold uppercase tracking-widest text-secondary-500 hover:text-secondary-700">
-                Optional: Pre-fill SOAP notes
-              </summary>
-              <div className="p-4 pt-0 space-y-4">
-                <SoapField
-                  label="Subjective"
-                  hint="Symptoms, history"
-                  value={startForm.subjective_note}
-                  onChange={(v) => setStartForm({ ...startForm, subjective_note: v })}
-                  compact
-                />
-                <SoapField
-                  label="Objective"
-                  hint="Findings"
-                  value={startForm.objective_note}
-                  onChange={(v) => setStartForm({ ...startForm, objective_note: v })}
-                  compact
-                />
-                <SoapField
-                  label="Assessment"
-                  hint="Working diagnosis"
-                  value={startForm.assessment_note}
-                  onChange={(v) => setStartForm({ ...startForm, assessment_note: v })}
-                  compact
-                />
-                <SoapField
-                  label="Plan"
-                  hint="Initial plan"
-                  value={startForm.plan_note}
-                  onChange={(v) => setStartForm({ ...startForm, plan_note: v })}
-                  compact
-                />
-              </div>
-            </details>
-          </div>
-          <div className="pt-6 flex gap-4">
-            <button
-              onClick={() => setStartOpen(false)}
-              disabled={isStarting}
-              className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
-            >
+      <DxStatusBar>
+        <DxStatusItem>
+          Visit <b className="dx-mono">{visit.visit_code}</b>
+        </DxStatusItem>
+        {activeConsultation ? (
+          <>
+            <DxStatusItem>
+              Consultation <b>#{activeConsultation.id}</b>
+            </DxStatusItem>
+            <DxStatusItem>
+              Status <b>{humanize(activeConsultation.status)}</b>
+            </DxStatusItem>
+            <DxStatusItem>
+              Clinician <b>{clinicianOf(activeConsultation)}</b>
+            </DxStatusItem>
+          </>
+        ) : (
+          <DxStatusItem>No active consultation</DxStatusItem>
+        )}
+        <span className="ml-auto">
+          {isDirty ? <DxBadge tone="warning" dot>Unsaved changes</DxBadge> : activeConsultation && !isReadOnly ? <span className="dx-faint">All changes saved</span> : null}
+        </span>
+      </DxStatusBar>
+
+      {/* ---------- Start consultation ---------- */}
+      <DxPopup
+        isOpen={isStartOpen}
+        onClose={() => !startMutation.isPending && setStartPopup("closed")}
+        title="Start consultation"
+        size="md"
+        locked={startMutation.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setStartPopup("closed")} disabled={startMutation.isPending}>
               Cancel
-            </button>
-            <button
-              onClick={handleStartConsultation}
-              disabled={isStarting}
-              className="flex-[2] btn-primary py-4 rounded-2xl font-black tracking-tight shadow-xl shadow-primary-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
+            </DxButton>
+            <DxButton
+              variant="primary"
+              leftIcon={<Stethoscope />}
+              isLoading={startMutation.isPending}
+              disabled={effectiveClinicianId == null}
+              onClick={() => startMutation.mutate()}
             >
-              <Stethoscope className="h-4 w-4" />
-              {isStarting ? "Starting..." : "Start Consultation"}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Finalize Modal */}
-      {isFinalizeOpen && activeConsultation && (
-        <Modal
-          title="Finalize Consultation"
-          subtitle="Close The Encounter And Route Or End The Visit"
-          onClose={() => setFinalizeOpen(false)}
-        >
-          {finalizeError && (
-            <div className="mb-5 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-              <AlertCircle className="h-5 w-5" />
-              <span className="text-sm font-bold">{finalizeError}</span>
-            </div>
-          )}
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-2">
-                <Building2 className="h-3 w-3" />
-                Next Service Point (Optional)
-              </label>
-              <select
-                value={finalizeForm.next_service_delivery_point_id ?? ""}
-                onChange={(e) =>
-                  setFinalizeForm({
-                    ...finalizeForm,
-                    next_service_delivery_point_id: e.target.value
-                      ? Number(e.target.value)
-                      : null,
-                  })
-                }
-                disabled={finalizeForm.end_visit}
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full disabled:opacity-50"
-              >
-                <option value="">No routing — keep at current SDP</option>
-                {sdps
-                  .filter((s) => s.id !== currentSdp?.id)
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                setFinalizeForm({ ...finalizeForm, end_visit: !finalizeForm.end_visit })
-              }
-              className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${finalizeForm.end_visit
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                  : "bg-secondary-50 border-secondary-400 text-secondary-500"
-                }`}
-            >
-              <div className="text-left">
-                <p className="text-xs font-bold uppercase tracking-widest">End Visit</p>
-                <p className="text-[10px] font-bold opacity-70 mt-0.5">
-                  Mark the entire visit complete after finalizing
-                </p>
-              </div>
-              <div
-                className={`h-6 w-12 rounded-full p-0.5 transition-all ${finalizeForm.end_visit ? "bg-emerald-500" : "bg-secondary-200"
-                  }`}
-              >
-                <div
-                  className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${finalizeForm.end_visit ? "translate-x-6" : ""
-                    }`}
+              Start consultation
+            </DxButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {startMutation.isError ? <DxMessage tone="danger">{apiErrorMessage(startMutation.error, "Failed to start consultation.")}</DxMessage> : null}
+          <DxSelect
+            label="Clinician"
+            required
+            placeholder="Select clinician…"
+            value={effectiveClinicianId != null ? String(effectiveClinicianId) : ""}
+            onChange={(e) => setStartForm((f) => ({ ...f, clinician_staff_id: e.target.value ? Number(e.target.value) : null }))}
+            options={staffList.map((s) => ({
+              value: String(s.id),
+              label: `${staffDisplayName(s)}${s.designation ? ` · ${s.designation}` : ""}`,
+            }))}
+            error={effectiveClinicianId == null && startMutation.isError ? "Pick the clinician for this consultation." : undefined}
+          />
+          <DxGroupBox caption="Optional: pre-fill SOAP notes">
+            <div className="space-y-3">
+              {(Object.keys(SOAP_LABELS) as SoapTextKey[]).map((key) => (
+                <DxTextarea
+                  key={key}
+                  label={SOAP_LABELS[key]}
+                  rows={2}
+                  value={startForm[key]}
+                  onChange={(e) => setStartForm((f) => ({ ...f, [key]: e.target.value }))}
                 />
-              </div>
-            </button>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-2">
-                <ClipboardList className="h-3 w-3" />
-                Closing Note (Optional)
-              </label>
-              <textarea
-                value={finalizeForm.closing_note}
-                onChange={(e) =>
-                  setFinalizeForm({ ...finalizeForm, closing_note: e.target.value })
-                }
-                placeholder="Summary, hand-off note, or instructions for the next care team..."
-                className="input-field h-28 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-              />
+              ))}
             </div>
-          </div>
-          <div className="pt-6 flex gap-4">
-            <button
-              onClick={() => setFinalizeOpen(false)}
-              disabled={isFinalizing}
-              className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
-            >
+          </DxGroupBox>
+        </div>
+      </DxPopup>
+
+      {/* ---------- Save & Route / End visit ---------- */}
+      <DxPopup
+        isOpen={!embedded && finalizeOpen && !!activeConsultation}
+        onClose={() => !finalizeMutation.isPending && setFinalizeOpen(false)}
+        title={finalizeForm.end_visit ? "End visit" : "Save & Route"}
+        size="md"
+        locked={finalizeMutation.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setFinalizeOpen(false)} disabled={finalizeMutation.isPending}>
               Cancel
-            </button>
-            <button
-              onClick={handleFinalize}
-              disabled={isFinalizing}
-              className="flex-[2] btn-primary py-4 rounded-2xl font-black tracking-tight bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
+            </DxButton>
+            <DxButton
+              variant="primary"
+              rightIcon={<ArrowRight />}
+              isLoading={finalizeMutation.isPending}
+              onClick={() => finalizeMutation.mutate()}
             >
-              <CheckCircle2 className="h-4 w-4" />
-              {isFinalizing ? "Finalizing..." : "Finalize Consultation"}
-            </button>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-}
+              {finalizeForm.end_visit ? "Finalize & end visit" : "Finalize & route"}
+            </DxButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {finalizeMutation.isError ? <DxMessage tone="danger">{apiErrorMessage(finalizeMutation.error, "Failed to finalize consultation.")}</DxMessage> : null}
+          {isDirty ? <DxMessage tone="info">Your unsaved notes will be saved before the consultation is finalized.</DxMessage> : null}
+          <DxSelect
+            label="Next service point"
+            placeholder="No routing — keep at current service point"
+            value={finalizeForm.next_service_delivery_point_id != null ? String(finalizeForm.next_service_delivery_point_id) : ""}
+            onChange={(e) => setFinalizeForm((f) => ({ ...f, next_service_delivery_point_id: e.target.value ? Number(e.target.value) : null }))}
+            disabled={finalizeForm.end_visit}
+            options={sdpOptions}
+            hint={
+              nextStep?.service_delivery_point?.name
+                ? `Care pathway: next step is ${nextStep.service_delivery_point.name}.`
+                : "This visit has no remaining pathway steps — choose the destination manually."
+            }
+          />
+          <DxCheckbox
+            label="End visit instead"
+            description="Mark the entire visit complete after finalizing; the patient is not routed anywhere."
+            checked={finalizeForm.end_visit}
+            onChange={(e) =>
+              setFinalizeForm((f) => ({
+                ...f,
+                end_visit: e.target.checked,
+                next_service_delivery_point_id: e.target.checked ? null : nextStep?.service_delivery_point_id ?? f.next_service_delivery_point_id,
+              }))
+            }
+          />
+          <DxTextarea
+            label="Closing note"
+            rows={3}
+            placeholder="Summary, hand-off note, or instructions for the next care team…"
+            value={finalizeForm.closing_note}
+            onChange={(e) => setFinalizeForm((f) => ({ ...f, closing_note: e.target.value }))}
+          />
+        </div>
+      </DxPopup>
 
-// ---------- Reusable subcomponents ----------
+      {/* ---------- Apply clinical template ---------- */}
+      <DxPopup isOpen={templateOpen} onClose={() => setTemplateOpen(false)} title="Apply clinical template" size="lg"
+        footer={<DxButton onClick={() => setTemplateOpen(false)}>Close</DxButton>}>
+        <div className="space-y-3">
+          <p className="dx-muted text-[12.5px]">
+            Sections are matched to Subjective / Objective / Assessment / Plan by title; anything else is appended to Plan.
+            Empty fields are filled straight away — you will be asked before any existing text is replaced.
+          </p>
+          <DxGrid
+            columns={templateColumns}
+            data={templatesQuery.data}
+            rowKey={(t) => t.id}
+            isLoading={templatesQuery.isLoading}
+            error={templatesQuery.isError ? apiErrorMessage(templatesQuery.error, "Could not load templates.") : null}
+            onRetry={() => templatesQuery.refetch()}
+            onRowClick={applyTemplate}
+            filterRow
+            maxHeight={380}
+            empty={{ icon: LayoutTemplate, title: "No templates", description: "Create SOAP templates under Clinical › Templates." }}
+          />
+        </div>
+      </DxPopup>
 
-type SoapFieldProps = {
-  label: string;
-  hint: string;
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
-  compact?: boolean;
-};
-
-function SoapField({ label, hint, value, onChange, disabled, compact }: SoapFieldProps) {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <label className="text-xs font-black uppercase tracking-[0.2em] text-secondary-700">
-          {label}
-        </label>
-        <span className="text-[10px] font-bold text-secondary-400">{hint}</span>
-      </div>
-      <textarea
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={`${label} note...`}
-        className={`input-field ${compact ? "h-20" : "h-32"
-          } pt-3 px-4 resize-none disabled:opacity-70 disabled:cursor-not-allowed`}
+      {/* ---------- Confirmations ---------- */}
+      <DxConfirm
+        isOpen={confirm?.kind === "switch"}
+        onClose={() => setConfirm(null)}
+        title="Discard unsaved changes?"
+        description="The notes you typed on this consultation have not been saved. Switching will discard them."
+        confirmLabel="Discard & switch"
+        onConfirm={() => {
+          if (confirm?.kind !== "switch") return;
+          setSelectedId(confirm.id);
+          setDraft(null);
+        }}
       />
-    </div>
+      <DxConfirm
+        isOpen={confirm?.kind === "cancel"}
+        onClose={() => setConfirm(null)}
+        title={`Cancel consultation #${activeConsultation?.id ?? ""}?`}
+        description="The consultation will be marked cancelled. This cannot be undone."
+        confirmLabel="Cancel consultation"
+        cancelLabel="Keep"
+        onConfirm={() => cancelMutation.mutateAsync().then(() => undefined, () => undefined)}
+      />
+      <DxConfirm
+        isOpen={confirm?.kind === "overwrite"}
+        onClose={() => setConfirm(null)}
+        tone="primary"
+        title="Replace existing notes?"
+        description={
+          confirm?.kind === "overwrite" ? (
+            <>
+              Empty fields have been filled from <b className="dx-strong">{confirm.template.name}</b>. The following already contain text:{" "}
+              <b className="dx-strong">{confirm.conflicts.map((k) => SOAP_LABELS[k]).join(", ")}</b>. Replace them with the template content?
+            </>
+          ) : null
+        }
+        confirmLabel="Replace"
+        cancelLabel="Keep mine"
+        onConfirm={() => {
+          if (confirm?.kind !== "overwrite" || activeId == null) return;
+          setDraft({ forId: activeId, form: overwriteTemplateConflicts(soap, confirm.mapping, confirm.conflicts) });
+        }}
+      />
+    </>
   );
-}
 
-type ModalProps = {
-  title: string;
-  subtitle: string;
-  onClose: () => void;
-  children: React.ReactNode;
-};
-
-function Modal({ title, subtitle, onClose, children }: ModalProps) {
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] p-10 max-w-2xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"
-        >
-          <X className="h-5 w-5 text-secondary-400" />
-        </button>
-        <div className="flex items-center gap-5 mb-8">
-          <div className="h-14 w-14 rounded-2xl bg-primary-600 text-white flex items-center justify-center shadow-xl shadow-primary-500/20">
-            <Stethoscope className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-black font-display tracking-tight">{title}</h3>
-            <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-              {subtitle}
-            </p>
-          </div>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
+  return embedded ? <div className="space-y-4">{content}</div> : <DxPage>{content}</DxPage>;
 }

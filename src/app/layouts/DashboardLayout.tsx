@@ -2,6 +2,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "@/components/navigation/Sidebar";
 import { Topbar } from "@/components/navigation/Topbar";
 import { ModuleLocked } from "@/components/layout/ModuleLocked";
+import { OfflineBanner } from "@/components/layout/OfflineBanner";
 import { useUI } from "@/app/providers/UIProvider";
 import { useMyModules } from "@/lib/modules/useMyModules";
 import { moduleForPath } from "@/config/module-registry";
@@ -9,8 +10,13 @@ import { ThemeSync } from "@/lib/theme/ThemeSync";
 import { isDedicatedDeployment } from "@/config/env";
 import { useDeploymentInfo } from "@/lib/deployment/useDeploymentInfo";
 
+/**
+ * Application shell — flat enterprise chrome (DevExpress-inspired): a
+ * fixed-width navigation rail on the left, a slim command bar on top and a
+ * neutral canvas for page content. Every module renders inside this frame.
+ */
 export function DashboardLayout() {
-  const { isSidebarCollapsed } = useUI();
+  const { isSidebarCollapsed, sidebarWidth } = useUI();
   const location = useLocation();
   const { isEnabled, known, isSaaSAdmin } = useMyModules();
   const deployment = useDeploymentInfo();
@@ -21,39 +27,37 @@ export function DashboardLayout() {
   // Dedicated installs have no subscription plan — nothing is ever locked;
   // access is governed by the annual licence (banner below + backend gate).
   const requiredModule = moduleForPath(location.pathname);
-  const locked = !isDedicatedDeployment && !isSaaSAdmin && known &&
-    requiredModule !== null && !isEnabled(requiredModule);
+  const locked =
+    !isDedicatedDeployment && !isSaaSAdmin && known && requiredModule !== null && !isEnabled(requiredModule);
   const licenseNotice = deployment.data?.license?.message ?? null;
   const licenseUrgent = Boolean(deployment.data?.license?.in_grace || deployment.data?.license?.blocked);
 
   return (
-    <div className="min-h-screen ambient-bg bg-brand-gray selection:bg-primary-100 selection:text-primary-900 dark:bg-secondary-950 transition-colors duration-500">
+    <div className="dx dx-shell min-h-screen transition-colors duration-200">
       <ThemeSync />
       <Sidebar />
-      <div className={`flex flex-col min-h-screen transition-all duration-300 ${isSidebarCollapsed ? "lg:pl-24" : "lg:pl-72"} print:!pl-0`}>
+      <div
+        className="flex min-h-screen flex-col transition-[padding] duration-200 lg:pl-[var(--app-sidebar-w)] print:!pl-0"
+        style={{ ["--app-sidebar-w" as string]: `${isSidebarCollapsed ? 64 : sidebarWidth}px` }}
+      >
         <Topbar />
-        <main className="flex-1 p-6 md:p-10 animate-fade-in overflow-x-hidden print:p-0">
-          <div className="mx-auto max-w-7xl">
+        <main className="flex-1 overflow-x-hidden p-4 md:p-6 print:p-0">
+          <div className="mx-auto max-w-[1600px]">
+            <OfflineBanner />
             {licenseNotice && (
               <div
                 role="status"
-                className={`mb-6 rounded-xl border px-4 py-3 text-sm font-medium ${
-                  licenseUrgent
-                    ? "border-danger-300 bg-danger-50 text-danger-800"
-                    : "border-warning-300 bg-warning-50 text-warning-800"
-                }`}
+                className={`dx-msg mb-4 ${licenseUrgent ? "dx-msg-danger" : "dx-msg-warning"}`}
               >
-                {licenseNotice}
+                <span className="font-medium">{licenseNotice}</span>
               </div>
             )}
             {locked ? <ModuleLocked moduleName={requiredModule as string} /> : <Outlet />}
           </div>
         </main>
 
-        <footer className="px-6 py-6 border-t border-secondary-200/60 dark:border-white/5 bg-white/40 dark:bg-secondary-950/40 backdrop-blur-sm text-center">
-          <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-secondary-400">
-            Carepoint HMS © 2026 • Enterprise Health Management Systems
-          </p>
+        <footer className="dx-footer px-6 py-2.5 text-center print:hidden">
+          Carepoint HMS © 2026 · Enterprise Health Management Systems
         </footer>
       </div>
     </div>

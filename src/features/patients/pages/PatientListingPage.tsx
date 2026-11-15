@@ -1,230 +1,217 @@
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { SearchInput } from "@/components/forms/SearchInput";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
-import { Pagination } from "@/components/data-table/Pagination";
-import {
-  Plus,
-  User,
-  Phone,
-  MapPin,
-  ArrowRight,
-  RefreshCw,
-} from "lucide-react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { ArrowRight, Plus, RefreshCw, User, Users } from "lucide-react";
+import {
+  DxAvatar,
+  DxBadge,
+  DxButton,
+  DxGrid,
+  DxPage,
+  DxPageHeader,
+  DxPager,
+  DxSearchBox,
+  DxStatusBadge,
+  DxStatusBar,
+  DxStatusItem,
+  DxToolbar,
+  DxToolbarGroup,
+  DxToolbarSeparator,
+  DxToolbarSpacer,
+  ageFrom,
+  apiErrorMessage,
+  formatDate,
+  humanize,
+  type DxGridColumn,
+} from "@/components/dx";
 import { routes } from "@/config/routes";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { getPatients, searchPatients } from "../api/patients.api";
-import type { Patient } from "../api/patients.api";
+import { getPatients, searchPatients, type Patient } from "../api/patients.api";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
+function payerTone(p: Patient): "success" | "info" | "warning" | "neutral" {
+  const cls = String(p.patient_class ?? p.payer_type ?? "").toUpperCase();
+  if (cls.includes("HMO") || cls.includes("INSURANCE")) return "info";
+  if (cls.includes("RETAINER") || cls.includes("CORPORATE")) return "warning";
+  if (cls.includes("SELF") || cls.includes("CASH") || cls.includes("OUT")) return "success";
+  return "neutral";
+}
+
+function payerLabel(p: Patient): string {
+  const cls = p.patient_class ?? p.payer_type;
+  if (!cls) return "Self-pay";
+  const u = String(cls).toUpperCase();
+  if (u === "SELF_PAY" || u === "CASH" || u === "OUT_OF_POCKET") return "Self-pay";
+  if (u === "HMO" || u === "INSURANCE") return "HMO";
+  return humanize(cls);
+}
+
+/**
+ * Patient Registry — the front desk's starting point: find (or register) the
+ * patient, then start a visit straight from the row.
+ */
 export function PatientListingPage() {
   const navigate = useNavigate();
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [meta, setMeta] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
 
-  // Track the latest in-flight request so we can ignore stale responses.
-  // React 19's StrictMode double-mounts components in dev, which can cause
-  // an aborted first request's catch to overwrite a successful retry's state.
-  const requestIdRef = useRef(0);
+  const query = useQuery({
+    queryKey: ["patients", "registry", { page, pageSize, search }],
+    queryFn: () => (search ? searchPatients(search, 50) : getPatients((page - 1) * pageSize, pageSize)),
+    placeholderData: keepPreviousData,
+  });
 
-  const loadPatients = useCallback(async () => {
-    const myRequestId = ++requestIdRef.current;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = search
-        ? await searchPatients(search)
-        : await getPatients((page - 1) * PAGE_SIZE, PAGE_SIZE);
-      // Ignore the response if a newer request has already started or finished
-      if (myRequestId !== requestIdRef.current) return;
-      // Backend returns PaginatedResponse envelope
-      setPatients(response.items || []);
-      setMeta(response.meta);
-      setError(null); // explicit clear on success in case a stale error sneaks in
-    } catch (err: any) {
-      // Ignore aborts and superseded requests
-      if (myRequestId !== requestIdRef.current) return;
-      if (err?.code === "ERR_CANCELED" || err?.name === "CanceledError") return;
-      console.error("Failed to load patients", err);
-      setError("Unable to connect to patient records. Please check your connection.");
-    } finally {
-      if (myRequestId === requestIdRef.current) {
-        setIsLoading(false);
-      }
-    }
-  }, [page, search]);
+  const patients: Patient[] = query.data?.items ?? [];
+  const meta = (query.data?.meta ?? {}) as { total?: number; total_pages?: number; current_page?: number; limit?: number; has_next?: boolean };
 
-  useEffect(() => {
-    loadPatients();
-    // Bumping the ref on unmount means any in-flight response that lands
-    // after unmount is treated as stale and discarded.
-    return () => {
-      requestIdRef.current++;
-    };
-  }, [loadPatients]);
+  const goToDetail = (patient: Patient) => navigate(routes.patientDetail.replace(":patientId", String(patient.id)));
+  const startVisit = (patient: Patient) => navigate(routes.visitInitiate, { state: { patient } });
 
-  const goToDetail = (patient: Patient) =>
-    navigate(routes.patientDetail.replace(":patientId", String(patient.id)));
-
-  const columns: DataTableColumn<Patient>[] = [
-    {
-      key: "profile",
-      header: "Patient Profile",
-      render: (patient) => (
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 text-base font-bold text-white shadow-lg shadow-primary-500/20">
-            {patient.first_name?.[0] || "?"}
-            {patient.last_name?.[0] || "?"}
-          </div>
-          <div>
-            <p className="text-sm font-bold text-secondary-900">
-              {patient.first_name} {patient.last_name}
-            </p>
-            <p className="mt-0.5 text-[11px] font-bold uppercase tracking-tighter text-secondary-400">
-              {patient.gender} •{" "}
-              {patient.date_of_birth
-                ? `${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} Years`
-                : "Age Unknown"}
-            </p>
-          </div>
-        </div>
-      ),
-    },
+  const columns: DxGridColumn<Patient>[] = [
     {
       key: "hospital_number",
-      header: "Hospital ID",
-      render: (patient) => (
-        <span className="data-mono text-xs font-bold text-secondary-600 dark:text-secondary-300">
-          {patient.hospital_number}
-        </span>
-      ),
+      header: "Hospital no.",
+      width: 130,
+      sortable: true,
+      render: (p) => <span className="dx-mono font-semibold">{p.hospital_number}</span>,
     },
     {
-      key: "engagement",
-      header: "Engagement",
-      render: (patient) => (
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-xs font-bold text-secondary-700">
-            <Phone className="h-3.5 w-3.5 text-primary-500" />
-            <span>{patient.phone_number}</span>
-          </div>
-          <div className="flex items-center gap-2 text-[10px] font-bold text-secondary-400">
-            <MapPin className="h-3.5 w-3.5" />
-            <span className="max-w-[120px] truncate">{patient.city || "No Address"}</span>
+      key: "name",
+      header: "Patient",
+      sortable: true,
+      accessor: (p) => `${p.last_name} ${p.first_name}`,
+      render: (p) => (
+        <div className="flex min-w-0 items-center gap-2.5">
+          <DxAvatar name={`${p.first_name} ${p.last_name}`} />
+          <div className="min-w-0">
+            <div className="dx-row-primary truncate">
+              {p.first_name} {p.middle_name ? `${p.middle_name} ` : ""}
+              {p.last_name}
+            </div>
+            <div className="dx-row-secondary">
+              {humanize(p.gender)} · {ageFrom(p.date_of_birth)}
+            </div>
           </div>
         </div>
       ),
     },
+    { key: "phone_number", header: "Phone", width: 140, render: (p) => <span className="dx-mono">{p.phone_number || "—"}</span> },
+    { key: "city", header: "City", width: 140, sortable: true, render: (p) => p.city || <span className="dx-faint">—</span> },
     {
-      key: "payer_type",
-      header: "Payer Type",
-      render: (patient) => (
-        <Badge variant="soft-success">{patient.payer_type || "OUT-OF-POCKET"}</Badge>
-      ),
+      key: "payer",
+      header: "Payer",
+      width: 120,
+      sortable: true,
+      accessor: (p) => payerLabel(p),
+      render: (p) => <DxBadge tone={payerTone(p)}>{payerLabel(p)}</DxBadge>,
     },
+    { key: "status", header: "Status", width: 110, render: (p) => <DxStatusBadge status={p.status} /> },
+    { key: "created_at", header: "Registered", width: 120, sortable: true, render: (p) => <span className="dx-mono">{formatDate(p.created_at)}</span> },
     {
-      key: "operations",
-      header: "Operations",
+      key: "actions",
+      header: "",
+      width: 210,
       align: "right",
-      render: (patient) => (
-        <div className="flex items-center justify-end gap-2">
-          <Link
-            to={routes.patientDetail.replace(":patientId", String(patient.id))}
-            onClick={(e) => e.stopPropagation()}
-            className="rounded-xl border border-primary-500/20 p-2.5 text-primary-600 shadow-sm transition-all hover:bg-primary-500/10 dark:text-primary-400"
-            title="Patient Dashboard"
-          >
-            <User className="h-5 w-5" />
-          </Link>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(routes.visitInitiate, { state: { patient } });
-            }}
-            className="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg shadow-primary-500/10 transition-all hover:bg-primary-700"
-          >
-            <span>Initiate Visit</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
+      render: (p) => (
+        <div className="dx-td-actions" onClick={(e) => e.stopPropagation()}>
+          <DxButton size="sm" variant="text" leftIcon={<User />} onClick={() => goToDetail(p)} title="Patient record">
+            Record
+          </DxButton>
+          <DxButton size="sm" variant="primary" rightIcon={<ArrowRight />} onClick={() => startVisit(p)}>
+            Initiate visit
+          </DxButton>
         </div>
       ),
     },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader
-          title="Patient Registry"
-          description="Access comprehensive electronic medical records and manage patient onboarding."
-        />
-        <Link to={routes.patientRegister} className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
-          <Plus className="h-5 w-5" />
-          <span className="font-bold">New Patient</span>
-        </Link>
-      </div>
+    <DxPage>
+      <DxPageHeader
+        title="Patient Registry"
+        subtitle="Every patient with their hospital number, contact and payer type. Start a visit directly from the row."
+        actions={
+          <Link to={routes.patientRegister} className="dx-btn dx-btn-primary">
+            <Plus aria-hidden /> New patient
+          </Link>
+        }
+      />
 
-      <Card padding="none">
-        {/* Filters Bar */}
-        <div className="flex flex-wrap items-center gap-3 px-6 py-4">
-          <SearchInput
+      <DxToolbar attached>
+        <DxToolbarGroup>
+          <DxSearchBox
             onSearch={(term) => {
               setSearch(term);
               setPage(1);
             }}
-            placeholder="Search by hospital number, name, or phone..."
-            className="w-full sm:w-80"
+            placeholder="Search by hospital number, name or phone…"
+            className="w-80"
+            autoFocus
           />
-          <button
-            onClick={loadPatients}
-            className="btn-ghost p-2.5"
-            aria-label="Refresh patient list"
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
-        </div>
+          {search ? <DxBadge tone="accent">Search: “{search}”</DxBadge> : null}
+        </DxToolbarGroup>
+        <DxToolbarSeparator />
+        <DxButton size="sm" variant="text" leftIcon={<RefreshCw className={query.isFetching ? "animate-spin" : undefined} />} onClick={() => query.refetch()}>
+          Refresh
+        </DxButton>
+        <DxToolbarSpacer />
+        <Link to={routes.membershipCards} className="dx-btn dx-btn-text dx-btn-sm">
+          Membership cards
+        </Link>
+      </DxToolbar>
 
-        {/* Records Table */}
-        <DataTable
-          columns={columns}
-          data={patients}
-          rowKey={(patient) => patient.id}
-          isLoading={isLoading}
-          error={error}
-          onRetry={loadPatients}
-          onRowClick={goToDetail}
-          empty={{
-            icon: User,
-            title: "Registry is Empty",
-            description:
-              "No patient records were found in this facility. Start by admitting your first patient to the registry.",
-            action: (
-              <Link to={routes.patientRegister} className="btn-primary inline-flex items-center gap-2 px-8 py-3">
-                <Plus className="h-4 w-4" />
-                <span>Admission Form</span>
-              </Link>
-            ),
-          }}
-          footer={
-            meta ? (
-              <Pagination
-                page={meta.current_page ?? page}
-                totalPages={meta.total_pages}
-                totalItems={meta.total}
-                pageSize={meta.limit ?? PAGE_SIZE}
-                onPageChange={setPage}
-              />
-            ) : null
-          }
-        />
-      </Card>
-    </div>
+      <DxGrid
+        attached
+        columns={columns}
+        data={patients}
+        rowKey={(p) => p.id}
+        isLoading={query.isLoading}
+        error={query.isError ? apiErrorMessage(query.error, "Unable to connect to patient records.") : null}
+        onRetry={() => query.refetch()}
+        onRowClick={goToDetail}
+        filterRow
+        empty={{
+          icon: Users,
+          title: search ? `No patients match “${search}”` : "Registry is empty",
+          description: search ? "Try a hospital number, surname or phone number." : "Register your first patient to begin.",
+          action: (
+            <Link to={routes.patientRegister} className="dx-btn dx-btn-primary dx-btn-sm">
+              <Plus aria-hidden /> Register patient
+            </Link>
+          ),
+        }}
+        footer={
+          search ? (
+            <div className="dx-pager">
+              <span>
+                <b className="dx-strong">{patients.length}</b> result{patients.length === 1 ? "" : "s"} for “{search}”
+              </span>
+            </div>
+          ) : (
+            <DxPager
+              page={meta.current_page ?? page}
+              totalPages={meta.total_pages}
+              totalItems={meta.total}
+              pageSize={meta.limit ?? pageSize}
+              hasNext={meta.has_next}
+              onPageChange={setPage}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              onPageSizeChange={(n) => {
+                setPageSize(n);
+                setPage(1);
+              }}
+            />
+          )
+        }
+      />
+
+      <DxStatusBar>
+        <DxStatusItem>
+          Patients on file: <b>{meta.total ?? patients.length}</b>
+        </DxStatusItem>
+        <span className="ml-auto">Click a row for the patient record · “Initiate visit” starts the Standard Outpatient Pathway.</span>
+      </DxStatusBar>
+    </DxPage>
   );
 }

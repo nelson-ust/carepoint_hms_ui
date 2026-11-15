@@ -127,11 +127,17 @@ export async function listLabOrdersForVisit(
 }
 
 export async function listLabWorklist(
-  params: { skip?: number; limit?: number; status?: string } = {},
+  params: { skip?: number; limit?: number; status?: string; statuses?: string[] } = {},
 ): Promise<PaginatedResponse<LabOrder>> {
-  const { skip = 0, limit = 50, status } = params;
+  const { skip = 0, limit = 50, status, statuses } = params;
+  // The backend filters on repeated `statuses=` query params (plural); a single
+  // `status` is accepted here for convenience and expanded into that shape.
+  const search = new URLSearchParams();
+  search.set("skip", String(skip));
+  search.set("limit", String(limit));
+  for (const s of statuses ?? (status ? [status] : [])) search.append("statuses", s);
   const response = await apiClient.get<PaginatedResponse<LabOrder>>("/lab/orders/worklist", {
-    params: { skip, limit, status },
+    params: search,
   });
   return response.data;
 }

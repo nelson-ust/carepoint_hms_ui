@@ -67,6 +67,9 @@ export type Worklist = {
   message: string;
   service_delivery_point_id: number;
   service_delivery_point_name?: string | null;
+  service_delivery_point_code?: string | null;
+  /** ServicePointType of this desk (TRIAGE, CLINIC, PHARMACY, …). */
+  service_point_type?: string | null;
   waiting: QueueTicket[];
   serving: QueueTicket[];
   served_today: number;
@@ -180,6 +183,28 @@ function normalizeWorklist(worklist: Worklist): Worklist {
 // ============================================================
 // Worklists
 // ============================================================
+
+/** A desk the signed-in provider is assigned to staff (Service Desk console). */
+export type MyServicePoint = {
+  id: number;
+  name: string;
+  code: string;
+  service_point_type: string;
+  queue_prefix?: string | null;
+  supports_appointments?: boolean;
+  supports_walk_in?: boolean;
+  is_active?: boolean;
+};
+
+/**
+ * The service delivery points the caller is assigned to work. Empty for
+ * principals with no assignment (e.g. admins) — the console then offers every
+ * active service point instead.
+ */
+export async function getMyServicePoints(): Promise<MyServicePoint[]> {
+  const response = await apiClient.get<{ items: MyServicePoint[] }>("/queue/my-service-points");
+  return response.data.items ?? [];
+}
 
 export async function getMyWorklist(serviceDeliveryPointId?: number): Promise<Worklist> {
   const response = await apiClient.get<Worklist>("/queue/my-worklist", {

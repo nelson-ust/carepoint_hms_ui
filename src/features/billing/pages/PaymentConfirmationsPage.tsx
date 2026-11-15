@@ -12,15 +12,19 @@ import {
   XCircle,
 } from "lucide-react";
 import { format, isValid } from "date-fns";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { MetricCard } from "@/components/charts/MetricCard";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
-import { Modal } from "@/components/ui/Modal";
-import { Textarea } from "@/components/ui/Textarea";
-import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
+import {
+  DxBadge,
+  DxButton,
+  DxConfirm,
+  DxGrid,
+  DxKpi,
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxPopup,
+  DxTextarea,
+  type DxGridColumn,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiClient } from "@/lib/api/api-client";
 import { subscriptionPlanApi, type SubscriptionPayment } from "../api/subscription-plan.api";
@@ -92,18 +96,19 @@ export function PaymentConfirmationsPage() {
     return { count: payments.length, sum, withProof };
   }, [payments]);
 
-  const columns: DataTableColumn<SubscriptionPayment>[] = [
+  const columns: DxGridColumn<SubscriptionPayment>[] = [
     {
       key: "tenant",
       header: "Tenant",
+      minWidth: 200,
       render: (p) => (
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-[var(--dx-radius)] bg-[var(--dx-accent-soft)] text-[var(--dx-accent)] shrink-0">
             <Building2 className="h-4 w-4" />
-          </div>
+          </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-secondary-900">{p.tenant_name || `Tenant #${p.tenant_id}`}</p>
-            <p className="data-mono text-[11px] text-secondary-400">Invoice #{p.invoice_id}</p>
+            <p className="truncate font-medium text-[var(--dx-text)]">{p.tenant_name || `Tenant #${p.tenant_id}`}</p>
+            <p className="font-mono text-[11px] text-[var(--dx-text-muted)]">Invoice #{p.invoice_id}</p>
           </div>
         </div>
       ),
@@ -112,106 +117,110 @@ export function PaymentConfirmationsPage() {
       key: "amount",
       header: "Amount",
       align: "right",
-      render: (p) => <span className="data-mono text-sm font-bold text-secondary-900">{money(p.amount, p.currency)}</span>,
+      width: 150,
+      accessor: (p) => Number(p.amount || 0),
+      render: (p) => <span className="font-mono font-medium text-[var(--dx-text)]">{money(p.amount, p.currency)}</span>,
     },
     {
       key: "bank",
       header: "Payer",
+      minWidth: 180,
       render: (p) => (
-        <div className="text-xs">
-          <p className="font-bold text-secondary-700">{p.payer_bank_name || "—"}</p>
-          <p className="text-secondary-400">{p.payer_account_name || ""} {p.payer_reference ? `· ${p.payer_reference}` : ""}</p>
+        <div>
+          <p className="font-medium text-[var(--dx-text)]">{p.payer_bank_name || "—"}</p>
+          <p className="text-[11px] text-[var(--dx-text-muted)]">
+            {p.payer_account_name || ""} {p.payer_reference ? `· ${p.payer_reference}` : ""}
+          </p>
         </div>
       ),
     },
     {
       key: "method",
       header: "Method",
+      width: 150,
       render: (p) => (
-        <Badge variant="secondary">
-          <Landmark className="mr-1 h-3 w-3" />
+        <DxBadge tone="neutral">
+          <Landmark className="h-3 w-3" />
           {(p.payment_method || "MANUAL").replace(/_/g, " ")}
-        </Badge>
+        </DxBadge>
       ),
     },
     {
       key: "submitted",
       header: "Submitted",
-      render: (p) => <span className="text-xs text-secondary-500">{safeDate(p.paid_at)}</span>,
+      width: 170,
+      accessor: (p) => p.paid_at ?? "",
+      render: (p) => <span className="text-[var(--dx-text-muted)]">{safeDate(p.paid_at)}</span>,
     },
     {
       key: "proof",
       header: "Proof",
+      width: 100,
       render: (p) =>
         p.has_proof ? (
-          <button
-            type="button"
-            className="btn-ghost inline-flex px-2.5 py-1.5 text-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              viewProof(p.id);
-            }}
-          >
-            <Download className="h-3.5 w-3.5" /> View
-          </button>
+          <DxButton size="sm" variant="text" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => viewProof(p.id)}>
+            View
+          </DxButton>
         ) : (
-          <span className="text-xs text-secondary-400">None</span>
+          <span className="text-[var(--dx-text-muted)]">None</span>
         ),
     },
     {
       key: "actions",
-      header: "",
+      header: "Actions",
       align: "right",
+      width: 180,
       render: (p) => (
-        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="primary"
+        <div className="flex items-center justify-end gap-1.5">
+          <DxButton
             size="sm"
-            onClick={() => setConfirmTarget(p)}
+            variant="primary"
             leftIcon={<CheckCircle2 className="h-3.5 w-3.5" />}
+            onClick={() => setConfirmTarget(p)}
           >
             Confirm
-          </Button>
-          <Button
-            variant="danger"
+          </DxButton>
+          <DxButton
             size="sm"
+            variant="outline-danger"
+            leftIcon={<XCircle className="h-3.5 w-3.5" />}
             onClick={() => {
               setRejectReason("");
               setRejectTarget(p);
             }}
-            leftIcon={<XCircle className="h-3.5 w-3.5" />}
           >
             Reject
-          </Button>
+          </DxButton>
         </div>
       ),
     },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <PageHeader
-        title="Payment Confirmations"
-        description="Review and confirm manual bank payments submitted by tenants."
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "SaaS admin" }, { label: "Payment confirmations" }]}
+        title="Payment confirmations"
+        subtitle="Review and confirm manual bank payments submitted by tenants."
         actions={
-          <Button
-            variant="ghost"
+          <DxButton
+            leftIcon={<RefreshCw className={pendingQuery.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             onClick={() => pendingQuery.refetch()}
-            leftIcon={<RefreshCw className={`h-4 w-4 ${pendingQuery.isFetching ? "animate-spin" : ""}`} />}
           >
             Refresh
-          </Button>
+          </DxButton>
         }
       />
 
-      <div className="grid gap-6 sm:grid-cols-3">
-        <MetricCard label="Awaiting Confirmation" value={totals.count} icon={Clock} tone="amber" isLoading={pendingQuery.isLoading} />
-        <MetricCard label="Total Pending Value" value={money(totals.sum)} icon={Banknote} tone="primary" isLoading={pendingQuery.isLoading} />
-        <MetricCard label="With Proof Attached" value={totals.withProof} icon={FileText} tone="cyan" isLoading={pendingQuery.isLoading} />
+      <div className="grid gap-3 md:grid-cols-3">
+        <DxKpi label="Awaiting confirmation" value={totals.count} icon={Clock} tone="warning" isLoading={pendingQuery.isLoading} />
+        <DxKpi label="Total pending value" value={money(totals.sum)} icon={Banknote} tone="accent" isLoading={pendingQuery.isLoading} />
+        <DxKpi label="With proof attached" value={totals.withProof} icon={FileText} tone="info" isLoading={pendingQuery.isLoading} />
       </div>
 
-      <Card padding="none">
-        <DataTable
+      <DxPanel title="Pending payments" icon={<Banknote className="h-4 w-4" />} flush>
+        <DxGrid
+          borderless
           columns={columns}
           data={payments}
           rowKey={(p) => p.id}
@@ -224,9 +233,9 @@ export function PaymentConfirmationsPage() {
             description: "There are no manual payments awaiting confirmation right now.",
           }}
         />
-      </Card>
+      </DxPanel>
 
-      <ConfirmDialog
+      <DxConfirm
         isOpen={!!confirmTarget}
         onClose={() => setConfirmTarget(null)}
         title="Confirm this payment?"
@@ -242,20 +251,21 @@ export function PaymentConfirmationsPage() {
         onConfirm={async () => {
           if (!confirmTarget) return;
           await confirmMut.mutateAsync(confirmTarget.id);
+          setConfirmTarget(null);
         }}
       />
 
-      <Modal
+      <DxPopup
         isOpen={!!rejectTarget}
         onClose={() => setRejectTarget(null)}
         title="Reject payment"
         size="md"
         footer={
-          <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={() => setRejectTarget(null)} disabled={rejectMut.isPending}>
+          <>
+            <DxButton onClick={() => setRejectTarget(null)} disabled={rejectMut.isPending}>
               Cancel
-            </Button>
-            <Button
+            </DxButton>
+            <DxButton
               variant="danger"
               isLoading={rejectMut.isPending}
               onClick={async () => {
@@ -265,21 +275,21 @@ export function PaymentConfirmationsPage() {
               }}
             >
               Reject payment
-            </Button>
-          </div>
+            </DxButton>
+          </>
         }
       >
-        <p className="mb-4 text-sm font-medium text-secondary-600">
+        <p className="mb-3 text-[var(--dx-text-muted)]">
           Let the tenant know why this evidence was rejected so they can re-submit.
         </p>
-        <Textarea
+        <DxTextarea
           label="Reason"
           placeholder="e.g. The uploaded receipt doesn't match the amount due."
           value={rejectReason}
           onChange={(e) => setRejectReason(e.target.value)}
           rows={3}
         />
-      </Modal>
-    </div>
+      </DxPopup>
+    </DxPage>
   );
 }

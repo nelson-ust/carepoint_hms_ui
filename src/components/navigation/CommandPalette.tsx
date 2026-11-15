@@ -39,6 +39,24 @@ export function CommandPalette({
     });
   }, [items, query]);
 
+  // Group results by category, preserving the sidebar's category order (the
+  // incoming `items` are already ordered Core → Clinical → … ). A running flat
+  // index keeps ↑/↓ keyboard navigation aligned with the rendered rows.
+  const groups = useMemo(() => {
+    const out: { category: string; items: { m: AppModule; i: number }[] }[] = [];
+    const byCat = new Map<string, { m: AppModule; i: number }[]>();
+    filtered.forEach((m, i) => {
+      let bucket = byCat.get(m.category);
+      if (!bucket) {
+        bucket = [];
+        byCat.set(m.category, bucket);
+        out.push({ category: m.category, items: bucket });
+      }
+      bucket.push({ m, i });
+    });
+    return out;
+  }, [filtered]);
+
   useEffect(() => {
     if (open) {
       setQuery("");
@@ -116,41 +134,48 @@ export function CommandPalette({
               Nothing matches “{query}”.
             </p>
           ) : (
-            filtered.map((m, i) => {
-              const active = i === index;
-              return (
-                <button
-                  key={m.code}
-                  data-active={active || undefined}
-                  onMouseEnter={() => setIndex(i)}
-                  onClick={() => openItem(m)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
-                    active
-                      ? "bg-primary-500/15 ring-1 ring-primary-500/30"
-                      : "hover:bg-white/5"
-                  }`}
-                >
-                  <span
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                      active ? "bg-primary-500 text-white" : "bg-white/5 text-secondary-300"
-                    }`}
-                  >
-                    <m.icon className="h-4 w-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className={`block truncate text-sm font-bold ${active ? "text-white" : "text-secondary-100"}`}>
-                      {m.label}
-                    </span>
-                    {m.description ? (
-                      <span className="block truncate text-xs text-secondary-500">{m.description}</span>
-                    ) : null}
-                  </span>
-                  <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.2em] text-secondary-500">
-                    {m.category}
-                  </span>
-                </button>
-              );
-            })
+            <div className="space-y-1.5">
+              {groups.map((g) => (
+                <div key={g.category}>
+                  <div className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-[0.18em] text-secondary-500">
+                    {g.category}
+                  </div>
+                  {g.items.map(({ m, i }) => {
+                    const active = i === index;
+                    return (
+                      <button
+                        key={m.code}
+                        data-active={active || undefined}
+                        onMouseEnter={() => setIndex(i)}
+                        onClick={() => openItem(m)}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                          active ? "bg-primary-500/15 ring-1 ring-primary-500/30" : "hover:bg-white/5"
+                        }`}
+                      >
+                        <span
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                            active ? "bg-primary-500 text-white" : "bg-white/5 text-secondary-300"
+                          }`}
+                        >
+                          <m.icon className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className={`block truncate text-sm font-bold ${active ? "text-white" : "text-secondary-100"}`}>
+                            {m.label}
+                          </span>
+                          {m.description ? (
+                            <span className="block truncate text-xs text-secondary-500">{m.description}</span>
+                          ) : null}
+                        </span>
+                        <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.2em] text-secondary-500">
+                          {m.category}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           )}
         </div>
 

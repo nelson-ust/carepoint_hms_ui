@@ -2,6 +2,26 @@ import { apiClient } from "@/lib/api/api-client";
 
 // ---------- types ----------
 
+export type FinanceDashboard = {
+  as_of: string;
+  kpis: {
+    revenue_billed_mtd: string; revenue_billed_ytd: string;
+    collected_today: string; collected_mtd: string; collected_ytd: string;
+    expense_mtd: string; expense_ytd: string;
+    surplus_mtd: string; surplus_ytd: string; collection_rate: string;
+    ar_outstanding: string; ar_overdue: string;
+    ap_outstanding: string; ap_overdue: string;
+    cash_on_hand: string; net_working_position: string;
+  };
+  ar_aging: { current: string; d1_30: string; d31_60: string; d61_90: string; d90_plus: string };
+  ap: { outstanding: string; overdue: string; overdue_count: number; open_bills: number };
+  cash_accounts: { name: string; subtitle: string; type: string; balance: string }[];
+  trend: { month: string; billed: string; collected: string; expense: string }[];
+  ar_segments: { patient_self_pay: string; hmo_fee_for_service: string; capitation: string; total: string };
+  period: { code: string; name: string; status: string; end_date: string } | null;
+  alerts: { severity: "info" | "warning" | "danger"; title: string; detail: string }[];
+};
+
 export type BankAccount = {
   id: number; name: string; bank_name?: string | null;
   account_number_masked?: string | null; account_id: number;
@@ -172,6 +192,8 @@ export const financeExtApi = {
   arSegments: () =>
     g<{ patient_self_pay: string; hmo_fee_for_service: string; capitation: string;
         total: string }>("/accounting-ext/reports/ar-segments"),
+  financeDashboard: () =>
+    g<{ data: FinanceDashboard }>("/accounting-ext/finance-dashboard").then((d) => d.data),
   preCloseChecklist: (periodId: number) =>
     g<{ period: string; ready: boolean;
         checklist: { item: string; count: number; ok: boolean }[] }>(

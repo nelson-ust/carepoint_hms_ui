@@ -9,15 +9,23 @@ import {
   Landmark,
   Receipt,
   RefreshCw,
-  Search,
 } from "lucide-react";
 import { format, isValid } from "date-fns";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { MetricCard } from "@/components/charts/MetricCard";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
+import {
+  DxBadge,
+  DxButton,
+  DxGrid,
+  DxKpi,
+  DxPage,
+  DxPageHeader,
+  DxSearchBox,
+  DxSegmented,
+  DxToolbar,
+  DxToolbarSeparator,
+  DxToolbarSpacer,
+  type DxBadgeTone,
+  type DxGridColumn,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiClient } from "@/lib/api/api-client";
 import { apiErrorMessage } from "@/lib/api/api-error";
@@ -47,25 +55,27 @@ function safeDate(v?: string | null): string {
   return isValid(d) ? format(d, "MMM d, yyyy HH:mm") : "—";
 }
 
-const STATUS_TABS: { value: string; label: string }[] = [
-  { value: "SUCCEEDED", label: "Confirmed" },
-  { value: "PENDING", label: "Pending" },
-  { value: "FAILED", label: "Rejected" },
-  { value: "ALL", label: "All" },
+const STATUS_TABS = [
+  { key: "SUCCEEDED", label: "Confirmed" },
+  { key: "PENDING", label: "Pending" },
+  { key: "FAILED", label: "Rejected" },
+  { key: "ALL", label: "All" },
 ];
 
+const STATUS_TONES: Record<string, { tone: DxBadgeTone; label: string }> = {
+  SUCCEEDED: { tone: "success", label: "Confirmed" },
+  PENDING: { tone: "warning", label: "Pending" },
+  FAILED: { tone: "danger", label: "Rejected" },
+};
 function statusBadge(status: string) {
-  const s = status.toUpperCase();
-  if (s === "SUCCEEDED") return <Badge variant="soft-success">Confirmed</Badge>;
-  if (s === "PENDING") return <Badge variant="soft-warning">Pending</Badge>;
-  if (s === "FAILED") return <Badge variant="soft-danger">Rejected</Badge>;
-  return <Badge variant="secondary">{s}</Badge>;
+  const s = (status || "").toUpperCase();
+  const m = STATUS_TONES[s];
+  return <DxBadge tone={m?.tone ?? "neutral"} dot>{m?.label ?? s}</DxBadge>;
 }
 
 export function PaymentsLookupPage() {
   const toast = useToast();
   const [status, setStatus] = useState("SUCCEEDED");
-  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
 
   const paymentsQuery = useQuery({
@@ -100,25 +110,19 @@ export function PaymentsLookupPage() {
     }
   };
 
-  const submitSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSearch(searchInput);
-  };
-
-  const columns: DataTableColumn<SubscriptionPayment>[] = [
+  const columns: DxGridColumn<SubscriptionPayment>[] = [
     {
       key: "tenant",
       header: "Tenant",
+      minWidth: 200,
       render: (p) => (
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-[var(--dx-radius)] bg-[var(--dx-accent-soft)] text-[var(--dx-accent)] shrink-0">
             <Building2 className="h-4 w-4" />
-          </div>
+          </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-secondary-900">
-              {p.tenant_name || `Tenant #${p.tenant_id}`}
-            </p>
-            <p className="data-mono text-[11px] text-secondary-400">Invoice #{p.invoice_id}</p>
+            <p className="truncate font-medium text-[var(--dx-text)]">{p.tenant_name || `Tenant #${p.tenant_id}`}</p>
+            <p className="font-mono text-[11px] text-[var(--dx-text-muted)]">Invoice #{p.invoice_id}</p>
           </div>
         </div>
       ),
@@ -127,21 +131,22 @@ export function PaymentsLookupPage() {
       key: "amount",
       header: "Amount",
       align: "right",
-      render: (p) => (
-        <span className="data-mono text-sm font-bold text-secondary-900">{money(p.amount, p.currency)}</span>
-      ),
+      width: 150,
+      accessor: (p) => Number(p.amount || 0),
+      render: (p) => <span className="font-mono font-medium text-[var(--dx-text)]">{money(p.amount, p.currency)}</span>,
     },
     {
       key: "receipt",
       header: "Receipt / Ref",
+      minWidth: 170,
       render: (p) => (
-        <div className="text-xs">
-          <p className="flex items-center gap-1 font-bold text-secondary-700">
-            <Receipt className="h-3 w-3 text-secondary-400" />
+        <div>
+          <p className="flex items-center gap-1 font-medium text-[var(--dx-text)]">
+            <Receipt className="h-3 w-3 text-[var(--dx-text-muted)]" />
             {p.receipt_number || "—"}
           </p>
           {p.payer_reference || p.transaction_reference ? (
-            <p className="flex items-center gap-1 text-secondary-400">
+            <p className="flex items-center gap-1 text-[11px] text-[var(--dx-text-muted)]">
               <Hash className="h-3 w-3" />
               {p.payer_reference || p.transaction_reference}
             </p>
@@ -152,139 +157,89 @@ export function PaymentsLookupPage() {
     {
       key: "method",
       header: "Method",
+      width: 150,
       render: (p) => (
-        <Badge variant="secondary">
-          <Landmark className="mr-1 h-3 w-3" />
+        <DxBadge tone="neutral">
+          <Landmark className="h-3 w-3" />
           {(p.payment_method || "MANUAL").replace(/_/g, " ")}
-        </Badge>
+        </DxBadge>
       ),
     },
     {
       key: "status",
       header: "Status",
+      width: 130,
+      accessor: (p) => String(p.status),
       render: (p) => statusBadge(String(p.status)),
     },
     {
       key: "confirmed",
       header: "Confirmed",
-      render: (p) => (
-        <span className="text-xs text-secondary-500">{safeDate(p.confirmed_at || p.paid_at)}</span>
-      ),
+      width: 170,
+      accessor: (p) => p.confirmed_at || p.paid_at || "",
+      render: (p) => <span className="text-[var(--dx-text-muted)]">{safeDate(p.confirmed_at || p.paid_at)}</span>,
     },
     {
       key: "proof",
       header: "Proof",
       align: "right",
+      width: 100,
       render: (p) =>
         p.has_proof ? (
-          <button
-            type="button"
-            className="btn-ghost inline-flex px-2.5 py-1.5 text-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              viewProof(p.id);
-            }}
-          >
-            <Download className="h-3.5 w-3.5" /> View
-          </button>
+          <DxButton size="sm" variant="text" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => viewProof(p.id)}>
+            View
+          </DxButton>
         ) : (
-          <span className="text-xs text-secondary-400">None</span>
+          <span className="text-[var(--dx-text-muted)]">None</span>
         ),
     },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <PageHeader
-        title="Payment Lookup"
-        description="Search and review subscription payments received from tenants."
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "SaaS admin" }, { label: "Payment lookup" }]}
+        title="Payment lookup"
+        subtitle="Search and review subscription payments received from tenants."
         actions={
-          <Button
-            variant="ghost"
+          <DxButton
+            leftIcon={<RefreshCw className={paymentsQuery.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
             onClick={() => paymentsQuery.refetch()}
-            leftIcon={<RefreshCw className={`h-4 w-4 ${paymentsQuery.isFetching ? "animate-spin" : ""}`} />}
           >
             Refresh
-          </Button>
+          </DxButton>
         }
       />
 
-      <div className="grid gap-6 sm:grid-cols-3">
-        <MetricCard
-          label="Records Shown"
-          value={totals.count}
-          icon={Receipt}
-          tone="primary"
-          isLoading={paymentsQuery.isLoading}
-        />
-        <MetricCard
-          label="Confirmed Payments"
-          value={totals.confirmedCount}
-          icon={CheckCircle2}
-          tone="violet"
-          isLoading={paymentsQuery.isLoading}
-        />
-        <MetricCard
-          label="Confirmed Value"
-          value={money(totals.sum)}
-          icon={Banknote}
-          tone="cyan"
-          isLoading={paymentsQuery.isLoading}
-        />
+      <div className="grid gap-3 md:grid-cols-3">
+        <DxKpi label="Records shown" value={totals.count} icon={Receipt} tone="accent" isLoading={paymentsQuery.isLoading} />
+        <DxKpi label="Confirmed payments" value={totals.confirmedCount} icon={CheckCircle2} tone="info" isLoading={paymentsQuery.isLoading} />
+        <DxKpi label="Confirmed value" value={money(totals.sum)} icon={Banknote} tone="success" isLoading={paymentsQuery.isLoading} />
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-2 rounded-2xl bg-secondary-100 p-1 dark:bg-white/5">
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setStatus(tab.value)}
-              className={`rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-widest transition-all ${
-                status === tab.value
-                  ? "bg-white text-primary-600 shadow-sm dark:bg-secondary-800"
-                  : "text-secondary-500 hover:text-secondary-800"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <form onSubmit={submitSearch} className="relative w-full max-w-sm">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search tenant, receipt or reference…"
-            className="w-full rounded-2xl border border-secondary-300 bg-white/70 py-3 pl-12 pr-24 text-sm outline-none focus:border-primary-500"
-          />
-          <button
-            type="submit"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-primary-500 px-4 py-1.5 text-xs font-bold text-white hover:bg-primary-600"
-          >
-            Search
-          </button>
-        </form>
-      </div>
+      <DxToolbar attached>
+        <DxSegmented value={status} onChange={setStatus} items={STATUS_TABS} />
+        <DxToolbarSeparator />
+        <DxToolbarSpacer />
+        <DxSearchBox onSearch={setSearch} placeholder="Search tenant, receipt or reference…" className="w-72" />
+      </DxToolbar>
 
-      <Card padding="none">
-        <DataTable
-          columns={columns}
-          data={payments}
-          rowKey={(p) => p.id}
-          isLoading={paymentsQuery.isLoading}
-          error={paymentsQuery.error ? paymentsLoadError(paymentsQuery.error) : null}
-          onRetry={() => paymentsQuery.refetch()}
-          empty={{
-            icon: Receipt,
-            title: search ? "No matching payments" : "No payments found",
-            description: search
-              ? "Try a different tenant name, receipt number, or reference."
-              : "Confirmed subscription payments will appear here.",
-          }}
-        />
-      </Card>
-    </div>
+      <DxGrid
+        attached
+        columns={columns}
+        data={payments}
+        rowKey={(p) => p.id}
+        isLoading={paymentsQuery.isLoading}
+        error={paymentsQuery.error ? paymentsLoadError(paymentsQuery.error) : null}
+        onRetry={() => paymentsQuery.refetch()}
+        empty={{
+          icon: Receipt,
+          title: search ? "No matching payments" : "No payments found",
+          description: search
+            ? "Try a different tenant name, receipt number, or reference."
+            : "Confirmed subscription payments will appear here.",
+        }}
+      />
+    </DxPage>
   );
 }

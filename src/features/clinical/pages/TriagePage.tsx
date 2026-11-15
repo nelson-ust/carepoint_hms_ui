@@ -1,300 +1,684 @@
-import { PageHeader } from "@/components/layout/PageHeader";
-import { useState, useEffect } from "react";
+import { useMemo, useState, type ChangeEvent, type ElementType } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-   Activity,
-   Thermometer,
-   Heart,
-   Wind,
-   Weight,
-   ArrowUpRight,
-   Scale,
-   Droplet,
-   Save,
-   Clock,
-   User,
-   History,
-   AlertCircle
+  Activity,
+  ArrowLeft,
+  ArrowRight,
+  Droplet,
+  Eraser,
+  Heart,
+  History,
+  RotateCcw,
+  Save,
+  Scale,
+  Thermometer,
+  Wind,
 } from "lucide-react";
-import { recordVitalSigns, getVisitVitalSigns, VitalSign } from "../api/vital-signs.api";
-import { getCurrentStaff } from "@/features/staff/api/staff.api";
-import { getVisitDetails, rerouteVisit, Visit } from "@/features/visits/api/visits.api";
-import { useParams, useNavigate } from "react-router-dom";
+import {
+  DxBadge,
+  DxButton,
+  DxField,
+  DxGrid,
+  DxGroupBox,
+  DxInput,
+  DxMessage,
+  DxPage,
+  DxPageHeader,
+  DxPageLoading,
+  DxPanel,
+  DxPopup,
+  DxProps,
+  DxSelect,
+  DxSkeleton,
+  DxStatusBar,
+  DxStatusItem,
+  DxTextarea,
+  DxToolbar,
+  DxToolbarGroup,
+  DxToolbarSpacer,
+  apiErrorMessage,
+  formatDateTime,
+  type DxGridColumn,
+} from "@/components/dx";
+import { useToast } from "@/components/feedback/ToastProvider";
 import { routes } from "@/config/routes";
+import { getCurrentStaff } from "@/features/staff/api/staff.api";
+import {
+  advanceVisit,
+  getServiceDeliveryPoints,
+  getVisitDetails,
+  rerouteVisit,
+  type ServiceDeliveryPoint,
+} from "@/features/visits/api/visits.api";
+import { VisitBanner } from "@/features/visits/components/VisitBanner";
+import { nextPathwayStep, patientDisplayName } from "@/features/visits/lib/clinic-flow";
+import {
+  bmiCategory,
+  computeBmi,
+  computeMews,
+  getVisitVitalSigns,
+  mewsBand,
+  recordVitalSigns,
+  vitalFlag,
+  type RecordVitalSignPayload,
+  type VitalSign,
+} from "../api/vital-signs.api";
 
-export function TriagePage() {
-   const navigate = useNavigate();
-   const { visitId } = useParams<{ visitId: string }>();
+// ============================================================
+// Form model
+// ============================================================
 
-   const [visit, setVisit] = useState<Visit | null>(null);
-   const [history, setHistory] = useState<VitalSign[]>([]);
-   const [isSubmitting, setIsSubmitting] = useState(false);
-   const [isLoading, setIsLoading] = useState(true);
-   const [error, setError] = useState<string | null>(null);
+type VitalKey =
+  | "temperature_celsius"
+  | "pulse_rate"
+  | "respiratory_rate"
+  | "oxygen_saturation"
+  | "systolic_bp"
+  | "diastolic_bp"
+  | "weight_kg"
+  | "height_cm";
 
-   const [vitals, setVitals] = useState<any>({
-      temperature_celsius: undefined,
-      pulse_rate: undefined,
-      respiratory_rate: undefined,
-      systolic_bp: undefined,
-      diastolic_bp: undefined,
-      oxygen_saturation: undefined,
-      weight_kg: undefined,
-      height_cm: undefined,
-      pain_score: 0,
-   });
+type VitalsForm = Record<VitalKey, string> & { pain_score: string; notes: string };
 
-   const [bmi, setBmi] = useState<number | null>(null);
+const EMPTY_FORM: VitalsForm = {
+  temperature_celsius: "",
+  pulse_rate: "",
+  respiratory_rate: "",
+  oxygen_saturation: "",
+  systolic_bp: "",
+  diastolic_bp: "",
+  weight_kg: "",
+  height_cm: "",
+  pain_score: "0",
+  notes: "",
+};
 
-   useEffect(() => {
-      const loadContext = async () => {
-         if (!visitId) return;
-         setIsLoading(true);
-         try {
-            const [visitData, vitalsHistory] = await Promise.all([
-               getVisitDetails(Number(visitId)),
-               getVisitVitalSigns(Number(visitId))
-            ]);
-            setVisit(visitData);
-            setHistory(vitalsHistory.items);
-         } catch (err) {
-            console.error("Failed to load triage context", err);
-            setError("Could not load visit details. Please verify the visit ID.");
-         } finally {
-            setIsLoading(false);
-         }
-      };
-      loadContext();
-   }, [visitId]);
+type FieldSpec = {
+  key: VitalKey;
+  label: string;
+  unit: string;
+  icon: ElementType;
+  placeholder: string;
+  step: string;
+  min: number;
+  max: number;
+};
 
-   useEffect(() => {
-      if (vitals.weight_kg && vitals.height_cm) {
-         const heightInMeters = vitals.height_cm / 100;
-         const calculatedBmi = vitals.weight_kg / (heightInMeters * heightInMeters);
-         setBmi(parseFloat(calculatedBmi.toFixed(1)));
-      } else {
-         setBmi(null);
+const INDEX_FIELDS: FieldSpec[] = [
+  { key: "temperature_celsius", label: "Temperature", unit: "°C", icon: Thermometer, placeholder: "36.8", step: "0.1", min: 30, max: 45 },
+  { key: "pulse_rate", label: "Pulse rate", unit: "bpm", icon: Heart, placeholder: "72", step: "1", min: 20, max: 250 },
+  { key: "respiratory_rate", label: "Respiratory rate", unit: "cpm", icon: Wind, placeholder: "16", step: "1", min: 4, max: 70 },
+  { key: "oxygen_saturation", label: "SpO₂", unit: "%", icon: Droplet, placeholder: "98", step: "1", min: 50, max: 100 },
+];
+
+const PAIN_OPTIONS = Array.from({ length: 11 }, (_, i) => ({
+  value: String(i),
+  label: i === 0 ? "0 — No pain" : i <= 3 ? `${i} — Mild` : i <= 6 ? `${i} — Moderate` : `${i} — Severe`,
+}));
+
+const num = (v: string): number | null => {
+  if (v.trim() === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+// ============================================================
+// Page
+// ============================================================
+
+/**
+ * Triage workstation. The nurse records the physiological index, the page
+ * derives BMI + MEWS live, and "Save & Route" closes the triage step and moves
+ * the patient to the next checkpoint on their care pathway (consulting room).
+ */
+export function TriagePage(props: { visitId?: number; embedded?: boolean } = {}) {
+  const embedded = props.embedded ?? false;
+  const navigate = useNavigate();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const { visitId } = useParams<{ visitId: string }>();
+  const id = props.visitId ?? Number(visitId);
+
+  const [form, setForm] = useState<VitalsForm>(EMPTY_FORM);
+  const [errors, setErrors] = useState<Partial<Record<keyof VitalsForm, string>>>({});
+  const [routePopup, setRoutePopup] = useState<{ open: boolean; reason?: string }>({ open: false });
+  const [manualTarget, setManualTarget] = useState("");
+
+  const visitQuery = useQuery({
+    queryKey: ["visits", "detail", id],
+    queryFn: () => getVisitDetails(id),
+    enabled: Number.isFinite(id),
+  });
+  const historyQuery = useQuery({
+    queryKey: ["vital-signs", "visit", id],
+    queryFn: () => getVisitVitalSigns(id),
+    enabled: Number.isFinite(id),
+  });
+  const sdpQuery = useQuery({
+    queryKey: ["service-delivery-points", "active", "triage"],
+    queryFn: () => getServiceDeliveryPoints({ limit: 200 }),
+    enabled: routePopup.open,
+  });
+
+  const visit = visitQuery.data ?? null;
+  const history: VitalSign[] = useMemo(
+    () =>
+      [...(historyQuery.data?.items ?? [])].sort(
+        (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime(),
+      ),
+    [historyQuery.data],
+  );
+
+  // Most recent reading in this visit — offered as "carry forward" for the
+  // anthropometrics so the nurse only re-enters what changed.
+  const latest = history[0];
+  const canCarryForward = !!latest && (latest.weight_kg != null || latest.height_cm != null);
+  const carryForward = () =>
+    setForm((f) => ({
+      ...f,
+      weight_kg: latest?.weight_kg != null ? String(latest.weight_kg) : f.weight_kg,
+      height_cm: latest?.height_cm != null ? String(latest.height_cm) : f.height_cm,
+    }));
+
+  // ---------- Derived clinical indices ----------
+  const weight = num(form.weight_kg);
+  const height = num(form.height_cm);
+  const bmi = computeBmi(weight, height);
+  const bmiCat = bmiCategory(bmi);
+  const mews = computeMews({
+    pulse_rate: num(form.pulse_rate),
+    respiratory_rate: num(form.respiratory_rate),
+    systolic_bp: num(form.systolic_bp),
+    temperature_celsius: num(form.temperature_celsius),
+  });
+  const band = mewsBand(mews);
+  const hasAnyValue = (Object.keys(EMPTY_FORM) as (keyof VitalsForm)[])
+    .filter((k) => k !== "pain_score" && k !== "notes")
+    .some((k) => form[k].trim() !== "");
+
+  const set = (key: keyof VitalsForm) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+    if (errors[key]) setErrors((er) => ({ ...er, [key]: undefined }));
+  };
+
+  const validate = (): boolean => {
+    const next: Partial<Record<keyof VitalsForm, string>> = {};
+    const check = (spec: Pick<FieldSpec, "key" | "min" | "max">) => {
+      const v = num(form[spec.key]);
+      if (form[spec.key].trim() !== "" && v == null) next[spec.key] = "Enter a number.";
+      else if (v != null && (v < spec.min || v > spec.max)) next[spec.key] = `Expected ${spec.min}–${spec.max}.`;
+    };
+    INDEX_FIELDS.forEach(check);
+    check({ key: "systolic_bp", min: 40, max: 300 });
+    check({ key: "diastolic_bp", min: 20, max: 200 });
+    check({ key: "weight_kg", min: 0.5, max: 400 });
+    check({ key: "height_cm", min: 30, max: 250 });
+    const s = num(form.systolic_bp);
+    const d = num(form.diastolic_bp);
+    if (s != null && d != null && d >= s) next.diastolic_bp = "Diastolic must be below systolic.";
+    if (!hasAnyValue) next.temperature_celsius = "Record at least one reading.";
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const buildPayload = async (): Promise<RecordVitalSignPayload> => {
+    const staff = await getCurrentStaff().catch(() => null);
+    return {
+      visit_id: id,
+      recorded_by_staff_id: staff?.id ?? null,
+      temperature_celsius: num(form.temperature_celsius),
+      pulse_rate: num(form.pulse_rate),
+      respiratory_rate: num(form.respiratory_rate),
+      oxygen_saturation: num(form.oxygen_saturation),
+      systolic_bp: num(form.systolic_bp),
+      diastolic_bp: num(form.diastolic_bp),
+      weight_kg: weight,
+      height_cm: height,
+      pain_score: num(form.pain_score),
+    };
+  };
+
+  // ---------- Mutations ----------
+  const saveMutation = useMutation({
+    mutationFn: async () => recordVitalSigns(await buildPayload()),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["vital-signs", "visit", id] });
+      setForm((f) => ({ ...EMPTY_FORM, weight_kg: f.weight_kg, height_cm: f.height_cm }));
+      const saved = res.vital_sign?.mews_score;
+      toast.success("Vital signs saved", saved != null ? `MEWS ${saved} recorded on the encounter.` : undefined);
+    },
+    onError: (err) => toast.error("Could not save vital signs", apiErrorMessage(err)),
+  });
+
+  const saveAndRouteMutation = useMutation({
+    mutationFn: async () => {
+      await recordVitalSigns(await buildPayload());
+      qc.invalidateQueries({ queryKey: ["vital-signs", "visit", id] });
+      return advanceVisit(id, { action: "complete", notes: form.notes.trim() || "Triage completed." });
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["visits"] });
+      qc.invalidateQueries({ queryKey: ["queue"] });
+      const nextSdp = (res.visit?.current_service_delivery_point?.name ?? "the next service point") as string;
+      toast.success("Triage complete", `${patientDisplayName(visit?.patient)} routed to ${nextSdp}.`);
+      navigate(routes.queues);
+    },
+    onError: (err: unknown) => {
+      const msg = apiErrorMessage(err);
+      // No pathway on this visit → let the nurse pick the destination manually.
+      if (/no clinical flow steps|flow steps/i.test(msg)) {
+        qc.invalidateQueries({ queryKey: ["vital-signs", "visit", id] });
+        setRoutePopup({ open: true, reason: msg });
+        return;
       }
-   }, [vitals.weight_kg, vitals.height_cm]);
+      toast.error("Could not complete triage", msg);
+    },
+  });
 
-   const handleSave = async () => {
-      if (!visitId) return;
-      setIsSubmitting(true);
-      setError(null);
-      try {
-         const currentStaff = await getCurrentStaff();
-         if (!currentStaff) {
-            setError("Unable to identify current clinician. Please re-login.");
-            return;
-         }
+  const manualRouteMutation = useMutation({
+    mutationFn: () =>
+      rerouteVisit(id, {
+        service_delivery_point_id: Number(manualTarget),
+        reason: form.notes.trim() || "Routed from triage",
+        create_queue_ticket: true,
+        mark_as_current: true,
+      }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["visits"] });
+      qc.invalidateQueries({ queryKey: ["queue"] });
+      toast.success("Patient routed", res.message);
+      setRoutePopup({ open: false });
+      navigate(routes.queues);
+    },
+    onError: (err) => toast.error("Could not route patient", apiErrorMessage(err)),
+  });
 
-         await recordVitalSigns({
-            visit_id: Number(visitId),
-            recorded_by_staff_id: currentStaff.id,
-            ...vitals
-         });
+  const busy = saveMutation.isPending || saveAndRouteMutation.isPending;
+  const nextStep = nextPathwayStep(visit);
 
-         // Route back to queues or dashboard
-         navigate(routes.queues);
-      } catch (err: any) {
-         setError(err.response?.data?.message || "Failed to save vital signs.");
-      } finally {
-         setIsSubmitting(false);
-      }
-   };
+  // ---------- History grid ----------
+  const historyColumns: DxGridColumn<VitalSign>[] = [
+    { key: "recorded_at", header: "Recorded", width: 150, render: (r) => <span className="dx-mono">{formatDateTime(r.recorded_at)}</span>, sortable: true },
+    { key: "bp", header: "BP", align: "center", render: (r) => (r.systolic_bp != null ? <span className="dx-mono">{r.systolic_bp}/{r.diastolic_bp ?? "—"}</span> : "—") },
+    { key: "temperature_celsius", header: "Temp", align: "center", render: (r) => (r.temperature_celsius != null ? <span className="dx-mono">{Number(r.temperature_celsius).toFixed(1)}°</span> : "—") },
+    { key: "pulse_rate", header: "Pulse", align: "center", render: (r) => r.pulse_rate ?? "—" },
+    { key: "respiratory_rate", header: "RR", align: "center", render: (r) => r.respiratory_rate ?? "—" },
+    { key: "oxygen_saturation", header: "SpO₂", align: "center", render: (r) => (r.oxygen_saturation != null ? `${Number(r.oxygen_saturation)}%` : "—") },
+    { key: "bmi", header: "BMI", align: "center", render: (r) => (r.bmi != null ? Number(r.bmi).toFixed(1) : "—") },
+    {
+      key: "mews_score",
+      header: "MEWS",
+      align: "center",
+      render: (r) =>
+        r.mews_score != null ? <DxBadge tone={mewsBand(r.mews_score).tone}>{r.mews_score}</DxBadge> : <span className="dx-faint">—</span>,
+    },
+  ];
 
-   const vitalConfigs = [
-      { key: "temperature_celsius", label: "Temperature", unit: "°C", icon: Thermometer, color: "rose", placeholder: "36.5" },
-      { key: "pulse_rate", label: "Pulse Rate", unit: "bpm", icon: Heart, color: "rose", placeholder: "72" },
-      { key: "respiratory_rate", label: "Respiratory Rate", unit: "cpm", icon: Wind, color: "blue", placeholder: "16" },
-      { key: "oxygen_saturation", label: "SpO2", unit: "%", icon: Droplet, color: "blue", placeholder: "98" },
-      { key: "weight_kg", label: "Weight", unit: "kg", icon: Weight, color: "emerald", placeholder: "70" },
-      { key: "height_cm", label: "Height", unit: "cm", icon: ArrowUpRight, color: "emerald", placeholder: "175" },
-   ];
-
-   if (isLoading) return <div className="p-20 text-center animate-pulse">Loading triage context...</div>;
-
-   return (
-      <div className="max-w-6xl mx-auto space-y-10 animate-fade-in">
-         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <PageHeader
-               title="Clinical Triage"
-               description="Capture clinical baseline data and determine encounter priority."
-            />
-            {visit && (
-               <div className="flex items-center gap-4 px-6 py-4 rounded-[1.5rem] bg-white border border-secondary-200 shadow-sm">
-                  <div className="h-10 w-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center font-bold">
-                     {visit.patient?.first_name[0]}{visit.patient?.last_name[0]}
-                  </div>
-                  <div>
-                     <p className="text-sm font-black text-secondary-900">{visit.patient?.first_name} {visit.patient?.last_name}</p>
-                     <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase tracking-widest">{visit.patient?.hospital_number}</p>
-                  </div>
-               </div>
-            )}
-         </div>
-
-         {error && (
-            <div className="p-6 bg-rose-50 border border-rose-100 text-rose-600 rounded-3xl flex items-center gap-4">
-               <AlertCircle className="h-6 w-6" />
-               <p className="font-bold">{error}</p>
-            </div>
-         )}
-
-         <div className="grid gap-8 lg:grid-cols-12">
-            {/* Left: Input Form */}
-            <div className="lg:col-span-8 space-y-8">
-               <div className="glass-card rounded-[2.5rem] p-10 md:p-12 shadow-premium">
-                  <div className="grid gap-8 md:grid-cols-2">
-                     {vitalConfigs.map((cfg) => (
-                        <div key={cfg.key} className="space-y-3 group">
-                           <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                 <div className={`p-2 rounded-lg bg-${cfg.color}-50 text-${cfg.color}-600 group-focus-within:bg-${cfg.color}-600 group-focus-within:text-white transition-all`}>
-                                    <cfg.icon className="h-4 w-4" />
-                                 </div>
-                                 <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">{cfg.label}</label>
-                              </div>
-                              <span className="text-[10px] font-bold text-secondary-400 uppercase">{cfg.unit}</span>
-                           </div>
-                           <input
-                              type="number"
-                              step="0.1"
-                              placeholder={cfg.placeholder}
-                              value={vitals[cfg.key] || ""}
-                              onChange={(e) => setVitals({ ...vitals, [cfg.key]: parseFloat(e.target.value) })}
-                              className="input-field py-4 text-xl font-black bg-secondary-50/50 border-secondary-400 focus:bg-white"
-                           />
-                        </div>
-                     ))}
-
-                     <div className="space-y-3 col-span-2 pt-6 border-t border-secondary-400 mt-4">
-                        <div className="flex items-center gap-2">
-                           <div className="p-2 rounded-lg bg-slate-900 text-white">
-                              <Activity className="h-4 w-4" />
-                           </div>
-                           <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-secondary-500">Arterial Blood Pressure (Systolic / Diastolic)</label>
-                        </div>
-                        <div className="flex items-center gap-6">
-                           <div className="flex-1 space-y-2">
-                              <input
-                                 type="number"
-                                 placeholder="120"
-                                 value={vitals.systolic_bp || ""}
-                                 onChange={(e) => setVitals({ ...vitals, systolic_bp: parseInt(e.target.value) })}
-                                 className="input-field py-5 text-2xl font-black text-center bg-white border-2 border-secondary-400 focus:border-primary-500"
-                              />
-                              <p className="text-[9px] text-center font-bold text-secondary-400 uppercase tracking-widest">Systolic (mmHg)</p>
-                           </div>
-                           <span className="text-4xl font-light text-secondary-200">/</span>
-                           <div className="flex-1 space-y-2">
-                              <input
-                                 type="number"
-                                 placeholder="80"
-                                 value={vitals.diastolic_bp || ""}
-                                 onChange={(e) => setVitals({ ...vitals, diastolic_bp: parseInt(e.target.value) })}
-                                 className="input-field py-5 text-2xl font-black text-center bg-white border-2 border-secondary-400 focus:border-primary-500"
-                              />
-                              <p className="text-[9px] text-center font-bold text-secondary-400 uppercase tracking-widest">Diastolic (mmHg)</p>
-                           </div>
-                        </div>
-                     </div>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-6 mt-16 pt-10 border-t border-secondary-400">
-                     <button onClick={() => setVitals({})} className="btn-secondary px-10 py-4 rounded-2xl font-bold">Clear All</button>
-                     <button
-                        onClick={handleSave}
-                        disabled={isSubmitting}
-                        className="btn-primary px-16 py-4 rounded-2xl gap-3 text-base shadow-xl shadow-primary-500/20"
-                     >
-                        {isSubmitting ? "Processing..." : (
-                           <>
-                              <Save className="h-5 w-5" />
-                              <span>Synchronize & Complete</span>
-                           </>
-                        )}
-                     </button>
-                  </div>
-               </div>
-            </div>
-
-            {/* Right: Calculations & Clinical History */}
-            <div className="lg:col-span-4 space-y-8">
-               <div className="glass-card rounded-[2.5rem] p-10 bg-slate-900 text-white relative overflow-hidden shadow-2xl">
-                  <div className="absolute top-0 right-0 p-8 opacity-5">
-                     <Scale className="h-40 w-40" />
-                  </div>
-                  <div className="flex items-center gap-3 mb-10 relative z-10">
-                     <div className="p-2 rounded-lg bg-white/10">
-                        <Activity className="h-4 w-4 text-primary-400" />
-                     </div>
-                     <h3 className="text-sm font-bold uppercase tracking-widest">Physiological Index</h3>
-                  </div>
-
-                  <div className="space-y-10 relative z-10">
-                     <div className="flex flex-col">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/40 mb-2">Calculated BMI</span>
-                        <div className="flex items-end gap-4">
-                           <p className="text-6xl font-black tracking-tighter">{bmi || "--.-"}</p>
-                           <div className={`mb-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${bmi && bmi < 25 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                              }`}>
-                              {bmi ? (bmi < 18.5 ? "Underweight" : bmi < 25 ? "Normal Range" : bmi < 30 ? "Overweight" : "Obese Class") : "Awaiting Data"}
-                           </div>
-                        </div>
-                     </div>
-
-                     <div className="grid grid-cols-2 gap-4">
-                        <div className="p-5 rounded-3xl bg-white/5 border border-white/5">
-                           <p className="text-[10px] font-bold text-white/30 uppercase mb-2">Weight</p>
-                           <p className="text-xl font-bold">{vitals.weight_kg || "-"} <span className="text-xs opacity-40">kg</span></p>
-                        </div>
-                        <div className="p-5 rounded-3xl bg-white/5 border border-white/5">
-                           <p className="text-[10px] font-bold text-white/30 uppercase mb-2">Height</p>
-                           <p className="text-xl font-bold">{vitals.height_cm || "-"} <span className="text-xs opacity-40">cm</span></p>
-                        </div>
-                     </div>
-                  </div>
-               </div>
-
-               <div className="glass-card rounded-[2.5rem] p-10 bg-white shadow-premium">
-                  <div className="flex items-center justify-between mb-10">
-                     <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-secondary-50 text-secondary-400">
-                           <History className="h-4 w-4" />
-                        </div>
-                        <h3 className="text-sm font-bold uppercase tracking-widest">Visit Timeline</h3>
-                     </div>
-                  </div>
-
-                  <div className="space-y-8">
-                     {history.length > 0 ? history.map((entry) => (
-                        <div key={entry.id} className="flex gap-5 group relative">
-                           <div className="h-10 w-10 shrink-0 rounded-2xl bg-secondary-50 flex items-center justify-center text-secondary-400 group-hover:bg-primary-50 group-hover:text-primary-600 transition-all border border-secondary-400">
-                              <Clock className="h-5 w-5" />
-                           </div>
-                           <div className="flex-1 min-w-0 border-b border-secondary-50 pb-6">
-                              <p className="text-xs font-black text-secondary-900">{new Date(entry.recorded_at).toLocaleDateString()} • {new Date(entry.recorded_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                              <div className="grid grid-cols-2 gap-2 mt-3">
-                                 <div className="px-3 py-2 rounded-xl bg-secondary-50 border border-secondary-400">
-                                    <p className="text-[9px] font-bold text-secondary-400 uppercase tracking-tighter">BP</p>
-                                    <p className="text-xs font-black">{entry.systolic_bp}/{entry.diastolic_bp}</p>
-                                 </div>
-                                 <div className="px-3 py-2 rounded-xl bg-secondary-50 border border-secondary-400">
-                                    <p className="text-[9px] font-bold text-secondary-400 uppercase tracking-tighter">Temp</p>
-                                    <p className="text-xs font-black">{entry.temperature_celsius}°C</p>
-                                 </div>
-                              </div>
-                           </div>
-                        </div>
-                     )) : (
-                        <div className="py-12 text-center">
-                           <p className="text-[10px] font-bold text-secondary-300 uppercase tracking-widest leading-relaxed">No physiological history found for this visit.</p>
-                        </div>
-                     )}
-                  </div>
-               </div>
-            </div>
-         </div>
+  // ---------- Render ----------
+  if (!Number.isFinite(id)) {
+    const invalid = (
+      <DxMessage tone="danger" title="Invalid visit">
+        The triage workstation needs a visit identifier. Open a patient from the queue.
+      </DxMessage>
+    );
+    return embedded ? <div className="space-y-4">{invalid}</div> : <DxPage>{invalid}</DxPage>;
+  }
+  if (visitQuery.isLoading)
+    return embedded ? (
+      <div className="space-y-4">
+        <DxSkeleton className="h-8 w-48" />
+        <DxSkeleton className="h-64 w-full" />
       </div>
-   );
+    ) : (
+      <DxPageLoading label="Loading encounter…" />
+    );
+  if (visitQuery.isError || !visit) {
+    const loadError = (
+      <DxMessage
+        tone="danger"
+        title="Could not load the visit"
+        action={
+          <DxButton size="sm" onClick={() => visitQuery.refetch()} leftIcon={<RotateCcw />}>
+            Retry
+          </DxButton>
+        }
+      >
+        {apiErrorMessage(visitQuery.error, "Please verify the visit and try again.")}
+      </DxMessage>
+    );
+    return embedded ? <div className="space-y-4">{loadError}</div> : <DxPage>{loadError}</DxPage>;
+  }
+
+  const renderIndexField = (spec: FieldSpec) => {
+    const value = num(form[spec.key]);
+    const flag = vitalFlag(spec.key, value);
+    return (
+      <DxInput
+        key={spec.key}
+        label={
+          <span className="inline-flex items-center gap-1.5">
+            <spec.icon className="h-3.5 w-3.5 text-[var(--dx-text-faint)]" aria-hidden />
+            {spec.label}
+            {flag ? (
+              <DxBadge tone={flag === "high" ? "danger" : "warning"} className="ml-1">
+                {flag}
+              </DxBadge>
+            ) : null}
+          </span>
+        }
+        type="number"
+        inputMode="decimal"
+        step={spec.step}
+        min={spec.min}
+        max={spec.max}
+        placeholder={spec.placeholder}
+        unit={spec.unit}
+        editorSize="lg"
+        mono
+        value={form[spec.key]}
+        onChange={set(spec.key)}
+        error={errors[spec.key]}
+        disabled={busy}
+      />
+    );
+  };
+
+  const Wrapper = embedded ? "div" : DxPage;
+
+  return (
+    <Wrapper className={embedded ? "space-y-4" : undefined}>
+      {!embedded && (
+        <DxPageHeader
+          crumbs={[{ label: "Queues", to: routes.queues }, { label: "Triage" }]}
+          title="Triage — vital signs"
+          subtitle="Record the physiological index; BMI and MEWS are derived automatically and attached to the encounter."
+          actions={
+            <DxButton leftIcon={<ArrowLeft />} onClick={() => navigate(routes.queues)}>
+              Back to queue
+            </DxButton>
+          }
+        />
+      )}
+
+      {!embedded && <VisitBanner visit={visit} />}
+
+      {/* Command bar */}
+      <DxToolbar>
+        <DxToolbarGroup>
+          <DxButton
+            variant="text"
+            leftIcon={<Eraser />}
+            disabled={busy || !hasAnyValue}
+            onClick={() => {
+              setForm(EMPTY_FORM);
+              setErrors({});
+            }}
+          >
+            Clear
+          </DxButton>
+        </DxToolbarGroup>
+        <DxToolbarSpacer />
+        <DxToolbarGroup>
+          <DxButton
+            leftIcon={<Save />}
+            isLoading={saveMutation.isPending}
+            disabled={busy}
+            onClick={() => validate() && saveMutation.mutate()}
+          >
+            Save vitals
+          </DxButton>
+          {!embedded && (
+            <DxButton
+              variant="primary"
+              rightIcon={<ArrowRight />}
+              isLoading={saveAndRouteMutation.isPending}
+              disabled={busy}
+              onClick={() => validate() && saveAndRouteMutation.mutate()}
+              title={nextStep ? `Completes triage and queues the patient at ${nextStep.service_delivery_point?.name}` : "Completes triage and routes the patient onward"}
+            >
+              {nextStep ? `Complete & Route to ${nextStep.service_delivery_point?.name ?? "next step"}` : "Complete & Route"}
+            </DxButton>
+          )}
+        </DxToolbarGroup>
+      </DxToolbar>
+
+      <div className="grid gap-4 xl:grid-cols-12">
+        {/* ---------- Capture form ---------- */}
+        <div className="space-y-4 xl:col-span-8">
+          <DxPanel title="Vital signs" icon={<Activity />} description="Adult reference ranges are flagged inline.">
+            <div className="space-y-5">
+              <DxGroupBox caption="Blood pressure">
+                <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
+                  <DxInput
+                    label={
+                      <span className="inline-flex items-center gap-1.5">
+                        Systolic
+                        {vitalFlag("systolic_bp", num(form.systolic_bp)) ? (
+                          <DxBadge tone={vitalFlag("systolic_bp", num(form.systolic_bp)) === "high" ? "danger" : "warning"}>
+                            {vitalFlag("systolic_bp", num(form.systolic_bp))}
+                          </DxBadge>
+                        ) : null}
+                      </span>
+                    }
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="120"
+                    unit="mmHg"
+                    editorSize="lg"
+                    mono
+                    value={form.systolic_bp}
+                    onChange={set("systolic_bp")}
+                    error={errors.systolic_bp}
+                    disabled={busy}
+                  />
+                  <span className="hidden pb-2 text-2xl font-light text-[var(--dx-text-faint)] sm:block">/</span>
+                  <DxInput
+                    label={
+                      <span className="inline-flex items-center gap-1.5">
+                        Diastolic
+                        {vitalFlag("diastolic_bp", num(form.diastolic_bp)) ? (
+                          <DxBadge tone={vitalFlag("diastolic_bp", num(form.diastolic_bp)) === "high" ? "danger" : "warning"}>
+                            {vitalFlag("diastolic_bp", num(form.diastolic_bp))}
+                          </DxBadge>
+                        ) : null}
+                      </span>
+                    }
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="80"
+                    unit="mmHg"
+                    editorSize="lg"
+                    mono
+                    value={form.diastolic_bp}
+                    onChange={set("diastolic_bp")}
+                    error={errors.diastolic_bp}
+                    disabled={busy}
+                  />
+                </div>
+              </DxGroupBox>
+
+              <DxGroupBox caption="Physiological index">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{INDEX_FIELDS.map(renderIndexField)}</div>
+              </DxGroupBox>
+
+              <DxGroupBox caption="Anthropometry & pain">
+                {canCarryForward ? (
+                  <div className="mb-2 flex justify-end">
+                    <DxButton size="sm" variant="accent-text" onClick={carryForward} disabled={busy}>
+                      Carry forward last weight/height
+                    </DxButton>
+                  </div>
+                ) : null}
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <DxInput
+                    label="Weight"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    placeholder="70.0"
+                    unit="kg"
+                    editorSize="lg"
+                    mono
+                    value={form.weight_kg}
+                    onChange={set("weight_kg")}
+                    error={errors.weight_kg}
+                    disabled={busy}
+                  />
+                  <DxInput
+                    label="Height"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    placeholder="170"
+                    unit="cm"
+                    editorSize="lg"
+                    mono
+                    value={form.height_cm}
+                    onChange={set("height_cm")}
+                    error={errors.height_cm}
+                    disabled={busy}
+                  />
+                  <DxField label="BMI" hint={bmiCat.label}>
+                    <input className="dx-editor dx-editor-lg dx-mono" readOnly value={bmi != null ? bmi.toFixed(1) : ""} placeholder="—" aria-label="Body mass index" />
+                  </DxField>
+                  <DxSelect label="Pain score (0–10)" options={PAIN_OPTIONS} value={form.pain_score} onChange={set("pain_score")} disabled={busy} />
+                </div>
+              </DxGroupBox>
+
+              <DxTextarea
+                label="Triage note (optional)"
+                hint="Added to the pathway step when the patient is routed onward."
+                placeholder="e.g. Known hypertensive, on amlodipine. Reports headache since morning."
+                rows={2}
+                value={form.notes}
+                onChange={set("notes")}
+                disabled={busy}
+              />
+            </div>
+          </DxPanel>
+        </div>
+
+        {/* ---------- Derived indices + history ---------- */}
+        <div className="space-y-4 xl:col-span-4">
+          <DxPanel title="Early warning score" icon={<Scale />}>
+            <div className="flex items-start gap-4">
+              <div
+                className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded border text-center"
+                style={{
+                  borderColor: `var(--dx-${band.tone === "neutral" ? "border-strong" : band.tone})`,
+                  background: `var(--dx-${band.tone === "neutral" ? "surface-alt" : `${band.tone}-soft`})`,
+                  color: `var(--dx-${band.tone === "neutral" ? "text-muted" : band.tone})`,
+                }}
+              >
+                <span className="text-2xl font-semibold leading-none dx-num">{mews ?? "–"}</span>
+                <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide">MEWS</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <DxBadge tone={band.tone}>{band.label}</DxBadge>
+                  <span className="dx-faint text-[11px]">live preview</span>
+                </div>
+                <p className="mt-1.5 text-[12px] text-[var(--dx-text-muted)]">{band.advice}</p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <DxProps
+                tight
+                items={[
+                  { label: "BMI", value: bmi != null ? <span>{bmi.toFixed(1)} <DxBadge tone={bmiCat.tone} className="ml-1">{bmiCat.label}</DxBadge></span> : "—" },
+                  { label: "Weight / Height", value: weight != null || height != null ? `${weight ?? "—"} kg · ${height ?? "—"} cm` : "—" },
+                  { label: "Pain", value: PAIN_OPTIONS.find((o) => o.value === form.pain_score)?.label ?? "—" },
+                  { label: "Next checkpoint", value: nextStep?.service_delivery_point?.name ?? <span className="dx-faint">No pathway — choose on route</span> },
+                ]}
+              />
+            </div>
+          </DxPanel>
+
+          <DxPanel
+            title="Previous readings"
+            icon={<History />}
+            description={history.length ? `${history.length} in this visit` : undefined}
+            flush
+            actions={
+              <DxButton size="sm" variant="text" icon title="Refresh" onClick={() => historyQuery.refetch()}>
+                <RotateCcw className={historyQuery.isFetching ? "animate-spin" : undefined} />
+              </DxButton>
+            }
+          >
+            <DxGrid
+              columns={historyColumns}
+              data={history}
+              rowKey={(r) => r.id}
+              isLoading={historyQuery.isLoading}
+              error={historyQuery.isError ? apiErrorMessage(historyQuery.error, "Could not load readings.") : null}
+              onRetry={() => historyQuery.refetch()}
+              borderless
+              striped
+              maxHeight={320}
+              empty={{ title: "No readings yet", description: "The first set of vitals for this visit will appear here." }}
+            />
+          </DxPanel>
+        </div>
+      </div>
+
+      <DxStatusBar>
+        <DxStatusItem>
+          Visit <b className="dx-mono">{visit.visit_code}</b>
+        </DxStatusItem>
+        <DxStatusItem>
+          Readings this visit: <b>{history.length}</b>
+        </DxStatusItem>
+        {history[0]?.mews_score != null ? (
+          <DxStatusItem>
+            Last MEWS: <b>{history[0].mews_score}</b>
+          </DxStatusItem>
+        ) : null}
+        <span className="ml-auto">MEWS ≥ 5 raises an emergency alert on save.</span>
+      </DxStatusBar>
+
+      {/* Manual routing fallback when the visit has no pathway */}
+      {!embedded && (
+      <DxPopup
+        isOpen={routePopup.open}
+        onClose={() => !manualRouteMutation.isPending && setRoutePopup({ open: false })}
+        title="Route the patient"
+        size="sm"
+        locked={manualRouteMutation.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setRoutePopup({ open: false })} disabled={manualRouteMutation.isPending}>
+              Later
+            </DxButton>
+            <DxButton
+              variant="primary"
+              disabled={!manualTarget}
+              isLoading={manualRouteMutation.isPending}
+              onClick={() => manualRouteMutation.mutate()}
+              rightIcon={<ArrowRight />}
+            >
+              Route patient
+            </DxButton>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <DxMessage tone="info">
+            Vitals were saved. {routePopup.reason ? "This visit has no care pathway, so" : "Now"} choose where the patient goes next.
+          </DxMessage>
+          <DxSelect
+            label="Next service point"
+            required
+            placeholder="Select a service point…"
+            value={manualTarget}
+            onChange={(e) => setManualTarget(e.target.value)}
+            options={(sdpQuery.data ?? [])
+              .filter((s: ServiceDeliveryPoint) => s.id !== visit.current_service_delivery_point_id)
+              .map((s: ServiceDeliveryPoint) => ({ value: String(s.id), label: `${s.name} (${s.code})` }))}
+          />
+        </div>
+      </DxPopup>
+      )}
+    </Wrapper>
+  );
 }

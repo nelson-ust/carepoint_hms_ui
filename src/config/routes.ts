@@ -50,7 +50,9 @@ export const routes = {
   insuranceDashboard: "/insurance/dashboard",
   insurancePayers: "/insurance/payers",
   insuranceEnrollees: "/insurance/enrollees",
+  eligibilityConfirm: "/insurance/eligibility",
   insuranceRemittances: "/insurance/remittances",
+  financeDashboard: "/accounting/dashboard",
   banking: "/accounting/banking",
   cashOffice: "/accounting/cash-office",
   arDocuments: "/accounting/credit-notes",
@@ -68,6 +70,7 @@ export const routes = {
 
 
   
+  serviceDesk: "/service-desk",
   queues: "/queues",
   queueAnalytics: "/queues/analytics",
   queueDisplayBoard: "/queues/display-board",
@@ -91,6 +94,19 @@ export const routes = {
   admissions: "/admissions",
   wards: "/wards",
   beds: "/beds",
+  dentalWorklist: "/dental",
+  dentalChart: "/dental/charts/:chartId",
+  eyeClinic: "/eye-clinic",
+  eyeExam: "/eye-clinic/exams/:examId",
+  orthoWorklist: "/orthopaedics",
+  orthoAssessment: "/orthopaedics/assessments/:assessmentId",
+  mortuary: "/mortuary",
+  mortuaryUnits: "/mortuary/units",
+  mortuaryAutopsies: "/mortuary/autopsies",
+  mortuaryBilling: "/mortuary/billing",
+  mortuaryAnalytics: "/mortuary/analytics",
+  mortuaryDeceasedDetail: "/mortuary/deceased/:recordId",
+  dataProtection: "/data-protection",
 
   // Surgery / Theatre
   surgery: "/surgery",
@@ -146,12 +162,14 @@ export const routes = {
 
   ambulances: "/ambulances",
   ambulanceDetail: "/ambulances/:ambulanceId",
+  ambulanceDispatchDetail: "/ambulances/dispatches/:dispatchId",
 
   invitations: "/invitations",
   invitationAccept: "/invitations/accept",
 
   saasInvoices: "/saas/billing",
   subscriptionPlans: "/saas/plans",
+  planCampaigns: "/saas/plan-campaigns",
   saasPaymentsLookup: "/saas/payments",
   supportAccess: "/saas/support",
 

@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom"
 import { AuthLayout } from "@/app/layouts/AuthLayout";
 import { DashboardLayout } from "@/app/layouts/DashboardLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
+import { OnlineRequiredRoute } from "@/components/layout/OnlineRequiredRoute";
 import { routes } from "@/config/routes";
 import { RouteErrorBoundary } from "@/components/common/ErrorBoundary";
 import { PatientDetailPage } from "@/features/patients/pages/PatientDetailPage";
@@ -24,6 +25,7 @@ const VisitInitiationPage = lazy(() => import("@/features/visits/pages/VisitInit
 const VisitFlowManagementPage = lazy(() => import("@/features/visits/pages/VisitFlowManagementPage").then(m => ({ default: m.VisitFlowManagementPage })));
 const VisitDetailPage = lazy(() => import("@/features/visits/pages/VisitDetailPage").then(m => ({ default: m.VisitDetailPage })));
 const VisitReRoutePage = lazy(() => import("@/features/visits/pages/VisitReRoutePage").then(m => ({ default: m.VisitReRoutePage })));
+const ServiceDeskPage = lazy(() => import("@/features/service-desk/pages/ServiceDeskPage").then(m => ({ default: m.ServiceDeskPage })));
 const QueueDashboardPage = lazy(() => import("@/features/queues/pages/QueueDashboardPage").then(m => ({ default: m.QueueDashboardPage })));
 const LabTestsPage = lazy(() => import("@/features/laboratory/pages/LabTestsPage").then(m => ({ default: m.LabTestsPage })));
 const LabOrdersPage = lazy(() => import("@/features/laboratory/pages/LabOrdersPage").then(m => ({ default: m.LabOrdersPage })));
@@ -45,10 +47,22 @@ const ProcedureCatalogPage = lazy(() => import("@/features/surgery/pages/Procedu
 const InstrumentSetsPage = lazy(() => import("@/features/surgery/pages/InstrumentSetsPage").then(m => ({ default: m.InstrumentSetsPage })));
 
 const AmbulanceListingPage = lazy(() => import("@/features/ambulance/pages/AmbulanceListingPage").then(m => ({ default: m.AmbulanceListingPage })));
+const MortuaryPage = lazy(() => import("@/features/mortuary/pages/MortuaryPage").then(m => ({ default: m.MortuaryPage })));
+const DentalWorklistPage = lazy(() => import("@/features/dental/pages/DentalWorklistPage").then(m => ({ default: m.DentalWorklistPage })));
+const DentalChartPage = lazy(() => import("@/features/dental/pages/DentalChartPage").then(m => ({ default: m.DentalChartPage })));
+const EyeWorklistPage = lazy(() => import("@/features/eye/pages/EyeWorklistPage").then(m => ({ default: m.EyeWorklistPage })));
+const EyeExamPage = lazy(() => import("@/features/eye/pages/EyeExamPage").then(m => ({ default: m.EyeExamPage })));
+const OrthoWorklistPage = lazy(() => import("@/features/ortho/pages/OrthoWorklistPage").then(m => ({ default: m.OrthoWorklistPage })));
+const OrthoAssessmentPage = lazy(() => import("@/features/ortho/pages/OrthoAssessmentPage").then(m => ({ default: m.OrthoAssessmentPage })));
+const DeceasedDetailPage = lazy(() => import("@/features/mortuary/pages/DeceasedDetailPage").then(m => ({ default: m.DeceasedDetailPage })));
+const MortuaryAnalyticsPage = lazy(() => import("@/features/mortuary/pages/MortuaryAnalyticsPage").then(m => ({ default: m.MortuaryAnalyticsPage })));
+const DataProtectionPage = lazy(() => import("@/features/data-protection/pages/DataProtectionPage").then(m => ({ default: m.DataProtectionPage })));
 const AmbulanceDetailPage = lazy(() => import("@/features/ambulance/pages/AmbulanceDetailPage").then(m => ({ default: m.AmbulanceDetailPage })));
+const DispatchDetailPage = lazy(() => import("@/features/ambulance/pages/DispatchDetailPage").then(m => ({ default: m.DispatchDetailPage })));
 const InvitationsPage = lazy(() => import("@/features/invitations/pages/InvitationsPage").then(m => ({ default: m.InvitationsPage })));
 const SaaSInvoicesPage = lazy(() => import("@/features/billing/pages/SaaSInvoicesPage").then(m => ({ default: m.SaaSInvoicesPage })));
 const SubscriptionPlansPage = lazy(() => import("@/features/saas-dashboard/pages/SubscriptionPlansPage").then(m => ({ default: m.SubscriptionPlansPage })));
+const PlanCampaignsPage = lazy(() => import("@/features/saas-dashboard/pages/PlanCampaignsPage").then(m => ({ default: m.PlanCampaignsPage })));
 const SupportAccessPage = lazy(() => import("@/features/saas-dashboard/pages/SupportAccessPage").then(m => ({ default: m.SupportAccessPage })));
 const ConnectivityPage = lazy(() => import("@/features/saas-dashboard/pages/ConnectivityPage").then(m => ({ default: m.ConnectivityPage })));
 const SaasOverviewPage = lazy(() => import("@/features/saas-dashboard/pages/SaasOverviewPage").then(m => ({ default: m.SaasOverviewPage })));
@@ -91,11 +105,13 @@ const InsuranceClaimsPage = lazy(() => import("@/features/insurance/pages/Insura
 const InsuranceDashboardPage = lazy(() => import("@/features/insurance/pages/InsuranceDashboardPage").then(m => ({ default: m.InsuranceDashboardPage })));
 const PayersPage = lazy(() => import("@/features/insurance/pages/PayersPage").then(m => ({ default: m.PayersPage })));
 const EnrolleesPage = lazy(() => import("@/features/insurance/pages/EnrolleesPage").then(m => ({ default: m.EnrolleesPage })));
+const EligibilityConfirmPage = lazy(() => import("@/features/insurance/pages/EligibilityConfirmPage").then(m => ({ default: m.EligibilityConfirmPage })));
 const RemittancesPage = lazy(() => import("@/features/insurance/pages/RemittancesPage").then(m => ({ default: m.RemittancesPage })));
 const BankingPage = lazy(() => import("@/features/accounting/pages/BankingPage").then(m => ({ default: m.BankingPage })));
 const CashOfficePage = lazy(() => import("@/features/accounting/pages/CashOfficePage").then(m => ({ default: m.CashOfficePage })));
 const ArDocumentsPage = lazy(() => import("@/features/accounting/pages/ArDocumentsPage").then(m => ({ default: m.ArDocumentsPage })));
 const FinanceReportsExtPage = lazy(() => import("@/features/accounting/pages/FinanceReportsExtPage").then(m => ({ default: m.FinanceReportsExtPage })));
+const FinanceDashboardPage = lazy(() => import("@/features/accounting/pages/FinanceDashboardPage").then(m => ({ default: m.FinanceDashboardPage })));
 const FinanceSettingsPage = lazy(() => import("@/features/accounting/pages/FinanceSettingsPage").then(m => ({ default: m.FinanceSettingsPage })));
 const StatutoryPage = lazy(() => import("@/features/accounting/pages/StatutoryPage").then(m => ({ default: m.StatutoryPage })));
 const HRDashboardPage = lazy(() => import("@/features/staff/pages/HRDashboardPage").then(m => ({ default: m.HRDashboardPage })));
@@ -314,7 +330,7 @@ const router = createBrowserRouter([
 
           // Service Delivery Points
           { path: routes.serviceDeliveryPoints, element: <Suspense fallback={<PageLoader />}><SDPListingPage /></Suspense> },
-          { path: routes.interoperability, element: <Suspense fallback={<PageLoader />}><InteroperabilityPage /></Suspense> },
+          { path: routes.interoperability, element: <OnlineRequiredRoute area="Cross-hospital data exchange & referrals"><Suspense fallback={<PageLoader />}><InteroperabilityPage /></Suspense></OnlineRequiredRoute> },
           { path: routes.integrations, element: <Suspense fallback={<PageLoader />}><IntegrationsPage /></Suspense> },
           { path: routes.developerAccess, element: <Suspense fallback={<PageLoader />}><DeveloperAccessPage /></Suspense> },
           { path: routes.medicalAccess, element: <Suspense fallback={<PageLoader />}><MedicalAccessConsolePage /></Suspense> },
@@ -323,6 +339,7 @@ const router = createBrowserRouter([
           { path: routes.facilities, element: <Suspense fallback={<PageLoader />}><FacilitiesPage /></Suspense> },
 
           // Queue Management
+          { path: routes.serviceDesk, element: <Suspense fallback={<PageLoader />}><ServiceDeskPage /></Suspense> },
           { path: routes.queues, element: <Suspense fallback={<PageLoader />}><QueueDashboardPage /></Suspense> },
           { path: routes.queueAnalytics, element: <Suspense fallback={<PageLoader />}><QueueAnalyticsPage /></Suspense> },
 
@@ -361,10 +378,12 @@ const router = createBrowserRouter([
           { path: routes.insuranceDashboard, element: <Suspense fallback={<PageLoader />}><InsuranceDashboardPage /></Suspense> },
           { path: routes.insurancePayers, element: <Suspense fallback={<PageLoader />}><PayersPage /></Suspense> },
           { path: routes.insuranceEnrollees, element: <Suspense fallback={<PageLoader />}><EnrolleesPage /></Suspense> },
+          { path: `${routes.eligibilityConfirm}/:visitId`, element: <Suspense fallback={<PageLoader />}><EligibilityConfirmPage /></Suspense> },
           { path: routes.insuranceRemittances, element: <Suspense fallback={<PageLoader />}><RemittancesPage /></Suspense> },
           { path: routes.banking, element: <Suspense fallback={<PageLoader />}><BankingPage /></Suspense> },
           { path: routes.cashOffice, element: <Suspense fallback={<PageLoader />}><CashOfficePage /></Suspense> },
           { path: routes.arDocuments, element: <Suspense fallback={<PageLoader />}><ArDocumentsPage /></Suspense> },
+          { path: routes.financeDashboard, element: <Suspense fallback={<PageLoader />}><FinanceDashboardPage /></Suspense> },
           { path: routes.financeReportsExt, element: <Suspense fallback={<PageLoader />}><FinanceReportsExtPage /></Suspense> },
           { path: routes.financeSettings, element: <Suspense fallback={<PageLoader />}><FinanceSettingsPage /></Suspense> },
           { path: routes.statutory, element: <Suspense fallback={<PageLoader />}><StatutoryPage /></Suspense> },
@@ -388,7 +407,25 @@ const router = createBrowserRouter([
 
           // Ambulance
           { path: routes.ambulances, element: <Suspense fallback={<PageLoader />}><AmbulanceListingPage /></Suspense> },
+          { path: routes.ambulanceDispatchDetail, element: <Suspense fallback={<PageLoader />}><DispatchDetailPage /></Suspense> },
           { path: routes.ambulanceDetail, element: <Suspense fallback={<PageLoader />}><AmbulanceDetailPage /></Suspense> },
+
+          // Mortuary (its own module)
+          { path: routes.mortuary, element: <Suspense fallback={<PageLoader />}><MortuaryPage /></Suspense> },
+          { path: routes.dentalWorklist, element: <Suspense fallback={<PageLoader />}><DentalWorklistPage /></Suspense> },
+          { path: routes.dentalChart, element: <Suspense fallback={<PageLoader />}><DentalChartPage /></Suspense> },
+          { path: routes.eyeClinic, element: <Suspense fallback={<PageLoader />}><EyeWorklistPage /></Suspense> },
+          { path: routes.eyeExam, element: <Suspense fallback={<PageLoader />}><EyeExamPage /></Suspense> },
+          { path: routes.orthoWorklist, element: <Suspense fallback={<PageLoader />}><OrthoWorklistPage /></Suspense> },
+          { path: routes.orthoAssessment, element: <Suspense fallback={<PageLoader />}><OrthoAssessmentPage /></Suspense> },
+          { path: routes.mortuaryUnits, element: <Suspense fallback={<PageLoader />}><MortuaryPage /></Suspense> },
+          { path: routes.mortuaryAutopsies, element: <Suspense fallback={<PageLoader />}><MortuaryPage /></Suspense> },
+          { path: routes.mortuaryBilling, element: <Suspense fallback={<PageLoader />}><MortuaryPage /></Suspense> },
+          { path: routes.mortuaryAnalytics, element: <Suspense fallback={<PageLoader />}><MortuaryAnalyticsPage /></Suspense> },
+          { path: routes.mortuaryDeceasedDetail, element: <Suspense fallback={<PageLoader />}><DeceasedDetailPage /></Suspense> },
+
+          // Data Protection (NDPA)
+          { path: routes.dataProtection, element: <Suspense fallback={<PageLoader />}><DataProtectionPage /></Suspense> },
 
           // Invitations
           { path: routes.invitations, element: <Suspense fallback={<PageLoader />}><InvitationsPage /></Suspense> },
@@ -396,6 +433,7 @@ const router = createBrowserRouter([
           // SaaS Billing
           { path: routes.saasInvoices, element: <Suspense fallback={<PageLoader />}><SaaSInvoicesPage /></Suspense> },
           { path: routes.subscriptionPlans, element: <Suspense fallback={<PageLoader />}><SubscriptionPlansPage /></Suspense> },
+          { path: routes.planCampaigns, element: <Suspense fallback={<PageLoader />}><PlanCampaignsPage /></Suspense> },
 
           // Support Access
           { path: routes.supportAccess, element: <Suspense fallback={<PageLoader />}><SupportAccessPage /></Suspense> },

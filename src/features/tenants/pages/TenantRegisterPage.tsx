@@ -78,12 +78,13 @@ export function TenantRegisterPage() {
         </div>
 
         {/* Three-step preview */}
-        <div className="grid gap-4 md:grid-cols-4 mx-auto mb-12">
+        <div className="grid gap-4 md:grid-cols-5 mx-auto mb-12">
           {[
             { n: 1, t: "Identity", d: "Hospital name & code" },
             { n: 2, t: "Billing", d: "Contact & address" },
             { n: 3, t: "Admin", d: "First user account" },
-            { n: 4, t: "Plan", d: "Choose subscription" },
+            { n: 4, t: "Deployment", d: "Hosting approach" },
+            { n: 5, t: "Plan", d: "Choose subscription" },
           ].map((s) => (
             <div
               key={s.n}

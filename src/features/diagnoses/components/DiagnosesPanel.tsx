@@ -1,23 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Edit3, Plus, RotateCcw, Stethoscope } from "lucide-react";
 import {
-  AlertCircle,
-  CheckCircle2,
-  Edit3,
-  FileText,
-  Hash,
-  Plus,
-  RefreshCw,
-  Save,
-  Stethoscope,
-  Tag,
-  X,
-} from "lucide-react";
-import {
-  createDiagnosis,
-  DIAGNOSIS_TYPES,
-  listDiagnosesForVisit,
-  updateDiagnosis,
-} from "../api/diagnoses.api";
+  DxBadge,
+  DxButton,
+  DxForm,
+  DxGrid,
+  DxInput,
+  DxMessage,
+  DxPanel,
+  DxPopup,
+  DxSelect,
+  DxTextarea,
+  apiErrorMessage,
+  formatDateTime,
+  humanize,
+  type DxBadgeTone,
+  type DxGridColumn,
+} from "@/components/dx";
+import { useToast } from "@/components/feedback/ToastProvider";
+import { createDiagnosis, DIAGNOSIS_TYPES, listDiagnosesForVisit, updateDiagnosis } from "../api/diagnoses.api";
 import type { Diagnosis } from "../api/diagnoses.api";
 
 type DiagnosesPanelProps = {
@@ -29,14 +31,14 @@ type DiagnosesPanelProps = {
   disabled?: boolean;
 };
 
-const typeStyles: Record<string, string> = {
-  PRIMARY: "bg-rose-50 text-rose-600 border-rose-100",
-  SECONDARY: "bg-amber-50 text-amber-600 border-amber-100",
-  PROVISIONAL: "bg-secondary-100 text-secondary-600 border-secondary-200",
-  DIFFERENTIAL: "bg-secondary-100 text-secondary-600 border-secondary-200",
-  CONFIRMED: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  FINAL: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  RULED_OUT: "bg-slate-100 text-slate-500 border-slate-200 line-through",
+const TYPE_TONE: Record<string, DxBadgeTone> = {
+  PRIMARY: "danger",
+  SECONDARY: "warning",
+  PROVISIONAL: "neutral",
+  DIFFERENTIAL: "neutral",
+  CONFIRMED: "success",
+  FINAL: "success",
+  RULED_OUT: "outline",
 };
 
 type FormState = {
@@ -62,366 +64,227 @@ function formStateFrom(d: Diagnosis): FormState {
   };
 }
 
+const sortDiagnoses = (items: Diagnosis[]) =>
+  [...items].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+/**
+ * Diagnoses recorded on the visit, grouped by consultation. Adding is gated by
+ * an active consultation; editing is limited to diagnoses of that consultation.
+ */
 export function DiagnosesPanel({ visitId, consultationId, disabled }: DiagnosesPanelProps) {
-  const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+  const qc = useQueryClient();
+  const queryKey = ["diagnoses", "visit", visitId] as const;
 
-  const [isModalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Diagnosis | null>(null);
+  const [modal, setModal] = useState<{ open: boolean; editing: Diagnosis | null }>({ open: false, editing: null });
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const load = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await listDiagnosesForVisit(visitId);
-      const items = Array.isArray(response.items) ? response.items : [];
-      setDiagnoses(
-        [...items].sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        ),
-      );
-    } catch (err: any) {
-      console.error("Failed to load diagnoses", err);
-      setError(err?.response?.data?.message || "Unable to load diagnoses for this visit.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const diagnosesQuery = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const res = await listDiagnosesForVisit(visitId);
+      return sortDiagnoses(Array.isArray(res.items) ? res.items : []);
+    },
+    enabled: Number.isFinite(visitId),
+  });
+  const diagnoses = diagnosesQuery.data ?? [];
 
-  useEffect(() => {
-    if (Number.isFinite(visitId)) load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visitId]);
+  const upsert = (saved: Diagnosis) =>
+    qc.setQueryData<Diagnosis[]>(queryKey, (old) => sortDiagnoses([saved, ...(old ?? []).filter((d) => d.id !== saved.id)]));
 
-  const grouped = useMemo(() => {
-    const map = new Map<number, Diagnosis[]>();
-    for (const d of diagnoses) {
-      const key = d.consultation_id ?? 0;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(d);
-    }
-    return Array.from(map.entries());
-  }, [diagnoses]);
-
-  const openCreate = () => {
-    setEditing(null);
-    setForm(emptyForm);
-    setSaveError(null);
-    setModalOpen(true);
-  };
-
-  const openEdit = (d: Diagnosis) => {
-    setEditing(d);
-    setForm(formStateFrom(d));
-    setSaveError(null);
-    setModalOpen(true);
-  };
-
-  const handleSave = async () => {
-    if (!form.diagnosis_name.trim()) {
-      setSaveError("Diagnosis name is required.");
-      return;
-    }
-    setIsSaving(true);
-    setSaveError(null);
-    try {
-      if (editing) {
-        const result = await updateDiagnosis(editing.id, {
-          diagnosis_name: form.diagnosis_name.trim(),
-          diagnosis_code: form.diagnosis_code.trim() || undefined,
-          diagnosis_type: form.diagnosis_type || undefined,
-          diagnosis_note: form.diagnosis_note.trim() || undefined,
-        });
-        setDiagnoses((prev) => {
-          const others = prev.filter((d) => d.id !== result.diagnosis.id);
-          return [result.diagnosis, ...others].sort(
-            (a, b) =>
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-          );
-        });
-      } else {
-        if (!consultationId) {
-          setSaveError("A consultation is required to create a diagnosis.");
-          return;
-        }
-        const result = await createDiagnosis({
-          visit_id: visitId,
-          consultation_id: consultationId,
-          diagnosis_name: form.diagnosis_name.trim(),
-          diagnosis_code: form.diagnosis_code.trim() || undefined,
-          diagnosis_type: form.diagnosis_type || undefined,
-          diagnosis_note: form.diagnosis_note.trim() || undefined,
-        });
-        setDiagnoses((prev) => [result.diagnosis, ...prev]);
-      }
-      setModalOpen(false);
-    } catch (err: any) {
-      setSaveError(err?.response?.data?.message || "Failed to save diagnosis.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        diagnosis_name: form.diagnosis_name.trim(),
+        diagnosis_code: form.diagnosis_code.trim() || undefined,
+        diagnosis_type: form.diagnosis_type || undefined,
+        diagnosis_note: form.diagnosis_note.trim() || undefined,
+      };
+      if (modal.editing) return updateDiagnosis(modal.editing.id, payload);
+      return createDiagnosis({ visit_id: visitId, consultation_id: consultationId as number, ...payload });
+    },
+    onSuccess: (res) => {
+      upsert(res.diagnosis);
+      setModal({ open: false, editing: null });
+      toast.success(modal.editing ? "Diagnosis updated" : "Diagnosis recorded", res.message || undefined);
+    },
+    onError: (err) => setFormError(apiErrorMessage(err, "Failed to save diagnosis.")),
+  });
 
   const canAdd = !disabled && !!consultationId;
 
+  const openCreate = () => {
+    setForm(emptyForm);
+    setFormError(null);
+    saveMutation.reset();
+    setModal({ open: true, editing: null });
+  };
+  const openEdit = (d: Diagnosis) => {
+    setForm(formStateFrom(d));
+    setFormError(null);
+    saveMutation.reset();
+    setModal({ open: true, editing: d });
+  };
+  const handleSave = () => {
+    if (!form.diagnosis_name.trim()) {
+      setFormError("Diagnosis name is required.");
+      return;
+    }
+    if (!modal.editing && !consultationId) {
+      setFormError("A consultation is required to create a diagnosis.");
+      return;
+    }
+    setFormError(null);
+    saveMutation.mutate();
+  };
+
+  const groupLabel = (d: Diagnosis) =>
+    consultationId != null && d.consultation_id === consultationId
+      ? "This consultation"
+      : !d.consultation_id
+        ? "Unlinked"
+        : `Consultation #${d.consultation_id}`;
+
+  const columns: DxGridColumn<Diagnosis>[] = [
+    {
+      key: "diagnosis_name",
+      header: "Diagnosis",
+      sortable: true,
+      wrap: true,
+      render: (d) => (
+        <div className="min-w-0">
+          <div className={String(d.diagnosis_type).toUpperCase() === "RULED_OUT" ? "font-medium line-through dx-muted" : "font-medium"}>{d.diagnosis_name}</div>
+          {d.diagnosis_note ? <div className="dx-muted text-[11.5px] whitespace-pre-wrap">{d.diagnosis_note}</div> : null}
+        </div>
+      ),
+    },
+    { key: "diagnosis_code", header: "Code", width: 90, sortable: true, render: (d) => (d.diagnosis_code ? <span className="dx-mono">{d.diagnosis_code}</span> : <span className="dx-faint">—</span>) },
+    {
+      key: "diagnosis_type",
+      header: "Type",
+      width: 120,
+      sortable: true,
+      filter: { options: DIAGNOSIS_TYPES.map((t) => ({ value: t, label: humanize(t) })) },
+      render: (d) => {
+        const key = (d.diagnosis_type || "").toUpperCase();
+        return key ? <DxBadge tone={TYPE_TONE[key] ?? "neutral"}>{humanize(key)}</DxBadge> : <span className="dx-faint">—</span>;
+      },
+    },
+    { key: "consultation_id", header: "Consultation", width: 140, sortable: true, accessor: (d) => groupLabel(d), render: (d) => <span className="dx-muted">{groupLabel(d)}</span> },
+    { key: "created_at", header: "Recorded", width: 140, sortable: true, render: (d) => <span className="dx-mono">{formatDateTime(d.created_at)}</span> },
+    {
+      key: "actions",
+      header: "",
+      width: 44,
+      align: "right",
+      render: (d) => {
+        const canEdit = !disabled && (consultationId == null || d.consultation_id === consultationId);
+        return canEdit ? (
+          <DxButton size="sm" variant="text" icon title="Edit diagnosis" onClick={() => openEdit(d)}>
+            <Edit3 />
+          </DxButton>
+        ) : null;
+      },
+    },
+  ];
+
   return (
-    <div className="glass-card rounded p-10 md:p-12 space-y-6">
-      <div className="flex items-center justify-between border-b border-secondary-400 pb-6">
-        <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-2xl bg-rose-500 text-white flex items-center justify-center shadow-md shadow-rose-500/20">
-            <Stethoscope className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-black font-display tracking-tight">Diagnoses</h3>
-            <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.25em] mt-0.5">
-              Working And Final Clinical Impressions
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={load}
-            className="p-2.5 rounded-xl hover:bg-secondary-100 transition-colors"
-            title="Refresh"
-          >
-            <RefreshCw className={`h-4 w-4 text-secondary-500 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
-          {canAdd && (
-            <button
-              onClick={openCreate}
-              className="btn-primary gap-2 px-5 py-2.5 text-xs"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Diagnosis</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {error && (
-        <div className="p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <span className="text-sm font-bold flex-1">{error}</span>
-          <button onClick={load} className="text-xs font-bold underline">
-            Retry
-          </button>
-        </div>
-      )}
-
-      {isLoading && diagnoses.length === 0 ? (
-        <div className="space-y-3">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-2xl bg-secondary-50 animate-pulse" />
-          ))}
-        </div>
-      ) : diagnoses.length === 0 && !error ? (
-        <div className="py-10 text-center">
-          <div className="h-14 w-14 mx-auto bg-rose-50 rounded-3xl flex items-center justify-center mb-3">
-            <Stethoscope className="h-7 w-7 text-rose-300" />
-          </div>
-          <p className="text-sm text-secondary-500 font-bold">No diagnoses recorded yet.</p>
+    <DxPanel
+      title="Diagnoses"
+      icon={<Stethoscope />}
+      description="Working and final clinical impressions on this visit."
+      flush
+      actions={
+        <>
+          <DxButton size="sm" variant="text" icon title="Refresh" onClick={() => diagnosesQuery.refetch()}>
+            <RotateCcw className={diagnosesQuery.isFetching ? "animate-spin" : undefined} />
+          </DxButton>
           {canAdd ? (
-            <button onClick={openCreate} className="btn-primary mt-5 gap-2 px-5 py-2 text-xs">
-              <Plus className="h-3.5 w-3.5" />
-              <span>Add First Diagnosis</span>
-            </button>
-          ) : !consultationId ? (
-            <p className="text-[11px] text-secondary-400 mt-3">
-              Start a consultation to capture diagnoses.
-            </p>
+            <DxButton size="sm" variant="primary" leftIcon={<Plus />} onClick={openCreate}>
+              Add diagnosis
+            </DxButton>
           ) : null}
+        </>
+      }
+    >
+      <DxGrid
+        columns={columns}
+        data={diagnoses}
+        rowKey={(d) => d.id}
+        isLoading={diagnosesQuery.isLoading}
+        error={diagnosesQuery.isError ? apiErrorMessage(diagnosesQuery.error, "Unable to load diagnoses for this visit.") : null}
+        onRetry={() => diagnosesQuery.refetch()}
+        borderless
+        filterRow={diagnoses.length > 5}
+        empty={{
+          icon: Stethoscope,
+          title: "No diagnoses recorded yet",
+          description: canAdd ? undefined : !consultationId ? "Start a consultation to capture diagnoses." : undefined,
+          action: canAdd ? (
+            <DxButton size="sm" variant="primary" leftIcon={<Plus />} onClick={openCreate}>
+              Add first diagnosis
+            </DxButton>
+          ) : undefined,
+        }}
+      />
+
+      <DxPopup
+        isOpen={modal.open}
+        onClose={() => !saveMutation.isPending && setModal({ open: false, editing: null })}
+        title={modal.editing ? "Edit diagnosis" : "Add diagnosis"}
+        size="md"
+        locked={saveMutation.isPending}
+        footer={
+          <>
+            <span className="dx-faint mr-auto text-[11.5px]">
+              Linked to consultation #{modal.editing?.consultation_id ?? consultationId ?? "—"} on visit #{visitId}
+            </span>
+            <DxButton onClick={() => setModal({ open: false, editing: null })} disabled={saveMutation.isPending}>
+              Cancel
+            </DxButton>
+            <DxButton variant="primary" isLoading={saveMutation.isPending} onClick={handleSave}>
+              {modal.editing ? "Save changes" : "Add diagnosis"}
+            </DxButton>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {formError ? <DxMessage tone="danger">{formError}</DxMessage> : null}
+          <DxForm cols={2}>
+            <DxInput
+              label="Diagnosis name"
+              required
+              fieldClassName="dx-col-span-full"
+              value={form.diagnosis_name}
+              onChange={(e) => setForm({ ...form, diagnosis_name: e.target.value })}
+              placeholder="e.g. Type 2 Diabetes Mellitus"
+              autoFocus
+            />
+            <DxInput
+              label="Code (e.g. ICD-10)"
+              mono
+              value={form.diagnosis_code}
+              onChange={(e) => setForm({ ...form, diagnosis_code: e.target.value.toUpperCase() })}
+              placeholder="E11"
+            />
+            <DxSelect
+              label="Type"
+              value={form.diagnosis_type}
+              onChange={(e) => setForm({ ...form, diagnosis_type: e.target.value })}
+              options={DIAGNOSIS_TYPES.map((t) => ({ value: t, label: humanize(t) }))}
+            />
+            <DxTextarea
+              label="Clinical note"
+              fieldClassName="dx-col-span-full"
+              rows={4}
+              value={form.diagnosis_note}
+              onChange={(e) => setForm({ ...form, diagnosis_note: e.target.value })}
+              placeholder="Reasoning, supporting evidence, severity, onset…"
+            />
+          </DxForm>
         </div>
-      ) : (
-        <div className="space-y-6">
-          {grouped.map(([groupKey, items]) => {
-            const isThisConsultation = consultationId != null && groupKey === consultationId;
-            return (
-              <div key={groupKey} className="space-y-3">
-                <h4 className="text-[10px] font-bold uppercase tracking-[0.25em] text-secondary-400 flex items-center gap-2">
-                  <Tag className="h-3 w-3" />
-                  {isThisConsultation
-                    ? "This Consultation"
-                    : groupKey === 0
-                      ? "Unlinked"
-                      : `Consultation #${groupKey}`}
-                </h4>
-                <div className="space-y-3">
-                  {items.map((d) => {
-                    const typeKey = (d.diagnosis_type || "").toUpperCase();
-                    const typeClass = typeStyles[typeKey] ?? typeStyles.PROVISIONAL;
-                    const canEdit = !disabled && (consultationId == null || d.consultation_id === consultationId);
-                    return (
-                      <div
-                        key={d.id}
-                        className="p-5 rounded-2xl bg-white border border-secondary-400 hover:border-rose-200 transition-all"
-                      >
-                        <div className="flex items-start justify-between gap-4 mb-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm font-black text-secondary-900">
-                                {d.diagnosis_name}
-                              </p>
-                              {d.diagnosis_code && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary-100 text-secondary-500 text-[10px] font-mono font-bold">
-                                  <Hash className="h-2.5 w-2.5" />
-                                  {d.diagnosis_code}
-                                </span>
-                              )}
-                              {typeKey && (
-                                <span
-                                  className={`px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-widest border ${typeClass}`}
-                                >
-                                  {typeKey.replace("_", " ")}
-                                </span>
-                              )}
-                            </div>
-                            {d.diagnosis_note && (
-                              <p className="mt-2 text-xs text-secondary-600 leading-relaxed flex items-start gap-1.5">
-                                <FileText className="h-3 w-3 mt-0.5 shrink-0 text-secondary-300" />
-                                <span>{d.diagnosis_note}</span>
-                              </p>
-                            )}
-                          </div>
-                          {canEdit && (
-                            <button
-                              onClick={() => openEdit(d)}
-                              className="p-2 rounded-xl hover:bg-secondary-100 text-secondary-500"
-                              title="Edit diagnosis"
-                            >
-                              <Edit3 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-          <div className="bg-white rounded p-10 max-w-xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setModalOpen(false)}
-              disabled={isSaving}
-              className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all disabled:opacity-50"
-            >
-              <X className="h-5 w-5 text-secondary-400" />
-            </button>
-            <div className="flex items-center gap-5 mb-8">
-              <div className="h-14 w-14 rounded-2xl bg-rose-500 text-white flex items-center justify-center shadow-xl shadow-rose-500/20">
-                {editing ? <Edit3 className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
-              </div>
-              <div>
-                <h3 className="text-xl font-black font-display tracking-tight">
-                  {editing ? "Edit Diagnosis" : "Add Diagnosis"}
-                </h3>
-                <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-                  Capture A Clinical Impression
-                </p>
-              </div>
-            </div>
-
-            {saveError && (
-              <div className="mb-5 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-                <AlertCircle className="h-5 w-5" />
-                <span className="text-sm font-bold">{saveError}</span>
-              </div>
-            )}
-
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                  Diagnosis Name *
-                </label>
-                <input
-                  type="text"
-                  value={form.diagnosis_name}
-                  onChange={(e) => setForm({ ...form, diagnosis_name: e.target.value })}
-                  placeholder="e.g. Type 2 Diabetes Mellitus"
-                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                    Code (e.g. ICD-10)
-                  </label>
-                  <input
-                    type="text"
-                    value={form.diagnosis_code}
-                    onChange={(e) =>
-                      setForm({ ...form, diagnosis_code: e.target.value.toUpperCase() })
-                    }
-                    placeholder="E11"
-                    className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                    Type
-                  </label>
-                  <select
-                    value={form.diagnosis_type}
-                    onChange={(e) => setForm({ ...form, diagnosis_type: e.target.value })}
-                    className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-                  >
-                    {DIAGNOSIS_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t.replace("_", " ")}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                  Clinical Note
-                </label>
-                <textarea
-                  value={form.diagnosis_note}
-                  onChange={(e) => setForm({ ...form, diagnosis_note: e.target.value })}
-                  placeholder="Reasoning, supporting evidence, severity, onset..."
-                  className="input-field h-28 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-                />
-              </div>
-            </div>
-
-            <div className="pt-6 flex gap-4">
-              <button
-                onClick={() => setModalOpen(false)}
-                disabled={isSaving}
-                className="flex-1 btn-secondary py-4 rounded-2xl font-bold disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="flex-[2] btn-primary py-4 rounded-2xl font-black tracking-tight bg-rose-500 hover:bg-rose-600 shadow-xl shadow-rose-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                {isSaving ? "Saving..." : editing ? "Save Changes" : "Add Diagnosis"}
-              </button>
-            </div>
-
-            <p className="mt-4 text-[10px] text-secondary-400 text-center flex items-center justify-center gap-1.5">
-              <CheckCircle2 className="h-3 w-3" />
-              Linked to consultation #{editing?.consultation_id ?? consultationId ?? "—"} on visit
-              #{visitId}
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
+      </DxPopup>
+    </DxPanel>
   );
 }

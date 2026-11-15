@@ -1,32 +1,49 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
+  BarChart3,
   Ban,
   CheckCircle2,
   Clock,
   ListChecks,
+  Monitor,
   PhoneCall,
   PlayCircle,
   RefreshCw,
   Users,
   Volume2,
 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
-import { Modal } from "@/components/ui/Modal";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
+import {
+  DxBadge,
+  DxButton,
+  DxConfirm,
+  DxGrid,
+  DxKpi,
+  DxLiveDot,
+  DxMessage,
+  DxPage,
+  DxPageHeader,
+  DxPager,
+  DxPanel,
+  DxPopup,
+  DxSegmented,
+  DxSelect,
+  DxStatusBar,
+  DxStatusItem,
+  DxTabs,
+  DxTextarea,
+  DxToolbar,
+  DxToolbarGroup,
+  DxToolbarLabel,
+  DxToolbarSeparator,
+  DxToolbarSpacer,
+  elapsed,
+  formatTime,
+  type DxGridColumn,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
-import { MetricCard } from "@/components/charts/MetricCard";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
-import { Pagination } from "@/components/data-table/Pagination";
-import { cn } from "@/lib/utils/cn";
 import { routes } from "@/config/routes";
+import { sdpTypeLabel, workstationPathFor } from "@/features/visits/lib/clinic-flow";
 import { RecordServiceModal } from "../components/RecordServiceModal";
 import type { QueueTicket } from "../api/queues.api";
 import {
@@ -37,15 +54,8 @@ import {
   type ConfirmKind,
   type ModalKind,
 } from "../lib/queue-dashboard-helpers";
-import {
-  formatTime,
-  LiveIndicator,
-  SegmentButton,
-  ServingTicketCard,
-  StatusBadge,
-  ticketPatientName,
-  WaitingTicketCard,
-} from "../components/ticket-cards";
+import { journeyText, ticketPatientName } from "../lib/ticket-utils";
+import { PriorityBadge, ServingTicketCard, StatusBadge, WaitingRowActions } from "../components/ticket-cards";
 import {
   useActiveServicePoints,
   useCallTicket,
@@ -61,17 +71,21 @@ import {
   useTransferTicket,
 } from "../hooks/use-queue";
 
-// ============================================================
-// Page
-// ============================================================
+type Scope = "my" | "sdp";
+type Tab = "worklist" | "all";
 
+/**
+ * Patient Queue — the live worklist every desk works from: call, serve, open
+ * the right workstation for the desk, record services, then route the patient
+ * onward (or end the visit). "By Service Point" shows any desk in the hospital.
+ */
 export function QueueDashboardPage() {
   const toast = useToast();
   const navigate = useNavigate();
 
-  const [scope, setScope] = useState<"my" | "sdp">("my");
+  const [scope, setScope] = useState<Scope>("my");
   const [selectedSdpId, setSelectedSdpId] = useState<number | null>(null);
-  const [tab, setTab] = useState<"worklist" | "all">("worklist");
+  const [tab, setTab] = useState<Tab>("worklist");
 
   // Modal / confirm state
   const [modal, setModal] = useState<{ kind: ModalKind; ticket: QueueTicket } | null>(null);
@@ -84,20 +98,20 @@ export function QueueDashboardPage() {
   // "All tickets" tab state
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(1);
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState(20);
 
   // ---------- Data ----------
   const sdpQuery = useActiveServicePoints();
-  const sdps = sdpQuery.data?.items ?? [];
+  const sdps = useMemo(() => sdpQuery.data?.items ?? [], [sdpQuery.data]);
 
   const myWorklistQuery = useMyWorklist(undefined, { enabled: scope === "my" });
-  const sdpWorklistQuery = useServicePointWorklist(selectedSdpId ?? 0, {
-    enabled: scope === "sdp" && !!selectedSdpId,
-  });
+  const sdpWorklistQuery = useServicePointWorklist(selectedSdpId ?? 0, { enabled: scope === "sdp" && !!selectedSdpId });
   const worklistQuery = scope === "my" ? myWorklistQuery : sdpWorklistQuery;
   const worklist = worklistQuery.data;
-  const activeSdpId =
-    scope === "sdp" ? selectedSdpId : worklist?.service_delivery_point_id ?? null;
+  const activeSdpId = scope === "sdp" ? selectedSdpId : (worklist?.service_delivery_point_id ?? null);
+  const activeSdp = useMemo(() => sdps.find((s) => s.id === activeSdpId) ?? null, [sdps, activeSdpId]);
+  // Desk type drives which workstation "Open" leads to (triage, consultation, pharmacy…).
+  const deskType = (worklist as { service_point_type?: string | null } | undefined)?.service_point_type ?? activeSdp?.service_point_type ?? null;
 
   const ticketsQuery = useServicePointTickets(
     activeSdpId ?? 0,
@@ -105,14 +119,9 @@ export function QueueDashboardPage() {
     { enabled: tab === "all" && !!activeSdpId },
   );
 
-  const waitingOnly = useMemo(
-    () => (worklist?.waiting ?? []).filter((t) => t.status === "WAITING"),
-    [worklist],
-  );
-  const calledOnly = useMemo(
-    () => (worklist?.waiting ?? []).filter((t) => t.status === "CALLED"),
-    [worklist],
-  );
+  const waitingAndCalled = useMemo(() => worklist?.waiting ?? [], [worklist]);
+  const waitingOnly = useMemo(() => waitingAndCalled.filter((t) => t.status === "WAITING"), [waitingAndCalled]);
+  const calledOnly = useMemo(() => waitingAndCalled.filter((t) => t.status === "CALLED"), [waitingAndCalled]);
   const serving = worklist?.serving ?? [];
 
   // ---------- Mutations ----------
@@ -124,11 +133,8 @@ export function QueueDashboardPage() {
   const missMutation = useMissTicket();
   const cancelMutation = useCancelTicket();
   const transferMutation = useTransferTicket();
-  const anyModalPending =
-    routeMutation.isPending ||
-    endVisitMutation.isPending ||
-    cancelMutation.isPending ||
-    transferMutation.isPending;
+  const anyModalPending = routeMutation.isPending || endVisitMutation.isPending || cancelMutation.isPending || transferMutation.isPending;
+  const rowBusy = callMutation.isPending || serveMutation.isPending;
 
   const handleCall = (ticket: QueueTicket) =>
     callMutation.mutate(
@@ -169,10 +175,7 @@ export function QueueDashboardPage() {
       mutation.mutate(
         { ticketId: ticket.id },
         {
-          onSuccess: (res) =>
-            toast.success(
-              res.message || (kind === "complete" ? "Ticket completed." : "Ticket marked missed."),
-            ),
+          onSuccess: (res) => toast.success(res.message || (kind === "complete" ? "Ticket completed." : "Ticket marked missed.")),
           onError: (err) => toast.error("Action failed", apiErrorMessage(err)),
           onSettled: () => resolve(),
         },
@@ -198,67 +201,88 @@ export function QueueDashboardPage() {
       if (!targetId) return setModalError("Pick the next service point.");
       routeMutation.mutate(
         { ticketId: ticket.id, targetServiceDeliveryPointId: targetId, notes: text || undefined },
-        {
-          ...common,
-          onSuccess: (res) => {
-            toast.success(res.message || "Patient routed to the next service point.");
-            setModal(null);
-          },
-        },
+        { ...common, onSuccess: (res) => { toast.success(res.message || "Patient routed to the next service point."); setModal(null); } },
       );
     } else if (kind === "complete-end-visit") {
       endVisitMutation.mutate(
         { ticketId: ticket.id, note: text || undefined },
-        {
-          ...common,
-          onSuccess: (res) => {
-            toast.success(
-              res.message || "Visit marked completed.",
-              `Visit #${res.visit_id} · ${res.visit_status}`,
-            );
-            setModal(null);
-          },
-        },
+        { ...common, onSuccess: (res) => { toast.success(res.message || "Visit marked completed.", `Visit #${res.visit_id} · ${res.visit_status}`); setModal(null); } },
       );
     } else if (kind === "cancel") {
       if (!text) return setModalError("A cancellation reason is required.");
       cancelMutation.mutate(
         { ticketId: ticket.id, reason: text },
-        {
-          ...common,
-          onSuccess: (res) => {
-            toast.success(res.message || "Ticket cancelled.");
-            setModal(null);
-          },
-        },
+        { ...common, onSuccess: (res) => { toast.success(res.message || "Ticket cancelled."); setModal(null); } },
       );
     } else if (kind === "transfer") {
       if (!targetId) return setModalError("Pick a destination service point.");
       transferMutation.mutate(
         { ticketId: ticket.id, targetServiceDeliveryPointId: targetId, reason: text || undefined },
-        {
-          ...common,
-          onSuccess: (res) => {
-            toast.success(res.message || "Ticket transferred.");
-            setModal(null);
-          },
-        },
+        { ...common, onSuccess: (res) => { toast.success(res.message || "Ticket transferred."); setModal(null); } },
       );
     }
   };
 
-  // ---------- All-tickets table ----------
-  const columns: DataTableColumn<QueueTicket>[] = [
+  // ---------- Grids ----------
+  const waitingColumns: DxGridColumn<QueueTicket>[] = [
+    { key: "queue_number", header: "Ticket", width: 110, sortable: true, render: (t) => <span className="dx-mono font-semibold">{t.queue_number}</span> },
+    {
+      key: "patient",
+      header: "Patient",
+      sortable: true,
+      accessor: (t) => ticketPatientName(t),
+      render: (t) => (
+        <div className="min-w-0">
+          <div className="dx-row-primary truncate">{ticketPatientName(t)}</div>
+          <div className="dx-row-secondary dx-mono">{t.hospital_number ?? `#${t.patient_id}`}</div>
+        </div>
+      ),
+    },
+    { key: "priority", header: "Priority", width: 100, sortable: true, accessor: (t) => t.priority ?? 0, render: (t) => <PriorityBadge priority={t.priority} /> },
+    { key: "status", header: "Status", width: 110, render: (t) => <StatusBadge status={t.status} /> },
+    {
+      key: "created_at",
+      header: "Waiting",
+      width: 110,
+      sortable: true,
+      render: (t) => (
+        <span className="inline-flex items-center gap-1 dx-mono">
+          <Clock className="h-3 w-3 text-[var(--dx-text-faint)]" aria-hidden />
+          {elapsed(t.created_at)}
+          {t.status === "CALLED" && t.called_at ? <span className="dx-faint"> · called {formatTime(t.called_at)}</span> : null}
+        </span>
+      ),
+    },
+    { key: "journey", header: "Journey", render: (t) => <span className="dx-muted truncate" title={journeyText(t)}>{journeyText(t)}</span> },
+    {
+      key: "actions",
+      header: "",
+      width: 230,
+      align: "right",
+      render: (t) => (
+        <WaitingRowActions
+          ticket={t}
+          busy={rowBusy}
+          onCall={() => handleCall(t)}
+          onServe={() => handleServe(t)}
+          onMiss={() => setConfirmAction({ kind: "miss", ticket: t })}
+          onCancel={() => openModal("cancel", t)}
+          onTransfer={() => openModal("transfer", t)}
+        />
+      ),
+    },
+  ];
+
+  const allColumns: DxGridColumn<QueueTicket>[] = [
     {
       key: "queue_number",
       header: "Ticket",
+      width: 120,
       render: (t) => (
-        <div>
-          <span className="data-mono font-bold text-secondary-900">{t.queue_number}</span>
-          {t.queue_position != null && (
-            <span className="ml-2 text-xs text-secondary-400">pos {t.queue_position}</span>
-          )}
-        </div>
+        <span className="dx-mono font-semibold">
+          {t.queue_number}
+          {t.queue_position != null ? <span className="dx-faint ml-1 text-[11px]">pos {t.queue_position}</span> : null}
+        </span>
       ),
     },
     {
@@ -266,265 +290,220 @@ export function QueueDashboardPage() {
       header: "Patient",
       render: (t) => (
         <div className="min-w-0">
-          <p className="truncate font-semibold text-secondary-900">{ticketPatientName(t)}</p>
-          <p className="data-mono text-xs text-secondary-400">{t.hospital_number ?? "—"}</p>
+          <div className="dx-row-primary truncate">{ticketPatientName(t)}</div>
+          <div className="dx-row-secondary dx-mono">{t.hospital_number ?? "—"}</div>
         </div>
       ),
     },
-    { key: "status", header: "Status", render: (t) => <StatusBadge status={t.status} /> },
-    {
-      key: "previous_steps",
-      header: "Journey",
-      render: (t) =>
-        t.previous_steps.length ? (
-          <span className="text-xs font-medium text-secondary-500">
-            {t.previous_steps.map((s) => s.service_delivery_point_name).join(" → ")}
-          </span>
-        ) : (
-          <span className="text-xs text-secondary-400">First stop</span>
-        ),
-    },
-    {
-      key: "created_at",
-      header: "Issued",
-      render: (t) => <span className="data-mono text-xs">{formatTime(t.created_at)}</span>,
-    },
-    {
-      key: "called_at",
-      header: "Called",
-      render: (t) => <span className="data-mono text-xs">{formatTime(t.called_at)}</span>,
-    },
-    {
-      key: "service_ended_at",
-      header: "Ended",
-      render: (t) => <span className="data-mono text-xs">{formatTime(t.service_ended_at)}</span>,
-    },
+    { key: "status", header: "Status", width: 110, render: (t) => <StatusBadge status={t.status} /> },
+    { key: "journey", header: "Journey", render: (t) => <span className="dx-muted">{journeyText(t)}</span> },
+    { key: "created_at", header: "Issued", width: 90, render: (t) => <span className="dx-mono">{formatTime(t.created_at)}</span> },
+    { key: "called_at", header: "Called", width: 90, render: (t) => <span className="dx-mono">{formatTime(t.called_at)}</span> },
+    { key: "service_ended_at", header: "Ended", width: 90, render: (t) => <span className="dx-mono">{formatTime(t.service_ended_at)}</span> },
   ];
 
   const ticketsMeta = ticketsQuery.data?.meta;
   const totalItems = ticketsMeta?.total ?? ticketsQuery.data?.count;
-  const totalPages =
-    ticketsMeta?.total_pages ??
-    (typeof totalItems === "number" ? Math.max(1, Math.ceil(totalItems / pageSize)) : undefined);
+  const totalPages = ticketsMeta?.total_pages ?? (typeof totalItems === "number" ? Math.max(1, Math.ceil(totalItems / pageSize)) : undefined);
+
+  const sdpOptions = sdps.map((s) => ({ value: String(s.id), label: `${s.name} (${s.code})` }));
+  const needsSdp = scope === "sdp" && !selectedSdpId;
 
   // ---------- Render ----------
   return (
-    <div className="space-y-8 animate-fade-in">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
         title="Patient Queue"
-        description="Live worklist orchestration — call, serve, route and transfer tickets across service points."
+        subtitle="Live worklist — call, serve, open the workstation, record services and route the patient to the next checkpoint."
         actions={
-          <div className="flex flex-wrap items-center gap-3">
-            <LiveIndicator />
-            <Button
-              variant="secondary"
-              size="sm"
-              leftIcon={<RefreshCw className={cn("h-3.5 w-3.5", worklistQuery.isFetching && "animate-spin")} />}
-              onClick={() => worklistQuery.refetch()}
-            >
+          <>
+            <DxLiveDot label="Live · refreshes every 30s" />
+            <DxButton leftIcon={<RefreshCw className={worklistQuery.isFetching ? "animate-spin" : undefined} />} onClick={() => worklistQuery.refetch()}>
               Refresh
-            </Button>
-          </div>
+            </DxButton>
+          </>
         }
       />
 
-      {/* Scope switch + SDP picker */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="inline-flex overflow-hidden rounded-2xl border border-secondary-200 dark:border-white/10">
-          <SegmentButton active={scope === "my"} onClick={() => setScope("my")} label="My Worklist" />
-          <SegmentButton active={scope === "sdp"} onClick={() => setScope("sdp")} label="By Service Point" />
-        </div>
-        {scope === "sdp" && (
-          <Select
-            aria-label="Service point"
-            className="w-72 py-2.5"
-            value={selectedSdpId ?? ""}
-            onChange={(e) => {
-              setSelectedSdpId(e.target.value ? Number(e.target.value) : null);
-              setPage(1);
-            }}
-            options={sdps.map((s) => ({ value: String(s.id), label: `${s.name} (${s.code})` }))}
-            placeholder="Pick a service point"
+      <DxToolbar>
+        <DxToolbarGroup>
+          <DxSegmented<Scope>
+            ariaLabel="Worklist scope"
+            value={scope}
+            onChange={(v) => { setScope(v); setPage(1); }}
+            items={[
+              { key: "my", label: "My worklist" },
+              { key: "sdp", label: "By service point" },
+            ]}
           />
-        )}
+          {scope === "sdp" ? (
+            <DxSelect
+              aria-label="Service point"
+              editorSize="sm"
+              className="w-72"
+              value={selectedSdpId ?? ""}
+              onChange={(e) => { setSelectedSdpId(e.target.value ? Number(e.target.value) : null); setPage(1); }}
+              options={sdpOptions}
+              placeholder="Pick a service point…"
+            />
+          ) : null}
+        </DxToolbarGroup>
         {worklist?.service_delivery_point_name ? (
-          <Badge variant="outline" className="normal-case tracking-normal">
-            {worklist.service_delivery_point_name}
-          </Badge>
+          <>
+            <DxToolbarSeparator />
+            <DxToolbarLabel>Desk</DxToolbarLabel>
+            <DxBadge tone="accent">{worklist.service_delivery_point_name}</DxBadge>
+            {deskType ? <DxBadge tone="outline">{sdpTypeLabel(deskType)}</DxBadge> : null}
+          </>
         ) : null}
-        {worklist ? (
-          <Badge variant="soft-danger">Cancelled today: {worklist.cancelled_today}</Badge>
-        ) : null}
+        <DxToolbarSpacer />
+        <DxToolbarGroup>
+          <Link to={routes.queueDisplayBoard} className="dx-btn dx-btn-text dx-btn-sm">
+            <Monitor aria-hidden /> Display board
+          </Link>
+          <Link to={routes.queueAnalytics} className="dx-btn dx-btn-text dx-btn-sm">
+            <BarChart3 aria-hidden /> Analytics
+          </Link>
+        </DxToolbarGroup>
+      </DxToolbar>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <DxKpi label="Waiting" value={waitingOnly.length} icon={Users} tone="warning" isLoading={worklistQuery.isLoading} />
+        <DxKpi label="Called" value={calledOnly.length} icon={PhoneCall} tone="info" isLoading={worklistQuery.isLoading} />
+        <DxKpi label="Serving" value={serving.length} icon={PlayCircle} tone="accent" isLoading={worklistQuery.isLoading} />
+        <DxKpi label="Served today" value={worklist?.served_today ?? 0} icon={CheckCircle2} tone="success" isLoading={worklistQuery.isLoading} />
+        <DxKpi label="Cancelled today" value={worklist?.cancelled_today ?? 0} icon={Ban} tone="danger" isLoading={worklistQuery.isLoading} />
       </div>
 
-      {/* KPIs */}
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Waiting" value={waitingOnly.length} icon={Users} tone="amber" isLoading={worklistQuery.isLoading} />
-        <MetricCard label="Called" value={calledOnly.length} icon={PhoneCall} tone="cyan" isLoading={worklistQuery.isLoading} />
-        <MetricCard label="Serving" value={serving.length} icon={PlayCircle} tone="primary" isLoading={worklistQuery.isLoading} />
-        <MetricCard
-          label="Served Today"
-          value={worklist?.served_today ?? 0}
-          icon={CheckCircle2}
-          tone="violet"
-          isLoading={worklistQuery.isLoading}
-        />
-      </div>
-
-      {/* Tabs */}
-      <div className="inline-flex overflow-hidden rounded-2xl border border-secondary-200 dark:border-white/10">
-        <SegmentButton active={tab === "worklist"} onClick={() => setTab("worklist")} label="Worklist" />
-        <SegmentButton active={tab === "all"} onClick={() => setTab("all")} label="All Tickets" />
-      </div>
+      <DxTabs<Tab>
+        value={tab}
+        onChange={setTab}
+        items={[
+          { key: "worklist", label: "Worklist", icon: <ListChecks />, count: waitingAndCalled.length + serving.length },
+          { key: "all", label: "All tickets", icon: <Clock /> },
+        ]}
+      />
 
       {tab === "worklist" ? (
-        scope === "sdp" && !selectedSdpId ? (
-          <Card>
-            <EmptyState
-              icon={ListChecks}
-              title="Pick a service point"
-              description="Choose a service delivery point above to browse its live queue."
-            />
-          </Card>
+        needsSdp ? (
+          <DxMessage tone="info" title="Pick a service point">Choose a service delivery point in the toolbar to browse its live queue.</DxMessage>
         ) : worklistQuery.isError ? (
-          <Card>
-            <EmptyState
-              icon={Ban}
-              title="Unable to load the worklist"
-              description={apiErrorMessage(worklistQuery.error)}
-              action={
-                <Button variant="secondary" size="sm" onClick={() => worklistQuery.refetch()}>
-                  Retry
-                </Button>
-              }
-            />
-          </Card>
-        ) : worklistQuery.isLoading ? (
-          <div className="grid gap-6 lg:grid-cols-12">
-            <div className="lg:col-span-7 space-y-4">
-              {[0, 1, 2].map((i) => (
-                <Skeleton key={i} className="h-28 w-full rounded-[2rem]" />
-              ))}
-            </div>
-            <div className="lg:col-span-5 space-y-4">
-              {[0, 1].map((i) => (
-                <Skeleton key={i} className="h-40 w-full rounded-[2rem]" />
-              ))}
-            </div>
-          </div>
+          <DxMessage tone="danger" title="Unable to load the worklist" action={<DxButton size="sm" onClick={() => worklistQuery.refetch()}>Retry</DxButton>}>
+            {apiErrorMessage(worklistQuery.error)}
+          </DxMessage>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-12">
-            {/* Waiting + Called column */}
-            <div className="lg:col-span-7 space-y-4">
-              <CardHeader
-                title="Waiting & Called"
-                description={`${waitingOnly.length} waiting · ${calledOnly.length} called`}
-                className="mb-0"
+          <div className="grid gap-4 xl:grid-cols-12">
+            <DxPanel
+              className="xl:col-span-8"
+              title="Waiting & called"
+              icon={<Users />}
+              description={`${waitingOnly.length} waiting · ${calledOnly.length} called`}
+              flush
+            >
+              <DxGrid
+                columns={waitingColumns}
+                data={waitingAndCalled}
+                rowKey={(t) => t.id}
+                isLoading={worklistQuery.isLoading}
+                borderless
+                rowClassName={(t) => (t.status === "CALLED" ? "font-medium" : undefined)}
+                empty={{ icon: Clock, title: "Queue is clear", description: "No patients are waiting at this service point." }}
               />
-              {worklist && worklist.waiting.length === 0 ? (
-                <Card>
-                  <EmptyState
-                    icon={Clock}
-                    title="Queue is clear"
-                    description="No patients are waiting at this service point."
-                  />
-                </Card>
-              ) : (
-                (worklist?.waiting ?? []).map((ticket) => (
-                  <WaitingTicketCard
-                    key={ticket.id}
-                    ticket={ticket}
-                    busy={callMutation.isPending || serveMutation.isPending}
-                    onCall={() => handleCall(ticket)}
-                    onServe={() => handleServe(ticket)}
-                    onMiss={() => setConfirmAction({ kind: "miss", ticket })}
-                    onCancel={() => openModal("cancel", ticket)}
-                    onTransfer={() => openModal("transfer", ticket)}
-                  />
-                ))
-              )}
-            </div>
+            </DxPanel>
 
-            {/* Now serving column */}
-            <div className="lg:col-span-5 space-y-4">
-              <CardHeader
-                title="Now Serving"
-                description={`${serving.length} in active service`}
-                className="mb-0"
-              />
-              {serving.length === 0 ? (
-                <Card>
-                  <EmptyState
-                    icon={Volume2}
-                    title="No one in service"
-                    description="Call the next patient when you are ready."
-                  />
-                </Card>
+            <DxPanel className="xl:col-span-4" title="Now serving" icon={<Volume2 />} description={`${serving.length} in active service`} bodyClassName="space-y-3">
+              {worklistQuery.isLoading ? (
+                <div className="space-y-2">
+                  <div className="dx-skeleton h-24" />
+                  <div className="dx-skeleton h-24" />
+                </div>
+              ) : serving.length === 0 ? (
+                <div className="dx-grid-state">
+                  <Volume2 aria-hidden />
+                  <p className="dx-grid-state-title">No one in service</p>
+                  <p>Call the next patient when you are ready.</p>
+                </div>
               ) : (
-                serving.map((ticket) => (
-                  <ServingTicketCard
-                    key={ticket.id}
-                    ticket={ticket}
-                    onComplete={() => setConfirmAction({ kind: "complete", ticket })}
-                    onRoute={() => openModal("complete-route", ticket)}
-                    onEndVisit={() => openModal("complete-end-visit", ticket)}
-                    onCancel={() => openModal("cancel", ticket)}
-                    onRecordService={() => setRecordServiceTicket(ticket)}
-                    onTransfer={() => openModal("transfer", ticket)}
-                    onOpenConsultation={() => navigate(`${routes.consultation}/${ticket.visit_id}`)}
-                  />
-                ))
+                serving.map((ticket) => {
+                  const ws = workstationPathFor(deskType, ticket.visit_id);
+                  return (
+                    <ServingTicketCard
+                      key={ticket.id}
+                      ticket={ticket}
+                      workstation={ws}
+                      onOpenWorkstation={() => navigate(ws.path)}
+                      onComplete={() => setConfirmAction({ kind: "complete", ticket })}
+                      onRoute={() => openModal("complete-route", ticket)}
+                      onEndVisit={() => openModal("complete-end-visit", ticket)}
+                      onCancel={() => openModal("cancel", ticket)}
+                      onRecordService={() => setRecordServiceTicket(ticket)}
+                      onTransfer={() => openModal("transfer", ticket)}
+                    />
+                  );
+                })
               )}
-            </div>
+            </DxPanel>
           </div>
         )
       ) : (
-        <Card padding="none">
-          <div className="flex flex-wrap items-center gap-3 px-6 py-4">
-            <Select
+        <div>
+          <DxToolbar attached>
+            <DxToolbarLabel>Status</DxToolbarLabel>
+            <DxSelect
               aria-label="Status filter"
-              className="w-80 py-2.5"
+              editorSize="sm"
+              className="w-80"
               value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
               options={STATUS_FILTER_OPTIONS}
             />
-            {!activeSdpId && (
-              <span className="text-sm font-medium text-secondary-400">
-                Select a service point (or load your worklist) to browse tickets.
-              </span>
-            )}
-          </div>
-          <DataTable
-            columns={columns}
+            {!activeSdpId ? <DxToolbarLabel>Select a service point (or load your worklist) to browse tickets.</DxToolbarLabel> : null}
+            <DxToolbarSpacer />
+            <DxButton size="sm" variant="text" leftIcon={<RefreshCw className={ticketsQuery.isFetching ? "animate-spin" : undefined} />} onClick={() => ticketsQuery.refetch()} disabled={!activeSdpId}>
+              Refresh
+            </DxButton>
+          </DxToolbar>
+          <DxGrid
+            attached
+            columns={allColumns}
             data={ticketsQuery.data?.items}
             rowKey={(t) => t.id}
             isLoading={ticketsQuery.isLoading && !!activeSdpId}
             error={ticketsQuery.isError ? apiErrorMessage(ticketsQuery.error) : null}
             onRetry={() => ticketsQuery.refetch()}
-            empty={{
-              icon: ListChecks,
-              title: "No tickets found",
-              description: "Adjust the status filter or check back later.",
-            }}
+            filterRow
+            empty={{ icon: ListChecks, title: "No tickets found", description: "Adjust the status filter or check back later." }}
             footer={
-              <Pagination
+              <DxPager
                 page={page}
                 totalPages={totalPages}
                 totalItems={typeof totalItems === "number" ? totalItems : undefined}
                 pageSize={pageSize}
+                pageSizeOptions={[10, 20, 50]}
+                onPageSizeChange={(n) => { setPageSize(n); setPage(1); }}
                 hasNext={ticketsMeta?.has_next}
                 onPageChange={setPage}
               />
             }
           />
-        </Card>
+        </div>
       )}
 
-      {/* Confirm dialogs */}
-      <ConfirmDialog
+      <DxStatusBar>
+        <DxStatusItem>
+          Desk: <b>{worklist?.service_delivery_point_name ?? "—"}</b>
+        </DxStatusItem>
+        <DxStatusItem>
+          Workstation: <b>{sdpTypeLabel(deskType)}</b>
+        </DxStatusItem>
+        <DxStatusItem>
+          Active tickets: <b>{waitingAndCalled.length + serving.length}</b>
+        </DxStatusItem>
+        <span className="ml-auto">Urgent and emergency patients are pushed ahead of routine ones automatically.</span>
+      </DxStatusBar>
+
+      {/* Confirms */}
+      <DxConfirm
         isOpen={confirmAction?.kind === "complete"}
         onClose={() => setConfirmAction(null)}
         onConfirm={handleConfirm}
@@ -533,73 +512,64 @@ export function QueueDashboardPage() {
         confirmLabel="Complete"
         tone="primary"
       />
-      <ConfirmDialog
+      <DxConfirm
         isOpen={confirmAction?.kind === "miss"}
         onClose={() => setConfirmAction(null)}
         onConfirm={handleConfirm}
         title="Mark ticket missed"
         description={`Mark ticket ${confirmAction?.ticket.queue_number ?? ""} as missed? Use this when the patient did not respond to the call.`}
-        confirmLabel="Mark Missed"
+        confirmLabel="Mark missed"
         tone="danger"
       />
 
-      {/* Action modal */}
       <RecordServiceModal
         ticket={recordServiceTicket}
         sdpId={activeSdpId}
         sdpName={worklist?.service_delivery_point_name ?? undefined}
         onClose={() => setRecordServiceTicket(null)}
       />
+
       {modal ? (
-        <Modal
+        <DxPopup
           isOpen
           onClose={closeModal}
           title={MODAL_META[modal.kind].title}
-          size="md"
+          size="sm"
+          locked={anyModalPending}
           footer={
-            <div className="flex justify-end gap-3">
-              <Button variant="secondary" size="sm" onClick={closeModal} disabled={anyModalPending}>
+            <>
+              <DxButton onClick={closeModal} disabled={anyModalPending}>
                 Back
-              </Button>
-              <Button
-                variant={modal.kind === "cancel" ? "danger" : "primary"}
-                size="sm"
-                onClick={submitModal}
-                isLoading={anyModalPending}
-              >
+              </DxButton>
+              <DxButton variant={modal.kind === "cancel" ? "danger" : "primary"} onClick={submitModal} isLoading={anyModalPending}>
                 {MODAL_META[modal.kind].cta}
-              </Button>
-            </div>
+              </DxButton>
+            </>
           }
         >
-          <div className="space-y-5">
-            <div className="flex items-center gap-4 rounded-2xl bg-secondary-500/5 p-4 dark:bg-white/5">
-              <span className="data-mono rounded-xl bg-primary-500/10 px-3 py-2 text-sm font-bold text-primary-600 dark:text-primary-300">
-                {modal.ticket.queue_number}
-              </span>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 rounded border border-[var(--dx-border)] bg-[var(--dx-surface-alt)] px-3 py-2">
+              <span className="dx-mono rounded bg-[var(--dx-accent-soft)] px-2 py-1 text-[12px] font-semibold text-[var(--dx-accent)]">{modal.ticket.queue_number}</span>
               <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-secondary-900">
-                  {ticketPatientName(modal.ticket)}
-                </p>
-                <p className="data-mono text-xs text-secondary-400">
-                  {modal.ticket.hospital_number ?? `Patient #${modal.ticket.patient_id}`}
-                </p>
+                <p className="truncate text-[13px] font-semibold">{ticketPatientName(modal.ticket)}</p>
+                <p className="dx-mono dx-muted text-[11.5px]">{modal.ticket.hospital_number ?? `Patient #${modal.ticket.patient_id}`}</p>
               </div>
             </div>
 
-            {(modal.kind === "complete-route" || modal.kind === "transfer") && (
-              <Select
+            {modal.kind === "complete-route" || modal.kind === "transfer" ? (
+              <DxSelect
                 label={modal.kind === "complete-route" ? "Next service point" : "Destination service point"}
+                required
                 value={modalTargetSdp}
                 onChange={(e) => setModalTargetSdp(e.target.value)}
                 options={sdps
                   .filter((s) => s.id !== modal.ticket.service_delivery_point_id)
-                  .map((s) => ({ value: String(s.id), label: `${s.name} (${s.code})` }))}
+                  .map((s) => ({ value: String(s.id), label: `${s.name} (${s.code}) — ${sdpTypeLabel(s.service_point_type)}` }))}
                 placeholder="Select a service point…"
               />
-            )}
+            ) : null}
 
-            <Textarea
+            <DxTextarea
               label={MODAL_META[modal.kind].textLabel}
               value={modalText}
               onChange={(e) => setModalText(e.target.value)}
@@ -608,8 +578,8 @@ export function QueueDashboardPage() {
               error={modalError ?? undefined}
             />
           </div>
-        </Modal>
+        </DxPopup>
       ) : null}
-    </div>
+    </DxPage>
   );
 }

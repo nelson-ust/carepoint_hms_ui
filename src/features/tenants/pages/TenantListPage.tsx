@@ -1,32 +1,53 @@
-import { PageHeader } from "@/components/layout/PageHeader";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { Wrench,
-  AlertCircle,
+import { useNavigate } from "react-router-dom";
+import {
   Building2,
   CheckCircle2,
   Clock,
   Crown,
   Database,
   Eye,
-  Filter,
+  Gift,
   Globe,
   Hash,
-  ListChecks,
+  Layers,
   Mail,
   Phone,
   RefreshCw,
-  Save,
-  Search,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
-  X,
+  Wrench,
 } from "lucide-react";
+import {
+  DxBadge,
+  DxButton,
+  DxGrid,
+  DxInput,
+  DxKpi,
+  DxMessage,
+  DxPage,
+  DxPageHeader,
+  DxPopup,
+  DxProps,
+  DxSearchBox,
+  DxSegmented,
+  DxSelect,
+  DxStatusBadge,
+  DxToolbar,
+  DxToolbarSeparator,
+  DxToolbarSpacer,
+  apiErrorMessage,
+  type DxGridColumn,
+} from "@/components/dx";
+import { useToast } from "@/components/feedback/ToastProvider";
+import { routes } from "@/config/routes";
 import { TenantProvisioningModal } from "../components/TenantProvisioningModal";
+import { TenantModulesManager } from "@/features/tenant-modules/components/TenantModulesManager";
 import {
   approveTenant,
   getProvisioningStatus,
+  grantFreeSubscription,
   listTenants,
   provisionTenantS3,
   TENANT_STATUSES,
@@ -34,44 +55,43 @@ import {
 } from "../api/tenants.api";
 import type { Tenant } from "../api/tenants.api";
 
-const statusStyles: Record<string, string> = {
-  PENDING: "bg-amber-50 text-amber-600 border-amber-100",
-  TRIAL: "bg-primary-50 text-primary-600 border-primary-100",
-  ACTIVE: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  SUSPENDED: "bg-rose-50 text-rose-600 border-rose-100",
-  TERMINATED: "bg-secondary-100 text-secondary-500 border-secondary-200",
-};
+const deploymentLabel = (m?: string | null) =>
+  m === "ON_PREMISE"
+    ? "On-premise"
+    : m === "CLOUD_DEDICATED"
+      ? "Cloud · Dedicated"
+      : "Cloud · Platform";
 
 const STATUS_FILTERS = [
-  { value: "", label: "All Statuses" },
+  { value: "", label: "All statuses" },
   ...TENANT_STATUSES.map((s) => ({ value: s, label: s })),
 ];
 
 type ActionKind = "approve" | "status" | null;
 
 export function TenantListPage() {
+  const navigate = useNavigate();
+  const toast = useToast();
+
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<
-    { tone: "success" | "error"; message: string } | null
-  >(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
   const [actionKind, setActionKind] = useState<ActionKind>(null);
   const [manageTenant, setManageTenant] = useState<Tenant | null>(null);
+  const [modulesTenant, setModulesTenant] = useState<Tenant | null>(null);
+  const [freeTenant, setFreeTenant] = useState<Tenant | null>(null);
+  const [freeReason, setFreeReason] = useState("");
+  const [freePending, setFreePending] = useState(false);
   const [actionTarget, setActionTarget] = useState<Tenant | null>(null);
   const [statusForm, setStatusForm] = useState<string>("ACTIVE");
   const [actionPending, setActionPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-
-  const showFeedback = (tone: "success" | "error", message: string) => {
-    setFeedback({ tone, message });
-    window.setTimeout(() => setFeedback(null), 3500);
-  };
+  const [provisioningS3Id, setProvisioningS3Id] = useState<number | null>(null);
 
   const load = async () => {
     setIsLoading(true);
@@ -80,8 +100,8 @@ export function TenantListPage() {
       const res = await listTenants({ page: 1, page_size: 100 });
       setTenants(res.tenants ?? []);
       setTotalCount(res.total_count ?? res.tenants?.length ?? 0);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Unable to load tenants.");
+    } catch (err) {
+      setError(apiErrorMessage(err) || "Unable to load tenants.");
     } finally {
       setIsLoading(false);
     }
@@ -90,6 +110,10 @@ export function TenantListPage() {
   useEffect(() => {
     load();
   }, []);
+
+  const replaceTenant = (updated: Tenant) => {
+    setTenants((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+  };
 
   const filteredTenants = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -115,31 +139,39 @@ export function TenantListPage() {
     return { total: totalCount || total, active, pending, suspended };
   }, [tenants, totalCount]);
 
-  const [provisioningS3Id, setProvisioningS3Id] = useState<number | null>(null);
-
   const handleProvisionS3 = async (t: Tenant) => {
     setProvisioningS3Id(t.id);
     try {
       const res = await provisionTenantS3(t.id);
       replaceTenant({ ...t, aws_s3_bucket_name: res.bucket_name });
-      showFeedback(
-        "success",
+      toast.success(
         res.already_provisioned
           ? `${t.name} already has bucket ${res.bucket_name}.`
           : `S3 bucket ${res.bucket_name} provisioned for ${t.name}.`,
       );
-    } catch (err: any) {
-      showFeedback("error", err?.response?.data?.message || `Failed to provision S3 for ${t.name}.`);
+    } catch (err) {
+      toast.error(apiErrorMessage(err) || `Failed to provision S3 for ${t.name}.`);
     } finally {
       setProvisioningS3Id(null);
     }
   };
 
-  const replaceTenant = (updated: Tenant) => {
-    setTenants((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+  const handleGrantFreeMonth = async () => {
+    if (!freeTenant) return;
+    setFreePending(true);
+    try {
+      await grantFreeSubscription(freeTenant.id, { months: 1, reason: freeReason || undefined });
+      toast.success(`${freeTenant.name} granted 1 free month.`);
+      setFreeTenant(null);
+      await load();
+    } catch (err) {
+      toast.error(apiErrorMessage(err) || "Failed to grant free month.");
+    } finally {
+      setFreePending(false);
+    }
   };
 
-  // ----- Actions -----
+  // ----- Action dialogs -----
   const openApprove = (t: Tenant) => {
     setActionKind("approve");
     setActionTarget(t);
@@ -163,11 +195,10 @@ export function TenantListPage() {
   };
 
   /**
-   * Approve + follow the async provisioning to completion. The backend
-   * returns immediately with status=PROVISIONING and creates the database
-   * on a background thread, so we poll /provisioning-status until the
-   * tenant is provisioned (→ ACTIVE) or the task records a failure
-   * (→ reverted to PENDING with provisioning_error set).
+   * Approve + follow the async provisioning to completion. The backend returns
+   * immediately with status=PROVISIONING and builds the database on a worker
+   * thread, so we poll /provisioning-status until the tenant is provisioned
+   * (→ ACTIVE) or a failure is recorded (→ reverted to PENDING).
    */
   const handleApprove = async () => {
     if (!actionTarget) return;
@@ -177,11 +208,10 @@ export function TenantListPage() {
     try {
       await approveTenant(target.id);
       replaceTenant({ ...target, status: "PROVISIONING" });
-      showFeedback("success", `${target.name} approved — provisioning database…`);
+      toast.success(`${target.name} approved — provisioning database…`);
       setActionKind(null);
       setActionTarget(null);
 
-      // Poll every 3s for up to 3 minutes.
       let attempts = 0;
       const timer = window.setInterval(async () => {
         attempts += 1;
@@ -190,21 +220,21 @@ export function TenantListPage() {
           if (ps.is_provisioned) {
             window.clearInterval(timer);
             replaceTenant({ ...target, status: ps.status, is_provisioned: true, provisioning_error: null });
-            showFeedback("success", `${target.name} is provisioned and ACTIVE.`);
+            toast.success(`${target.name} is provisioned and ACTIVE.`);
           } else if (ps.provisioning_error) {
             window.clearInterval(timer);
             replaceTenant({ ...target, status: ps.status, provisioning_error: ps.provisioning_error });
-            showFeedback("error", `Provisioning failed for ${target.name}: ${ps.provisioning_error}`);
+            toast.error(`Provisioning failed for ${target.name}: ${ps.provisioning_error}`);
           } else if (attempts >= 60) {
             window.clearInterval(timer);
-            showFeedback("error", `${target.name} is still provisioning — check back shortly.`);
+            toast.warning(`${target.name} is still provisioning — check back shortly.`);
           }
         } catch {
           if (attempts >= 60) window.clearInterval(timer);
         }
       }, 3000);
-    } catch (err: any) {
-      setActionError(err?.response?.data?.message || "Failed to approve tenant.");
+    } catch (err) {
+      setActionError(apiErrorMessage(err) || "Failed to approve tenant.");
     } finally {
       setActionPending(false);
     }
@@ -217,272 +247,269 @@ export function TenantListPage() {
     try {
       const updated = await updateTenantStatus(actionTarget.id, statusForm);
       replaceTenant(updated);
-      showFeedback("success", `${actionTarget.name} → ${statusForm}.`);
+      toast.success(`${actionTarget.name} → ${statusForm}.`);
       setActionKind(null);
       setActionTarget(null);
-    } catch (err: any) {
-      setActionError(err?.response?.data?.message || "Failed to update status.");
+    } catch (err) {
+      setActionError(apiErrorMessage(err) || "Failed to update status.");
     } finally {
       setActionPending(false);
     }
   };
 
-  return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader
-          title="Tenants"
-          description="SaaS administration: every hospital workspace, with subscription and onboarding status."
-        />
-        <div className="flex items-center gap-3">
+  const goDetail = (t: Tenant) =>
+    navigate(routes.tenantDetail.replace(":tenantId", String(t.id)));
+
+  const columns: DxGridColumn<Tenant>[] = [
+    {
+      key: "name",
+      header: "Tenant",
+      minWidth: 240,
+      accessor: (t) => t.name,
+      render: (t) => (
+        <div>
           <button
-            onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
+            onClick={() => goDetail(t)}
+            className="text-left font-semibold text-[var(--dx-text)] hover:text-[var(--dx-accent)]"
           >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            {t.name}
           </button>
-          <Link
-            to="/register-hospital"
-            className="btn-primary gap-3 py-3 px-7 shadow-xl shadow-primary-500/20"
-          >
-            <Building2 className="h-5 w-5" />
-            <span className="font-bold">Register Tenant</span>
-          </Link>
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            <span className="inline-flex items-center gap-1 text-[var(--dx-text-muted)] font-mono text-[11px]">
+              <Hash className="h-2.5 w-2.5" />
+              {t.code}
+            </span>
+            <DxBadge tone="outline">{deploymentLabel(t.deployment_model)}</DxBadge>
+          </div>
         </div>
-      </div>
-
-      {feedback && (
-        <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
-            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-            : "bg-rose-50 text-rose-700 border-rose-100"
-            }`}
-        >
-          {feedback.tone === "success" ? (
-            <CheckCircle2 className="h-5 w-5" />
-          ) : (
-            <AlertCircle className="h-5 w-5" />
+      ),
+    },
+    {
+      key: "domain",
+      header: "Domain",
+      minWidth: 180,
+      render: (t) => (
+        <div className="space-y-1">
+          {t.custom_domain && (
+            <p className="inline-flex items-center gap-1.5 font-mono text-[12px] text-[var(--dx-text)]">
+              <Crown className="h-3 w-3 text-[var(--dx-warning)]" />
+              {t.custom_domain}
+            </p>
           )}
-          <span className="text-sm font-bold">{feedback.message}</span>
+          {t.domain_url && (
+            <p className="inline-flex items-center gap-1 font-mono text-[11px] text-[var(--dx-text-muted)] truncate max-w-[220px]">
+              <Globe className="h-2.5 w-2.5" />
+              {t.domain_url}
+            </p>
+          )}
+          {!t.custom_domain && !t.domain_url && (
+            <span className="text-[var(--dx-text-muted)]">—</span>
+          )}
         </div>
-      )}
+      ),
+    },
+    {
+      key: "billing",
+      header: "Billing",
+      minWidth: 180,
+      render: (t) => (
+        <div className="space-y-0.5">
+          {t.billing_contact_name && (
+            <p className="font-medium text-[var(--dx-text)]">{t.billing_contact_name}</p>
+          )}
+          {t.billing_email && (
+            <p className="inline-flex items-center gap-1 text-[11px] text-[var(--dx-text-muted)]">
+              <Mail className="h-2.5 w-2.5" />
+              {t.billing_email}
+            </p>
+          )}
+          {t.billing_phone && (
+            <p className="inline-flex items-center gap-1 text-[11px] text-[var(--dx-text-muted)]">
+              <Phone className="h-2.5 w-2.5" />
+              {t.billing_phone}
+            </p>
+          )}
+          {!t.billing_contact_name && !t.billing_email && !t.billing_phone && (
+            <span className="text-[var(--dx-text-muted)]">—</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "subscription",
+      header: "Subscription",
+      minWidth: 150,
+      render: (t) => {
+        const sub = t.subscriptions?.[0];
+        if (!sub) return <span className="text-[var(--dx-text-muted)]">No plan</span>;
+        return (
+          <div className="space-y-1">
+            <DxBadge tone="accent">
+              {sub.plan?.name ?? sub.plan?.code ?? `Plan #${sub.plan_id}`}
+            </DxBadge>
+            <p className="text-[11px] text-[var(--dx-text-muted)]">{sub.status}</p>
+          </div>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Status",
+      width: 130,
+      accessor: (t) => t.status,
+      filter: { options: TENANT_STATUSES.map((s) => ({ value: s, label: s })) },
+      render: (t) => <DxStatusBadge status={t.status} />,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      width: 360,
+      render: (t) => {
+        const statusKey = (t.status || "PENDING").toUpperCase();
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            <DxButton size="sm" leftIcon={<Eye className="h-3 w-3" />} onClick={() => goDetail(t)}>
+              View
+            </DxButton>
+            {statusKey === "PENDING" && (
+              <DxButton
+                size="sm"
+                variant="primary"
+                leftIcon={<ShieldCheck className="h-3 w-3" />}
+                onClick={() => openApprove(t)}
+              >
+                Approve
+              </DxButton>
+            )}
+            {t.is_provisioned && !t.aws_s3_bucket_name && (
+              <DxButton
+                size="sm"
+                leftIcon={<Database className="h-3 w-3" />}
+                isLoading={provisioningS3Id === t.id}
+                onClick={() => handleProvisionS3(t)}
+                title="Workspace exists but no S3 bucket yet — create the tenant's own bucket."
+              >
+                Provision S3
+              </DxButton>
+            )}
+            <DxButton
+              size="sm"
+              leftIcon={<Wrench className="h-3 w-3" />}
+              onClick={() => setManageTenant(t)}
+              title="Approval, provisioning steps and infrastructure repair"
+            >
+              Manage
+            </DxButton>
+            <DxButton
+              size="sm"
+              variant="accent-text"
+              leftIcon={<Layers className="h-3 w-3" />}
+              onClick={() => setModulesTenant(t)}
+              title="Enable or disable modules for this tenant (loyalty benefits)"
+            >
+              Modules
+            </DxButton>
+            <DxButton
+              size="sm"
+              variant="accent-text"
+              leftIcon={<Gift className="h-3 w-3" />}
+              onClick={() => {
+                setFreeTenant(t);
+                setFreeReason("");
+              }}
+              title="Grant this tenant one free month of subscription"
+            >
+              Free month
+            </DxButton>
+            <DxButton
+              size="sm"
+              leftIcon={<Sparkles className="h-3 w-3" />}
+              onClick={() => openStatus(t)}
+              title="Move the workspace through its lifecycle"
+            >
+              Status
+            </DxButton>
+          </div>
+        );
+      },
+    },
+  ];
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <StatCard icon={Globe} label="Total Tenants" value={stats.total} tone="primary" />
-        <StatCard icon={CheckCircle2} label="Active" value={stats.active} tone="emerald" />
-        <StatCard icon={Clock} label="Pending" value={stats.pending} tone="amber" />
-        <StatCard icon={ShieldAlert} label="Suspended" value={stats.suspended} tone="rose" />
+  return (
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "SaaS admin" }, { label: "Tenants" }]}
+        title="Tenants"
+        subtitle="Every hospital workspace, with subscription and onboarding status."
+        actions={
+          <>
+            <DxButton leftIcon={<RefreshCw className={isLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />} onClick={load}>
+              Refresh
+            </DxButton>
+            <DxButton
+              variant="primary"
+              leftIcon={<Building2 className="h-4 w-4" />}
+              onClick={() => navigate(routes.tenantRegister)}
+            >
+              Register tenant
+            </DxButton>
+          </>
+        }
+      />
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <DxKpi label="Total tenants" value={stats.total} icon={Globe} tone="accent" isLoading={isLoading} />
+        <DxKpi label="Active" value={stats.active} icon={CheckCircle2} tone="success" isLoading={isLoading} />
+        <DxKpi label="Pending" value={stats.pending} icon={Clock} tone="warning" isLoading={isLoading} />
+        <DxKpi label="Suspended" value={stats.suspended} icon={ShieldAlert} tone="danger" isLoading={isLoading} />
       </div>
 
-      {/* Filters */}
-      <div className="glass-card rounded-[2rem] p-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center bg-white/40 backdrop-blur-md">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-secondary-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, code, billing contact, domain..."
-            className="w-full bg-white/50 border-none rounded-2xl pl-14 pr-6 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
-          />
-        </div>
-        <div className="relative">
-          <Filter className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
-          >
-            {STATUS_FILTERS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <DxToolbar attached>
+        <DxSearchBox
+          onSearch={setSearch}
+          placeholder="Search name, code, billing contact, domain…"
+          className="w-80"
+        />
+        <DxToolbarSeparator />
+        <DxSelect
+          editorSize="sm"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          options={STATUS_FILTERS}
+          className="w-44"
+        />
+        <DxToolbarSpacer />
+        <DxButton
+          variant="primary"
+          size="sm"
+          leftIcon={<Building2 className="h-3.5 w-3.5" />}
+          onClick={() => navigate(routes.tenantRegister)}
+        >
+          Register tenant
+        </DxButton>
+      </DxToolbar>
 
-      {/* Table */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-secondary-900/5">
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Tenant</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Domain</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Billing</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Subscription</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Status</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-secondary-100/50">
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="animate-pulse">
-                    <td colSpan={6} className="px-8 py-6">
-                      <div className="h-14 bg-secondary-100/30 rounded-2xl" />
-                    </td>
-                  </tr>
-                ))
-              ) : error ? (
-                <tr>
-                  <td colSpan={6} className="px-8 py-20 text-center">
-                    <AlertCircle className="h-12 w-12 mx-auto text-rose-500/50 mb-4" />
-                    <p className="text-secondary-600 font-bold">{error}</p>
-                    <button onClick={load} className="btn-primary mt-4 py-3 px-8">
-                      Try Again
-                    </button>
-                  </td>
-                </tr>
-              ) : filteredTenants.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-8 py-32 text-center">
-                    <div className="h-20 w-20 bg-secondary-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
-                      <Building2 className="h-10 w-10 text-secondary-200" />
-                    </div>
-                    <h4 className="text-xl font-bold text-secondary-900">No Tenants</h4>
-                    <p className="text-sm text-secondary-500 mt-2">
-                      {tenants.length === 0
-                        ? "No hospitals have registered yet. Share your registration link to onboard your first tenant."
-                        : "No tenants match your filters."}
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                filteredTenants.map((t) => {
-                  const statusKey = (t.status || "PENDING").toUpperCase();
-                  const statusClass = statusStyles[statusKey] ?? statusStyles.PENDING;
-                  const sub = t.subscriptions?.[0];
-                  return (
-                    <tr key={t.id} className="hover:bg-primary-50/30 transition-all">
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-3">
-                          {/* <div className="h-11 w-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md">
-                            <Building2 className="h-5 w-5" />
-                          </div> */}
-                          <div>
-                            <p className="text-sm font-bold text-secondary-900">{t.name}</p>
-                            <span className="inline-flex items-center gap-1 mt-1 bg-secondary-100 text-secondary-500 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold">
-                              <Hash className="h-2.5 w-2.5" />
-                              {t.code}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="space-y-1">
-                          {t.custom_domain && (
-                            <p className="text-xs font-bold text-secondary-700 inline-flex items-center gap-1.5">
-                              <Crown className="h-3 w-3 text-amber-500" />
-                              <span className="font-mono">{t.custom_domain}</span>
-                            </p>
-                          )}
-                          {t.domain_url && (
-                            <p className="text-[10px] font-mono font-bold text-secondary-500 truncate max-w-[200px] inline-flex items-center gap-1">
-                              <Globe className="h-2.5 w-2.5" />
-                              {t.domain_url}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="space-y-1">
-                          {t.billing_contact_name && (
-                            <p className="text-xs font-bold text-secondary-700">
-                              {t.billing_contact_name}
-                            </p>
-                          )}
-                          {t.billing_email && (
-                            <p className="text-[10px] text-secondary-500 inline-flex items-center gap-1">
-                              <Mail className="h-2.5 w-2.5" />
-                              {t.billing_email}
-                            </p>
-                          )}
-                          {t.billing_phone && (
-                            <p className="text-[10px] text-secondary-500 inline-flex items-center gap-1">
-                              <Phone className="h-2.5 w-2.5" />
-                              {t.billing_phone}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        {sub ? (
-                          <div className="space-y-1">
-                            <span className="inline-flex px-2.5 py-1 rounded-lg bg-primary-50 text-primary-600 border border-primary-100 text-[10px] font-bold uppercase tracking-widest">
-                              {sub.plan?.name ?? sub.plan?.code ?? `Plan #${sub.plan_id}`}
-                            </span>
-                            <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">
-                              {sub.status}
-                            </p>
-                          </div>
-                        ) : (
-                          <span className="text-secondary-400 text-[11px] font-bold">No plan</span>
-                        )}
-                      </td>
-                      <td className="px-8 py-6">
-                        <span
-                          className={`inline-flex px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${statusClass}`}
-                        >
-                          {statusKey}
-                        </span>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center justify-end gap-2">
-                          <Link
-                            to={`/tenants/${t.id}`}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-[10px] font-bold uppercase tracking-widest shadow-md"
-                          >
-                            <Eye className="h-3 w-3" />
-                            View
-                          </Link>
-                          {statusKey === "PENDING" && (
-                            <button
-                              onClick={() => openApprove(t)}
-                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest shadow-md"
-                            >
-                              <ShieldCheck className="h-3 w-3" />
-                              Approve
-                            </button>
-                          )}
-                          {t.is_provisioned && !t.aws_s3_bucket_name && (
-                            <button
-                              onClick={() => handleProvisionS3(t)}
-                              disabled={provisioningS3Id === t.id}
-                              title="The workspace exists but no S3 bucket is provisioned yet — create the tenant's own bucket."
-                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white text-[10px] font-bold uppercase tracking-widest shadow-md"
-                            >
-                              <Database className={`h-3 w-3 ${provisioningS3Id === t.id ? "animate-pulse" : ""}`} />
-                              {provisioningS3Id === t.id ? "Provisioning…" : "Provision S3"}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => setManageTenant(t)}
-                            title="Approval, provisioning steps and infrastructure repair"
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-[10px] font-bold uppercase tracking-widest shadow-md"
-                          >
-                            <Wrench className="h-3 w-3" />
-                            Manage
-                          </button>
-                          <button
-                            onClick={() => openStatus(t)}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold uppercase tracking-widest shadow-md"
-                          >
-                            <Sparkles className="h-3 w-3" />
-                            Status
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DxGrid
+        attached
+        columns={columns}
+        data={filteredTenants}
+        rowKey={(t) => t.id}
+        isLoading={isLoading}
+        error={error}
+        onRetry={load}
+        filterRow
+        empty={{
+          icon: Building2,
+          title: "No tenants",
+          description:
+            tenants.length === 0
+              ? "No hospitals have registered yet. Share your registration link to onboard the first tenant."
+              : "No tenants match your current search or status filter.",
+        }}
+      />
 
+      {/* Infrastructure / provisioning manager (own component) */}
       <TenantProvisioningModal
         tenant={manageTenant}
         onClose={() => setManageTenant(null)}
@@ -492,234 +519,133 @@ export function TenantListPage() {
         }}
       />
 
-      {actionKind === "approve" && actionTarget && (
-        <ModalShell
-          title="Approve Tenant"
-          subtitle="Activate The Workspace For This Hospital"
-          onClose={closeAction}
-          icon={ShieldCheck}
-          tone="emerald"
-        >
-          {actionError && <ErrorBanner message={actionError} />}
-          <div className="mb-6 p-5 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-start gap-3">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5" />
-            <div>
-              <p className="text-sm font-bold text-emerald-700">
-                {actionTarget.name}{" "}
-                <span className="font-mono text-emerald-600">({actionTarget.code})</span>
-              </p>
-              <p className="text-xs text-emerald-600 mt-1">
-                Approval will provision the tenant database and notify the admin user that
-                their workspace is live.
-              </p>
-            </div>
-          </div>
-          <ModalActions
-            onClose={closeAction}
-            onSubmit={handleApprove}
-            pending={actionPending}
-            submitLabel="Approve Tenant"
-            submitIcon={ShieldCheck}
-            tone="emerald"
-          />
-        </ModalShell>
-      )}
+      {/* Loyalty module grants */}
+      <DxPopup
+        isOpen={!!modulesTenant}
+        onClose={() => setModulesTenant(null)}
+        title={modulesTenant ? `Modules — ${modulesTenant.name}` : "Modules"}
+        size="xl"
+      >
+        {modulesTenant && <TenantModulesManager tenantId={modulesTenant.id} showHeader={false} />}
+      </DxPopup>
 
-      {actionKind === "status" && actionTarget && (
-        <ModalShell
-          title="Update Tenant Status"
-          subtitle="Move The Workspace Through Its Lifecycle"
-          onClose={closeAction}
-          icon={Sparkles}
-          tone="amber"
-        >
-          {actionError && <ErrorBanner message={actionError} />}
-          <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-400 flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <p className="text-sm font-bold text-secondary-900">{actionTarget.name}</p>
-              <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase mt-0.5">
-                {actionTarget.code}
-              </p>
-            </div>
-            <span
-              className={`inline-flex px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${statusStyles[actionTarget.status] ?? statusStyles.PENDING
-                }`}
+      {/* Grant one free month */}
+      <DxPopup
+        isOpen={!!freeTenant}
+        onClose={() => {
+          if (!freePending) setFreeTenant(null);
+        }}
+        title="Grant one free month"
+        size="md"
+        footer={
+          <>
+            <DxButton onClick={() => setFreeTenant(null)} disabled={freePending}>
+              Cancel
+            </DxButton>
+            <DxButton
+              variant="primary"
+              leftIcon={<Gift className="h-4 w-4" />}
+              isLoading={freePending}
+              onClick={handleGrantFreeMonth}
             >
-              Currently {actionTarget.status}
-            </span>
+              Grant free month
+            </DxButton>
+          </>
+        }
+      >
+        {freeTenant && (
+          <div className="space-y-3">
+            <DxMessage tone="success" title={freeTenant.name}>
+              Gives {freeTenant.name} one month of active, unbilled access. The first invoice
+              is deferred until the free month ends.
+            </DxMessage>
+            <DxInput
+              label="Reason (optional)"
+              value={freeReason}
+              onChange={(e) => setFreeReason(e.target.value)}
+              placeholder="e.g. loyalty benefit"
+            />
           </div>
-          <div className="space-y-2 mb-6">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              New Status *
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {TENANT_STATUSES.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setStatusForm(s)}
-                  className={`p-3 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${statusForm === s
-                    ? "bg-primary-500 text-white border-primary-500 shadow-md"
-                    : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-300"
-                    }`}
-                >
-                  {s}
-                </button>
-              ))}
+        )}
+      </DxPopup>
+
+      {/* Approve */}
+      <DxPopup
+        isOpen={actionKind === "approve" && !!actionTarget}
+        onClose={closeAction}
+        title="Approve tenant"
+        size="md"
+        footer={
+          <>
+            <DxButton onClick={closeAction} disabled={actionPending}>
+              Cancel
+            </DxButton>
+            <DxButton
+              variant="primary"
+              leftIcon={<ShieldCheck className="h-4 w-4" />}
+              isLoading={actionPending}
+              onClick={handleApprove}
+            >
+              Approve tenant
+            </DxButton>
+          </>
+        }
+      >
+        {actionError && (
+          <DxMessage tone="danger" className="mb-4">
+            {actionError}
+          </DxMessage>
+        )}
+        {actionTarget && (
+          <DxMessage tone="success" title={`${actionTarget.name} (${actionTarget.code})`}>
+            Approval provisions the tenant database and notifies the admin user that their
+            workspace is live.
+          </DxMessage>
+        )}
+      </DxPopup>
+
+      {/* Status */}
+      <DxPopup
+        isOpen={actionKind === "status" && !!actionTarget}
+        onClose={closeAction}
+        title="Update tenant status"
+        size="md"
+        footer={
+          <>
+            <DxButton onClick={closeAction} disabled={actionPending}>
+              Cancel
+            </DxButton>
+            <DxButton variant="primary" isLoading={actionPending} onClick={handleStatus}>
+              Update status
+            </DxButton>
+          </>
+        }
+      >
+        {actionError && (
+          <DxMessage tone="danger" className="mb-4">
+            {actionError}
+          </DxMessage>
+        )}
+        {actionTarget && (
+          <div className="space-y-4">
+            <DxProps
+              items={[
+                { label: "Tenant", value: actionTarget.name },
+                { label: "Code", value: actionTarget.code },
+                { label: "Current status", value: <DxStatusBadge status={actionTarget.status} /> },
+              ]}
+            />
+            <div>
+              <p className="dx-field-label mb-1.5">New status</p>
+              <DxSegmented
+                value={statusForm}
+                onChange={setStatusForm}
+                items={TENANT_STATUSES.map((s) => ({ key: s, label: s }))}
+              />
             </div>
           </div>
-          <ModalActions
-            onClose={closeAction}
-            onSubmit={handleStatus}
-            pending={actionPending}
-            submitLabel="Update Status"
-            submitIcon={Save}
-            tone="amber"
-          />
-        </ModalShell>
-      )}
-    </div>
+        )}
+      </DxPopup>
+    </DxPage>
   );
 }
-
-// =====================================================================
-// Sub-components
-// =====================================================================
-
-function ErrorBanner({ message }: { message: string }) {
-  return (
-    <div className="mb-5 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-      <AlertCircle className="h-5 w-5" />
-      <span className="text-sm font-bold">{message}</span>
-    </div>
-  );
-}
-
-function ModalActions({
-  onClose,
-  onSubmit,
-  pending,
-  submitLabel,
-  submitIcon: Icon,
-  tone = "primary",
-}: {
-  onClose: () => void;
-  onSubmit: () => void;
-  pending: boolean;
-  submitLabel: string;
-  submitIcon: typeof Save;
-  tone?: "primary" | "emerald" | "amber" | "rose";
-}) {
-  const cls =
-    tone === "rose"
-      ? "bg-rose-500 hover:bg-rose-600 shadow-rose-500/20"
-      : tone === "amber"
-        ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20"
-        : tone === "emerald"
-          ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
-          : "bg-primary-500 hover:bg-primary-600 shadow-primary-500/20";
-  return (
-    <div className="pt-2 flex gap-4">
-      <button
-        onClick={onClose}
-        disabled={pending}
-        className="flex-1 btn-secondary py-4 rounded-2xl font-bold disabled:opacity-50"
-      >
-        Cancel
-      </button>
-      <button
-        onClick={onSubmit}
-        disabled={pending}
-        className={`flex-[2] py-4 rounded-2xl text-white font-black tracking-tight shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 ${cls}`}
-      >
-        <Icon className="h-4 w-4" />
-        {pending ? "Working..." : submitLabel}
-      </button>
-    </div>
-  );
-}
-
-function ModalShell({
-  title,
-  subtitle,
-  onClose,
-  children,
-  icon: Icon,
-  tone = "primary",
-}: {
-  title: string;
-  subtitle: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  icon: typeof Save;
-  tone?: "primary" | "emerald" | "amber" | "rose";
-}) {
-  const cls =
-    tone === "rose"
-      ? "bg-rose-500 shadow-rose-500/20"
-      : tone === "amber"
-        ? "bg-amber-500 shadow-amber-500/20"
-        : tone === "emerald"
-          ? "bg-emerald-500 shadow-emerald-500/20"
-          : "bg-primary-600 shadow-primary-500/20";
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-      <div className="bg-white border rounded-[2.5rem] p-10 max-w-xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"
-        >
-          <X className="h-5 w-5 text-secondary-400" />
-        </button>
-        <div className="flex items-center gap-5 mb-8">
-          <div
-            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${cls}`}
-          >
-            <Icon className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-black font-display tracking-tight">{title}</h3>
-            <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-              {subtitle}
-            </p>
-          </div>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-type StatTone = "primary" | "emerald" | "amber" | "rose";
-const statToneStyles: Record<StatTone, string> = {
-  primary: "bg-primary-50 text-primary-600 border-primary-100",
-  emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  amber: "bg-amber-50 text-amber-600 border-amber-100",
-  rose: "bg-rose-50 text-rose-600 border-rose-100",
-};
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: typeof Building2;
-  label: string;
-  value: number;
-  tone: StatTone;
-}) {
-  return (
-    <div
-      className={`glass-card rounded-[2rem] p-6 border ${statToneStyles[tone]} bg-white/60 backdrop-blur-md`}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">{label}</span>
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="text-3xl font-black tracking-tight">{value}</div>
-    </div>
-  );
-}
-
-// Suppress unused-import for the icon library tree-shaking hints
-void ListChecks;

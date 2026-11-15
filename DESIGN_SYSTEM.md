@@ -3,6 +3,27 @@
 Futuristic dark-glass theme. Dark mode is the flagship; light mode fully supported.
 `darkMode: "class"` on `<html>`, toggled via `useTheme()` from `@/lib/theme/ThemeProvider`.
 
+## Clinic-flow workbench (DX kit) — DevExpress-inspired
+
+The outpatient clinic flow (Patient Registry → Visit Initiation → HMO Desk →
+Queues → Triage → Consultation → Laboratory → Pharmacy → Billing) and the
+application shell (sidebar/topbar) use a flat, data-dense enterprise layer
+instead of the glass theme. It lives in `src/components/dx/` (import from
+`@/components/dx`) with styles in `src/styles/dx.css`; see
+`src/components/dx/README.md` for the rules, page skeleton and component table.
+
+- Light-first (`--dx-*` tokens on `:root`, overridden under `html.dark`).
+- 13px type scale (`.dx` root via `<DxPage>`), 4px radius, 1px hairlines, 34px grid rows.
+- Grids are `DxGrid` (sort, filter row, selection, summary row, `DxPager`), commands sit in a `DxToolbar`,
+  forms are `DxForm` + `DxGroupBox`, status is `DxStatusBadge`, dialogs are `DxPopup` / `DxConfirm`.
+- Never use the Tailwind colour utilities hijacked by the legacy dark override block inside dx pages;
+  use dx classes or `[var(--dx-*)]` arbitrary values.
+- Clinic-flow helpers: `@/features/visits/lib/clinic-flow` (`workstationPathFor`, `pathwaySteps`,
+  `nextPathwayStep`) and `@/features/visits/components/VisitBanner`.
+- Reference implementation: `src/features/clinical/pages/TriagePage.tsx`.
+
+Other modules keep the glass components below until they are migrated.
+
 ## Principles
 
 1. **Glass surfaces** — content sits on `.glass-card` (or `<Card>`) over the ambient

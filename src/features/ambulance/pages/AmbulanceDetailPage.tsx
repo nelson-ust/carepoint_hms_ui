@@ -1,177 +1,158 @@
-import { PageHeader } from "@/components/layout/PageHeader";
-import {
-   ArrowLeft,
-   Truck,
-   User,
-   Wrench,
-   Shield,
-   Activity,
-   History,
-   Calendar,
-   AlertTriangle,
-   ChevronRight,
-   MoreHorizontal,
-   Settings as SettingsIcon,
-} from "lucide-react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Boxes, CheckCircle2, ClipboardList, Fuel, Plus, RotateCcw, ShieldCheck, Truck, Wrench } from "lucide-react";
+import {
+  DxBadge, DxButton, DxForm, DxGrid, DxInput, DxPage, DxPageHeader, DxPageLoading, DxPanel, DxPopup,
+  DxProps, DxTabs, DxTextarea, apiErrorMessage, formatDateTime, type DxGridColumn,
+} from "@/components/dx";
+import { useToast } from "@/components/feedback/ToastProvider";
 import { routes } from "@/config/routes";
-import { useAmbulance, useAmbulanceReadiness } from "../hooks/use-ambulance";
-import { format } from "date-fns";
+import { ambulanceApi, fuelApi, type AmbulanceEquipment, type AmbulanceMaintenance, type FuelLog } from "../api/ambulance.api";
+
+type Tab = "overview" | "equipment" | "maintenance" | "fuel";
+const naira = (n: number | string) => `₦ ${Number(n).toLocaleString()}`;
 
 export function AmbulanceDetailPage() {
-   const navigate = useNavigate();
-   const { ambulanceId } = useParams<{ ambulanceId: string }>();
-   const { data: ambulance, isLoading, error } = useAmbulance(Number(ambulanceId));
-   const { data: readiness, isLoading: readinessLoading } = useAmbulanceReadiness(Number(ambulanceId));
+  const { ambulanceId } = useParams();
+  const id = Number(ambulanceId);
+  const nav = useNavigate();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [tab, setTab] = useState<Tab>("overview");
+  const [dialog, setDialog] = useState<null | "equipment" | "maintenance" | "fuel">(null);
+  const [eq, setEq] = useState({ equipment_name: "", equipment_code: "", quantity: "1", condition_status: "GOOD" });
+  const [mt, setMt] = useState({ maintenance_type: "", issue_description: "", service_provider: "" });
+  const [fl, setFl] = useState({ litres: "", cost: "", odometer: "", station: "" });
 
-   if (isLoading) return <div className="p-20 text-center">Loading vehicle data...</div>;
-   if (!ambulance) return <div className="p-20 text-center">Vehicle not found.</div>;
+  const ambQ = useQuery({ queryKey: ["amb", "detail", id], queryFn: () => ambulanceApi.get(id), enabled: Number.isFinite(id) });
+  const readyQ = useQuery({ queryKey: ["amb", "detail", id, "ready"], queryFn: () => ambulanceApi.getReadiness(id), enabled: Number.isFinite(id) });
+  const eqQ = useQuery({ queryKey: ["amb", "detail", id, "equipment"], queryFn: () => ambulanceApi.listEquipment(id), enabled: Number.isFinite(id) });
+  const mtQ = useQuery({ queryKey: ["amb", "detail", id, "maintenance"], queryFn: () => ambulanceApi.listMaintenance(id), enabled: Number.isFinite(id) });
+  const flQ = useQuery({ queryKey: ["amb", "detail", id, "fuel"], queryFn: () => fuelApi.list(id), enabled: Number.isFinite(id) });
 
-   return (
-      <div className="space-y-10 animate-fade-in pb-20">
-         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-4">
-               <button
-                  onClick={() => navigate(routes.ambulances)}
-                  className="flex items-center gap-2 text-secondary-400 hover:text-secondary-900 font-bold transition-all group"
-               >
-                  <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-                  <span className="text-[10px] uppercase tracking-widest">Back to Fleet</span>
-               </button>
-               <PageHeader
-                  title={`${ambulance.manufacturer} ${ambulance.model}`}
-                  description={`Fleet Code: ${ambulance.code} • Plate: ${ambulance.plate_number}`}
-               />
-            </div>
-            <div className="flex gap-3">
-               <button className="btn-secondary gap-3 py-3 px-6">
-                  <SettingsIcon className="h-4 w-4" />
-                  <span className="font-bold">Maintenance Mode</span>
-               </button>
-               <button className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
-                  <Wrench className="h-5 w-5" />
-                  <span className="font-bold">Schedule Service</span>
-               </button>
-            </div>
-         </div>
+  const a = ambQ.data;
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["amb", "detail", id] });
+  const close = () => setDialog(null);
 
-         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            {/* Main Stats */}
-            <div className="lg:col-span-2 space-y-8">
-               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                  <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40">
-                     <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-2">Status</p>
-                     <span className="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-600 text-[10px] font-bold border border-emerald-100">
-                        {ambulance.status}
-                     </span>
-                  </div>
-                  <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40">
-                     <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-2">Current Odometer</p>
-                     <p className="text-xl font-black text-secondary-900">{ambulance.current_mileage.toLocaleString()} KM</p>
-                  </div>
-                  <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40">
-                     <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-2">Readiness</p>
-                     {readinessLoading ? (
-                        <div className="h-7 w-24 rounded-lg bg-secondary-100/50 animate-pulse" />
-                     ) : readiness ? (
-                        <>
-                           <p className={`text-xl font-black ${readiness.ready ? "text-emerald-600" : "text-rose-600"}`}>
-                              {readiness.ready ? "READY" : "NOT READY"}
-                           </p>
-                           {!readiness.ready && readiness.reasons.length > 0 && (
-                              <p className="text-[10px] text-secondary-500 font-medium mt-1 leading-snug">
-                                 {readiness.reasons[0]}
-                                 {readiness.reasons.length > 1 ? ` (+${readiness.reasons.length - 1} more)` : ""}
-                              </p>
-                           )}
-                        </>
-                     ) : (
-                        <p className="text-xl font-black text-secondary-400">—</p>
-                     )}
-                  </div>
-               </div>
+  const addEq = useMutation({ mutationFn: () => ambulanceApi.createEquipment(id, { ambulance_id: id, equipment_name: eq.equipment_name, equipment_code: eq.equipment_code, quantity: Number(eq.quantity) || 1, condition_status: eq.condition_status } as never), onSuccess: () => { toast.success("Equipment added"); close(); setEq({ equipment_name: "", equipment_code: "", quantity: "1", condition_status: "GOOD" }); invalidate(); }, onError: (e) => toast.error("Failed", apiErrorMessage(e)) });
+  const addMt = useMutation({ mutationFn: () => ambulanceApi.createMaintenance(id, { ambulance_id: id, maintenance_type: mt.maintenance_type, issue_description: mt.issue_description, service_provider: mt.service_provider, maintenance_date: new Date().toISOString() } as never), onSuccess: () => { toast.success("Maintenance scheduled"); close(); setMt({ maintenance_type: "", issue_description: "", service_provider: "" }); invalidate(); }, onError: (e) => toast.error("Failed", apiErrorMessage(e)) });
+  const addFl = useMutation({ mutationFn: () => fuelApi.add(id, { litres: Number(fl.litres) || 0, cost: fl.cost ? Number(fl.cost) : undefined, odometer: fl.odometer ? Number(fl.odometer) : undefined, station: fl.station || undefined }), onSuccess: () => { toast.success("Fuel logged"); close(); setFl({ litres: "", cost: "", odometer: "", station: "" }); invalidate(); }, onError: (e) => toast.error("Failed", apiErrorMessage(e)) });
 
-               {/* Tabs / Sub-sections */}
-               <div className="space-y-6">
-                  <div className="flex border-b border-secondary-400 gap-8">
-                     <button className="pb-4 border-b-2 border-primary-500 text-secondary-900 font-bold text-sm">Overview</button>
-                     <button className="pb-4 text-secondary-400 font-bold text-sm hover:text-secondary-600">Equipments</button>
-                     <button className="pb-4 text-secondary-400 font-bold text-sm hover:text-secondary-600">Service Logs</button>
-                     <button className="pb-4 text-secondary-400 font-bold text-sm hover:text-secondary-600">Mission History</button>
-                  </div>
+  if (ambQ.isLoading) return <DxPageLoading label="Loading ambulance…" />;
+  if (!a) return <DxPage><DxPageHeader crumbs={[{ label: "Ambulance", to: routes.ambulances }, { label: `#${ambulanceId}` }]} title="Ambulance not found" /></DxPage>;
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                     <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40">
-                        <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-6 flex items-center gap-2">
-                           <Shield className="h-4 w-4 text-primary-500" />
-                           Assigned Drivers
-                        </h4>
-                        <div className="space-y-4">
-                           <div className="flex items-center gap-4 p-4 rounded-2xl bg-secondary-900/5">
-                              <div className="h-10 w-10 rounded-xl bg-secondary-200" />
-                              <div>
-                                 <p className="text-sm font-bold text-secondary-900">John Doe</p>
-                                 <p className="text-[10px] text-secondary-500 font-medium">Class C License • Active</p>
-                              </div>
-                           </div>
-                           <button className="w-full py-3 rounded-2xl border-2 border-dashed border-secondary-200 text-secondary-400 text-xs font-bold hover:border-primary-500 hover:text-primary-500 transition-all">
-                              + Assign Driver
-                           </button>
-                        </div>
-                     </div>
+  const eqCols: DxGridColumn<AmbulanceEquipment>[] = [
+    { key: "equipment_name", header: "Equipment", render: (e) => <span className="font-semibold">{e.equipment_name}</span> },
+    { key: "equipment_code", header: "Code", render: (e) => <span className="dx-mono">{e.equipment_code}</span> },
+    { key: "quantity", header: "Qty", align: "center" },
+    { key: "condition_status", header: "Condition", align: "center", render: (e) => <DxBadge tone={e.condition_status === "GOOD" ? "success" : "warning"}>{e.condition_status}</DxBadge> },
+    { key: "expiry_date", header: "Expiry", render: (e) => e.expiry_date ? formatDateTime(e.expiry_date) : "—" },
+  ];
+  const mtCols: DxGridColumn<AmbulanceMaintenance>[] = [
+    { key: "maintenance_type", header: "Type", render: (m) => <span className="font-semibold">{m.maintenance_type}</span> },
+    { key: "maintenance_status", header: "Status", align: "center", render: (m) => <DxBadge tone={m.maintenance_status === "COMPLETED" ? "success" : "warning"}>{m.maintenance_status}</DxBadge> },
+    { key: "service_provider", header: "Provider", render: (m) => m.service_provider ?? "—" },
+    { key: "maintenance_date", header: "Date", render: (m) => formatDateTime(m.maintenance_date) },
+    { key: "cost", header: "Cost", align: "right", render: (m) => m.cost ? naira(m.cost) : "—" },
+  ];
+  const flCols: DxGridColumn<FuelLog>[] = [
+    { key: "logged_at", header: "Date", render: (f) => formatDateTime(f.logged_at) },
+    { key: "litres", header: "Litres", align: "right", render: (f) => `${Number(f.litres).toLocaleString()} L` },
+    { key: "cost", header: "Cost", align: "right", render: (f) => f.cost ? naira(f.cost) : "—" },
+    { key: "odometer", header: "Odometer", align: "right", render: (f) => f.odometer ? `${Number(f.odometer).toLocaleString()} km` : "—" },
+    { key: "station", header: "Station", render: (f) => f.station ?? "—" },
+  ];
 
-                     <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40">
-                        <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-6 flex items-center gap-2">
-                           <Activity className="h-4 w-4 text-primary-500" />
-                           Recent Mission
-                        </h4>
-                        <div className="p-4 rounded-2xl bg-primary-50/50 border border-primary-100">
-                           <p className="text-[10px] font-bold text-primary-600 uppercase tracking-widest mb-2">Last Dispatch</p>
-                           <h5 className="text-sm font-bold text-secondary-900 mb-1">Trauma Emergency #829</h5>
-                           <p className="text-xs text-secondary-500 font-medium">May 11, 2026 • 14:22 - 15:10</p>
-                        </div>
-                     </div>
-                  </div>
-               </div>
-            </div>
+  return (
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Ambulance", to: routes.ambulances }, { label: a.code }]}
+        title={`${[a.manufacturer, a.model].filter(Boolean).join(" ") || a.code}`}
+        subtitle="Vehicle readiness, equipment, maintenance and fuel."
+        actions={<>
+          <DxButton icon title="Refresh" onClick={() => invalidate()}><RotateCcw /></DxButton>
+          <DxButton leftIcon={<Truck />} onClick={() => nav(routes.ambulances)}>Back to fleet</DxButton>
+        </>}
+      />
 
-            {/* Technical Data Sidebar */}
-            <div className="lg:col-span-1 space-y-6">
-               <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 shadow-premium">
-                  <h4 className="text-sm font-bold text-secondary-900 uppercase tracking-widest mb-6">Technical Specifications</h4>
-                  <div className="space-y-4">
-                     <div className="flex justify-between py-3 border-b border-secondary-50">
-                        <span className="text-xs text-secondary-400 font-bold">Year</span>
-                        <span className="text-xs text-secondary-900 font-black">{ambulance.year_of_manufacture}</span>
-                     </div>
-                     <div className="flex justify-between py-3 border-b border-secondary-50">
-                        <span className="text-xs text-secondary-400 font-bold">Engine Type</span>
-                        <span className="text-xs text-secondary-900 font-black">2.8L Turbo Diesel</span>
-                     </div>
-                     <div className="flex justify-between py-3 border-b border-secondary-50">
-                        <span className="text-xs text-secondary-400 font-bold">Oxygen Capacity</span>
-                        <span className="text-xs text-secondary-900 font-black">2000L (2 Cyl)</span>
-                     </div>
-                     <div className="flex justify-between py-3">
-                        <span className="text-xs text-secondary-400 font-bold">Last Inspected</span>
-                        <span className="text-xs text-secondary-900 font-black">April 12, 2026</span>
-                     </div>
-                  </div>
-               </div>
+      <DxPanel title="Vehicle" icon={<Truck />} flush>
+        <DxProps items={[
+          { label: "Code", value: <span className="dx-mono">{a.code}</span> },
+          { label: "Plate", value: a.plate_number },
+          { label: "Status", value: <DxBadge tone={a.status === "AVAILABLE" ? "success" : a.status === "OUT_OF_SERVICE" ? "danger" : "info"}>{a.status.replace(/_/g, " ")}</DxBadge> },
+          { label: "Readiness", value: readyQ.data ? (readyQ.data.ready ? <DxBadge tone="success" dot>Ready</DxBadge> : <DxBadge tone="warning" dot>Not ready</DxBadge>) : "—" },
+          { label: "Year", value: a.year_of_manufacture ?? "—" },
+          { label: "Mileage", value: a.current_mileage ? `${Number(a.current_mileage).toLocaleString()} km` : "—" },
+        ]} />
+        {readyQ.data && !readyQ.data.ready && readyQ.data.reasons?.length ? (
+          <div className="px-3 pb-3 text-[12px] text-[var(--dx-warning)]">Not ready: {readyQ.data.reasons.join(", ")}</div>
+        ) : null}
+      </DxPanel>
 
-               <div className="glass-card rounded-[2.5rem] p-8 border border-amber-100 bg-amber-50/30">
-                  <div className="flex items-start gap-4">
-                     <AlertTriangle className="h-6 w-6 text-amber-500 shrink-0" />
-                     <div>
-                        <h4 className="text-sm font-bold text-secondary-900 mb-1">Service Reminder</h4>
-                        <p className="text-xs text-secondary-500 leading-relaxed">
-                           This vehicle is due for a routine oil change and brake inspection in 1,240 KM.
-                        </p>
-                     </div>
-                  </div>
-               </div>
-            </div>
-         </div>
-      </div>
-   );
+      <DxTabs<Tab> value={tab} onChange={setTab} className="mt-4 mb-3" items={[
+        { key: "overview", label: "Overview", icon: <ShieldCheck /> },
+        { key: "equipment", label: "Equipment", icon: <Boxes />, count: eqQ.data?.items?.length ?? null },
+        { key: "maintenance", label: "Maintenance", icon: <Wrench />, count: mtQ.data?.items?.length ?? null },
+        { key: "fuel", label: "Fuel", icon: <Fuel />, count: flQ.data?.items?.length ?? null },
+      ]} />
+
+      {tab === "overview" ? (
+        <DxPanel title="Readiness" icon={<ClipboardList />} flush>
+          <DxProps items={[
+            { label: "Primary driver", value: readyQ.data?.primary_driver_id ? `#${readyQ.data.primary_driver_id}` : "Not assigned" },
+            { label: "Expired equipment", value: String(readyQ.data?.expired_equipment_ids?.length ?? 0) },
+            { label: "Open maintenance", value: String(readyQ.data?.open_maintenance_ids?.length ?? 0) },
+          ]} />
+        </DxPanel>
+      ) : null}
+
+      {tab === "equipment" ? (
+        <DxPanel title="Equipment" icon={<Boxes />} flush actions={<DxButton size="sm" leftIcon={<Plus />} onClick={() => setDialog("equipment")}>Add equipment</DxButton>}>
+          <DxGrid borderless columns={eqCols} data={eqQ.data?.items ?? []} rowKey={(e) => e.id} isLoading={eqQ.isLoading} empty={{ icon: Boxes, title: "No equipment", description: "Add the vehicle's medical kit." }} />
+        </DxPanel>
+      ) : null}
+
+      {tab === "maintenance" ? (
+        <DxPanel title="Maintenance" icon={<Wrench />} flush actions={<DxButton size="sm" leftIcon={<Plus />} onClick={() => setDialog("maintenance")}>Schedule</DxButton>}>
+          <DxGrid borderless columns={mtCols} data={mtQ.data?.items ?? []} rowKey={(m) => m.id} isLoading={mtQ.isLoading} empty={{ icon: Wrench, title: "No maintenance", description: "Schedule servicing or log a repair." }} />
+        </DxPanel>
+      ) : null}
+
+      {tab === "fuel" ? (
+        <DxPanel title="Fuel log" icon={<Fuel />} flush actions={<DxButton size="sm" leftIcon={<Plus />} onClick={() => setDialog("fuel")}>Log fuel</DxButton>}>
+          <DxGrid borderless columns={flCols} data={flQ.data?.items ?? []} rowKey={(f) => f.id} isLoading={flQ.isLoading} empty={{ icon: Fuel, title: "No fuel logs", description: "Record refuelling and odometer readings." }} />
+        </DxPanel>
+      ) : null}
+
+      <DxPopup isOpen={dialog === "equipment"} onClose={close} title="Add equipment" locked={addEq.isPending}
+        footer={<><DxButton onClick={close}>Cancel</DxButton><DxButton variant="primary" isLoading={addEq.isPending} disabled={!eq.equipment_name.trim()} onClick={() => addEq.mutate()}>Add</DxButton></>}>
+        <DxForm cols={2}>
+          <DxInput label="Name" required value={eq.equipment_name} onChange={(e) => setEq((f) => ({ ...f, equipment_name: e.target.value }))} />
+          <DxInput label="Code" value={eq.equipment_code} onChange={(e) => setEq((f) => ({ ...f, equipment_code: e.target.value }))} />
+          <DxInput label="Quantity" type="number" value={eq.quantity} onChange={(e) => setEq((f) => ({ ...f, quantity: e.target.value }))} />
+          <DxInput label="Condition" value={eq.condition_status} onChange={(e) => setEq((f) => ({ ...f, condition_status: e.target.value }))} />
+        </DxForm>
+      </DxPopup>
+
+      <DxPopup isOpen={dialog === "maintenance"} onClose={close} title="Schedule maintenance" locked={addMt.isPending}
+        footer={<><DxButton onClick={close}>Cancel</DxButton><DxButton variant="primary" isLoading={addMt.isPending} disabled={!mt.maintenance_type.trim()} onClick={() => addMt.mutate()}>Schedule</DxButton></>}>
+        <DxForm cols={2}>
+          <DxInput label="Type" required value={mt.maintenance_type} onChange={(e) => setMt((f) => ({ ...f, maintenance_type: e.target.value }))} placeholder="Service / repair" />
+          <DxInput label="Service provider" value={mt.service_provider} onChange={(e) => setMt((f) => ({ ...f, service_provider: e.target.value }))} />
+          <DxTextarea label="Issue" fieldClassName="dx-col-span-full" rows={2} value={mt.issue_description} onChange={(e) => setMt((f) => ({ ...f, issue_description: e.target.value }))} />
+        </DxForm>
+      </DxPopup>
+
+      <DxPopup isOpen={dialog === "fuel"} onClose={close} title="Log fuel" locked={addFl.isPending}
+        footer={<><DxButton onClick={close}>Cancel</DxButton><DxButton variant="primary" isLoading={addFl.isPending} disabled={!(Number(fl.litres) > 0)} onClick={() => addFl.mutate()}>Log</DxButton></>}>
+        <DxForm cols={2}>
+          <DxInput label="Litres" required type="number" value={fl.litres} onChange={(e) => setFl((f) => ({ ...f, litres: e.target.value }))} />
+          <DxInput label="Cost (₦)" type="number" value={fl.cost} onChange={(e) => setFl((f) => ({ ...f, cost: e.target.value }))} />
+          <DxInput label="Odometer (km)" type="number" value={fl.odometer} onChange={(e) => setFl((f) => ({ ...f, odometer: e.target.value }))} />
+          <DxInput label="Station" value={fl.station} onChange={(e) => setFl((f) => ({ ...f, station: e.target.value }))} />
+        </DxForm>
+      </DxPopup>
+    </DxPage>
+  );
 }

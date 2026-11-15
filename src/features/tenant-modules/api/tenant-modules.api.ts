@@ -85,7 +85,8 @@ export async function bulkSetTenantModules(
   tenantId: number | string,
   payload: BulkModuleSettingPayload,
 ): Promise<unknown> {
-  const response = await apiClient.put(`/tenant-modules/${tenantId}/bulk`, payload);
+  // The backend expects an object wrapper: { modules: [...] }.
+  const response = await apiClient.put(`/tenant-modules/${tenantId}/bulk`, { modules: payload });
   return response.data;
 }
 

@@ -4,10 +4,15 @@ import {
   Ban, CheckCircle2, CircleDashed, Cloud, Database, Loader2, PlayCircle,
   RefreshCw, ShieldCheck, Sprout, XCircle,
 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Skeleton } from "@/components/ui/Skeleton";
+import {
+  DxBadge,
+  DxButton,
+  DxPopup,
+  DxProps,
+  DxSkeleton,
+  DxStatusBadge,
+  type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import {
   approveTenant,
@@ -23,33 +28,34 @@ import {
 function fmt(v?: string | null) {
   if (!v) return "—";
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? v : d.toLocaleString(undefined,
-    { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return Number.isNaN(d.getTime())
+    ? v
+    : d.toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 function fmtDate(v?: string | null) {
   if (!v) return "—";
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString(undefined,
-    { day: "2-digit", month: "short", year: "numeric" });
+  return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function StepIcon({ status }: { status: string }) {
   const s = (status || "").toUpperCase();
+  const base = "flex h-7 w-7 items-center justify-center rounded-full";
   if (s === "COMPLETED")
-    return <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-500"><CheckCircle2 className="h-4 w-4" /></span>;
+    return <span className={base} style={{ background: "var(--dx-success-soft)", color: "var(--dx-success)" }}><CheckCircle2 className="h-4 w-4" /></span>;
   if (s === "IN_PROGRESS")
-    return <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/15 text-amber-500"><Loader2 className="h-4 w-4 animate-spin" /></span>;
+    return <span className={base} style={{ background: "var(--dx-warning-soft)", color: "var(--dx-warning)" }}><Loader2 className="h-4 w-4 animate-spin" /></span>;
   if (s === "FAILED")
-    return <span className="flex h-7 w-7 items-center justify-center rounded-full bg-rose-500/15 text-rose-500"><XCircle className="h-4 w-4" /></span>;
-  return <span className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary-400/15 text-secondary-400"><CircleDashed className="h-4 w-4" /></span>;
+    return <span className={base} style={{ background: "var(--dx-danger-soft)", color: "var(--dx-danger)" }}><XCircle className="h-4 w-4" /></span>;
+  return <span className={base} style={{ background: "var(--dx-neutral-soft)", color: "var(--dx-text-muted)" }}><CircleDashed className="h-4 w-4" /></span>;
 }
 
-function stepBadge(status: string): { variant: any; label: string } {
+function stepBadgeTone(status: string): DxBadgeTone {
   const s = (status || "").toUpperCase();
-  if (s === "COMPLETED") return { variant: "soft-success", label: "COMPLETED" };
-  if (s === "IN_PROGRESS") return { variant: "soft-warning", label: "IN PROGRESS" };
-  if (s === "FAILED") return { variant: "soft-danger", label: "FAILED" };
-  return { variant: "secondary", label: s || "PENDING" };
+  if (s === "COMPLETED") return "success";
+  if (s === "IN_PROGRESS") return "warning";
+  if (s === "FAILED") return "danger";
+  return "neutral";
 }
 
 export function TenantProvisioningModal({
@@ -78,15 +84,21 @@ export function TenantProvisioningModal({
   const s3ok = !!(ps.data?.aws_s3_bucket_name ?? tenant?.aws_s3_bucket_name);
   const steps: ProvisioningStep[] = ps.data?.steps ?? [];
 
-  // Stop polling once provisioning settles.
   useEffect(() => {
     if (!polling) return;
     if (provisioned || ps.data?.provisioning_error) {
       setPolling(false);
-      if (tenant) onChanged({ id: tenant.id, status: ps.data?.status, is_provisioned: ps.data?.is_provisioned, provisioning_error: ps.data?.provisioning_error ?? null });
+      if (tenant)
+        onChanged({
+          id: tenant.id,
+          status: ps.data?.status,
+          is_provisioned: ps.data?.is_provisioned,
+          provisioning_error: ps.data?.provisioning_error ?? null,
+        });
       if (provisioned) toast.success("Provisioning complete", `${tenant?.name} is live.`);
       else if (ps.data?.provisioning_error) toast.error("Provisioning failed", ps.data.provisioning_error);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [polling, provisioned, ps.data?.provisioning_error]);
 
   useEffect(() => () => { if (pollRef.current) window.clearInterval(pollRef.current); }, []);
@@ -130,130 +142,139 @@ export function TenantProvisioningModal({
   const isSuspended = status === "SUSPENDED";
   const canApprove = isPending && !provisioned;
   const busy = approve.isPending || setStatus.isPending || repair.isPending;
-
-  // Newest first, like the mockup.
   const orderedSteps = [...steps].reverse();
 
+  const model = tenant.deployment_model || "CLOUD_PLATFORM";
+  const depMeta: Record<string, { label: string; detail: string }> = {
+    ON_PREMISE: { label: "On-premise", detail: "Dedicated full stack on the hospital's own servers – database, schema, admin and dedicated MinIO object storage are provisioned." },
+    CLOUD_DEDICATED: { label: "Cloud – Dedicated", detail: "Isolated cloud stack for this hospital – dedicated database and a dedicated AWS S3 bucket are provisioned." },
+    CLOUD_PLATFORM: { label: "Cloud – Platform", detail: "Shared platform infrastructure – only the tenant database is provisioned; AWS S3 storage is shared and namespaced by tenant code." },
+  };
+  const dep = depMeta[model] ?? depMeta.CLOUD_PLATFORM;
+
   return (
-    <Modal isOpen={!!tenant} onClose={onClose} title={tenant.name} size="xl">
-      <div className="space-y-6">
-        {/* Badges row */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="data-mono rounded-lg bg-secondary-100 px-2.5 py-1 text-xs font-bold dark:bg-white/10">{tenant.code?.toLowerCase()}</span>
-          <Badge variant={provisioned ? "soft-success" : "soft-warning"}>{provisioned ? "APPROVED" : "AWAITING APPROVAL"}</Badge>
-          <Badge variant={status === "ACTIVE" ? "soft-success" : isSuspended ? "soft-danger" : "soft-warning"}>{status || "—"}</Badge>
-          <Badge variant={s3ok ? "outline" : "secondary"}>
-            <Cloud className="mr-1 inline h-3 w-3" /> S3 {s3ok ? "✓" : "—"}
-          </Badge>
-          <span className="ml-auto text-xs text-secondary-400 font-medium">
-            Registered {fmtDate(ps.data?.registered_at)}
-          </span>
-        </div>
-
-        {/* Company info */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 rounded-2xl border border-secondary-200 bg-secondary-50/60 p-5 dark:border-white/10 dark:bg-white/5">
-          <Info label="Company email" value={ps.data?.company_email || tenant.billing_email} />
-          <Info label="Contact person" value={ps.data?.contact_person || tenant.billing_contact_name} />
-          <Info label="Industry" value={ps.data?.industry} />
-          <Info label="Tenant code" value={tenant.code} mono />
-        </div>
-
-        {/* Provisioning status */}
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h4 className="text-sm font-black tracking-tight">Provisioning status</h4>
-            <button
-              onClick={() => ps.refetch()}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-primary-600 hover:text-primary-700"
+    <DxPopup
+      isOpen={!!tenant}
+      onClose={onClose}
+      title={tenant.name}
+      size="xl"
+      footer={
+        <>
+          {canApprove ? (
+            <DxButton variant="primary" isLoading={approve.isPending} leftIcon={<ShieldCheck className="h-4 w-4" />} onClick={() => approve.mutate()}>
+              Approve & provision
+            </DxButton>
+          ) : (
+            <DxButton
+              isLoading={approve.isPending}
+              leftIcon={<PlayCircle className="h-4 w-4" />}
+              disabled={provisioned || busy}
+              title={provisioned ? "Already provisioned — use the targeted repair actions instead." : undefined}
+              onClick={() => approve.mutate()}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${ps.isFetching ? "animate-spin" : ""}`} /> Refresh
-            </button>
+              Re-run provisioning
+            </DxButton>
+          )}
+          {isSuspended ? (
+            <DxButton variant="primary" isLoading={setStatus.isPending} leftIcon={<CheckCircle2 className="h-4 w-4" />} onClick={() => setStatus.mutate("ACTIVE")}>
+              Reactivate
+            </DxButton>
+          ) : (
+            <DxButton variant="danger" isLoading={setStatus.isPending} leftIcon={<Ban className="h-4 w-4" />} disabled={isPending} onClick={() => setStatus.mutate("SUSPENDED")}>
+              Suspend
+            </DxButton>
+          )}
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-[12px] rounded bg-[var(--dx-surface-alt)] border border-[var(--dx-border)] px-2 py-0.5">
+            {tenant.code?.toLowerCase()}
+          </span>
+          <DxBadge tone={provisioned ? "success" : "warning"}>{provisioned ? "Approved" : "Awaiting approval"}</DxBadge>
+          <DxStatusBadge status={status} />
+          <DxBadge tone={s3ok ? "outline" : "neutral"}>
+            <Cloud className="h-3 w-3" /> S3 {s3ok ? "✓" : "—"}
+          </DxBadge>
+          <span className="ml-auto text-[11px] text-[var(--dx-text-muted)]">Registered {fmtDate(ps.data?.registered_at)}</span>
+        </div>
+
+        <DxProps
+          items={[
+            { label: "Company email", value: ps.data?.company_email || tenant.billing_email || "—" },
+            { label: "Contact person", value: ps.data?.contact_person || tenant.billing_contact_name || "—" },
+            { label: "Industry", value: ps.data?.industry || "—" },
+            { label: "Tenant code", value: <span className="font-mono">{tenant.code}</span> },
+          ]}
+        />
+
+        <div className="rounded-[var(--dx-radius)] border border-[var(--dx-accent)]/30 bg-[var(--dx-accent-soft)] px-4 py-3">
+          <p className="dx-field-label text-[var(--dx-accent)]">Deployment approach</p>
+          <p className="mt-0.5 font-semibold text-[var(--dx-text)]">{dep.label}</p>
+          <p className="mt-1 text-[12px] text-[var(--dx-text-muted)] leading-relaxed">{dep.detail}</p>
+        </div>
+
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="font-semibold text-[var(--dx-text)]">Provisioning status</h4>
+            <DxButton size="sm" variant="text" leftIcon={<RefreshCw className={ps.isFetching ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />} onClick={() => ps.refetch()}>
+              Refresh
+            </DxButton>
           </div>
-          <div className="max-h-72 overflow-y-auto rounded-2xl border border-secondary-200 dark:border-white/10">
+          <div className="max-h-72 overflow-y-auto rounded-[var(--dx-radius)] border border-[var(--dx-border)]">
             {ps.isLoading ? (
-              <div className="space-y-3 p-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+              <div className="space-y-2 p-3">
+                <DxSkeleton className="h-9 w-full" />
+                <DxSkeleton className="h-9 w-full" />
+              </div>
             ) : orderedSteps.length === 0 ? (
-              <p className="p-6 text-center text-sm text-secondary-400">
+              <p className="p-5 text-center text-[var(--dx-text-muted)]">
                 {canApprove
                   ? "No provisioning has run yet — approve this tenant to start."
                   : "No step log recorded for this tenant (provisioned before step tracking was added)."}
               </p>
             ) : (
-              orderedSteps.map((st, i) => {
-                const b = stepBadge(st.status);
-                return (
-                  <div key={i} className="flex items-start justify-between gap-3 border-b border-secondary-100 px-4 py-3 last:border-0 dark:border-white/5">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <StepIcon status={st.status} />
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold">{st.step}</p>
-                        {st.detail ? <p className="truncate text-xs text-secondary-400">{st.detail}</p> : null}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <Badge variant={b.variant}>{b.label}</Badge>
-                      <p className="mt-1 text-[10px] text-secondary-400">{fmt(st.at)}</p>
+              orderedSteps.map((st, i) => (
+                <div key={i} className="flex items-start justify-between gap-3 border-b border-[var(--dx-border)] px-4 py-3 last:border-0">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <StepIcon status={st.status} />
+                    <div className="min-w-0">
+                      <p className="font-medium text-[var(--dx-text)]">{st.step}</p>
+                      {st.detail ? <p className="truncate text-[11px] text-[var(--dx-text-muted)]">{st.detail}</p> : null}
                     </div>
                   </div>
-                );
-              })
+                  <div className="shrink-0 text-right">
+                    <DxBadge tone={stepBadgeTone(st.status)}>{(st.status || "PENDING").replace(/_/g, " ")}</DxBadge>
+                    <p className="mt-1 text-[11px] text-[var(--dx-text-muted)]">{fmt(st.at)}</p>
+                  </div>
+                </div>
+              ))
             )}
           </div>
           {ps.data?.provisioning_error ? (
-            <p className="mt-2 text-xs font-bold text-rose-500">Last error: {ps.data.provisioning_error}</p>
+            <p className="mt-2 text-[12px] font-medium text-[var(--dx-danger)]">Last error: {ps.data.provisioning_error}</p>
           ) : null}
         </div>
 
-        {/* Infrastructure repair */}
         {provisioned ? (
-          <div className="rounded-2xl border border-secondary-200 p-5 dark:border-white/10">
-            <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">Infrastructure repair</p>
-            <p className="mt-1 text-xs text-secondary-500">Targeted, idempotent fixes — no full re-provisioning required.</p>
+          <div className="rounded-[var(--dx-radius)] border border-[var(--dx-border)] p-4">
+            <p className="dx-field-label">Infrastructure repair</p>
+            <p className="mt-1 text-[12px] text-[var(--dx-text-muted)]">Targeted, idempotent fixes — no full re-provisioning required.</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" leftIcon={<Cloud className="h-3.5 w-3.5" />} disabled={busy}
-                onClick={() => repair.mutate("s3")}>Repair S3 bucket</Button>
-              <Button size="sm" variant="secondary" leftIcon={<Database className="h-3.5 w-3.5" />} disabled={busy}
-                onClick={() => repair.mutate("schema")}>Sync DB schema</Button>
-              <Button size="sm" variant="secondary" leftIcon={<Sprout className="h-3.5 w-3.5" />} disabled={busy}
-                onClick={() => repair.mutate("defaults")}>Sync defaults</Button>
+              <DxButton size="sm" leftIcon={<Cloud className="h-3.5 w-3.5" />} disabled={busy} onClick={() => repair.mutate("s3")}>
+                Repair storage bucket
+              </DxButton>
+              <DxButton size="sm" leftIcon={<Database className="h-3.5 w-3.5" />} disabled={busy} onClick={() => repair.mutate("schema")}>
+                Sync DB schema
+              </DxButton>
+              <DxButton size="sm" leftIcon={<Sprout className="h-3.5 w-3.5" />} disabled={busy} onClick={() => repair.mutate("defaults")}>
+                Sync defaults
+              </DxButton>
             </div>
           </div>
         ) : null}
-
-        {/* Footer actions */}
-        <div className="flex flex-wrap justify-end gap-3 border-t border-secondary-100 pt-4 dark:border-white/10">
-          {canApprove ? (
-            <Button isLoading={approve.isPending} leftIcon={<ShieldCheck className="h-4 w-4" />}
-              onClick={() => approve.mutate()}>
-              Approve & provision
-            </Button>
-          ) : (
-            <Button variant="secondary" isLoading={approve.isPending} leftIcon={<PlayCircle className="h-4 w-4" />}
-              disabled={provisioned || busy}
-              title={provisioned ? "Already provisioned — use the targeted repair actions instead." : undefined}
-              onClick={() => approve.mutate()}>
-              Re-run provisioning
-            </Button>
-          )}
-          {isSuspended ? (
-            <Button variant="secondary" isLoading={setStatus.isPending} leftIcon={<CheckCircle2 className="h-4 w-4" />}
-              onClick={() => setStatus.mutate("ACTIVE")}>Reactivate</Button>
-          ) : (
-            <Button variant="danger" isLoading={setStatus.isPending} leftIcon={<Ban className="h-4 w-4" />}
-              disabled={isPending}
-              onClick={() => setStatus.mutate("SUSPENDED")}>Suspend</Button>
-          )}
-        </div>
       </div>
-    </Modal>
-  );
-}
-
-function Info({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
-  return (
-    <div>
-      <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">{label}</p>
-      <p className={`mt-0.5 text-sm font-bold ${mono ? "data-mono" : ""}`}>{value || "—"}</p>
-    </div>
+    </DxPopup>
   );
 }

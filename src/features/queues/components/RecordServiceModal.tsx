@@ -1,14 +1,20 @@
 import { useMemo, useState } from "react";
-import { Plus, Receipt, Search, Trash2 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { Minus, Plus, Receipt, Trash2 } from "lucide-react";
+import {
+  DxButton,
+  DxGrid,
+  DxInput,
+  DxMessage,
+  DxPopup,
+  DxSearchBox,
+  formatNaira,
+  type DxGridColumn,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import type { BillableService, QueueTicket } from "../api/queues.api";
 import { useBillableServices, useRecordVisitServices } from "../hooks/use-queue";
-import { ticketPatientName } from "./ticket-cards";
+import { ticketPatientName } from "../lib/ticket-utils";
 
 type Line = {
   key: string;
@@ -18,10 +24,6 @@ type Line = {
   quantity: number;
   unit_price: number;
 };
-
-function naira(v: number): string {
-  return `₦${(Number.isFinite(v) ? v : 0).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 /**
  * Record services rendered at the CURRENT service delivery point for a serving
@@ -50,17 +52,12 @@ export function RecordServiceModal({
   const recordMut = useRecordVisitServices();
   const services = servicesQuery.data ?? [];
 
-  const total = useMemo(
-    () => lines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0),
-    [lines],
-  );
+  const total = useMemo(() => lines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0), [lines]);
 
   const addService = (s: BillableService) => {
     setLines((prev) => {
       const existing = prev.find((l) => l.billable_service_id === s.id);
-      if (existing) {
-        return prev.map((l) => (l.billable_service_id === s.id ? { ...l, quantity: l.quantity + 1 } : l));
-      }
+      if (existing) return prev.map((l) => (l.billable_service_id === s.id ? { ...l, quantity: l.quantity + 1 } : l));
       return [
         ...prev,
         {
@@ -78,16 +75,12 @@ export function RecordServiceModal({
   const addCustom = () => {
     const name = customName.trim();
     if (!name) return;
-    setLines((prev) => [
-      ...prev,
-      { key: `custom-${Date.now()}`, service_name: name, quantity: 1, unit_price: Number(customPrice) || 0 },
-    ]);
+    setLines((prev) => [...prev, { key: `custom-${Date.now()}`, service_name: name, quantity: 1, unit_price: Number(customPrice) || 0 }]);
     setCustomName("");
     setCustomPrice("");
   };
 
-  const updateLine = (key: string, patch: Partial<Line>) =>
-    setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  const updateLine = (key: string, patch: Partial<Line>) => setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const removeLine = (key: string) => setLines((prev) => prev.filter((l) => l.key !== key));
 
   const submit = () => {
@@ -123,135 +116,181 @@ export function RecordServiceModal({
     setCustomPrice("");
     setDone(null);
   };
+  const close = () => {
+    reset();
+    onClose();
+  };
+
+  const catalogueColumns: DxGridColumn<BillableService>[] = [
+    {
+      key: "name",
+      header: "Service",
+      render: (s) => (
+        <div className="min-w-0">
+          <div className="dx-row-primary truncate">{s.name}</div>
+          <div className="dx-row-secondary dx-mono">
+            {s.code}
+            {s.category ? ` · ${s.category}` : ""}
+          </div>
+        </div>
+      ),
+      wrap: true,
+    },
+    { key: "default_price", header: "Price", align: "right", width: 110, render: (s) => <span className="dx-mono">{formatNaira(Number(s.default_price) || 0)}</span> },
+    {
+      key: "add",
+      header: "",
+      width: 44,
+      align: "center",
+      render: (s) => (
+        <DxButton size="sm" variant="accent-text" icon title="Add" onClick={() => addService(s)}>
+          <Plus aria-hidden />
+        </DxButton>
+      ),
+    },
+  ];
+
+  const lineColumns: DxGridColumn<Line>[] = [
+    {
+      key: "service_name",
+      header: "Service",
+      wrap: true,
+      render: (l) => (
+        <div className="min-w-0">
+          <div className="dx-row-primary truncate">{l.service_name}</div>
+          {l.service_code ? <div className="dx-row-secondary dx-mono">{l.service_code}</div> : null}
+        </div>
+      ),
+    },
+    {
+      key: "quantity",
+      header: "Qty",
+      width: 110,
+      align: "center",
+      render: (l) => (
+        <span className="inline-flex items-center gap-1">
+          <DxButton size="sm" variant="text" icon onClick={() => updateLine(l.key, { quantity: Math.max(1, l.quantity - 1) })} title="Decrease">
+            <Minus aria-hidden />
+          </DxButton>
+          <span className="dx-mono w-6 text-center font-semibold">{l.quantity}</span>
+          <DxButton size="sm" variant="text" icon onClick={() => updateLine(l.key, { quantity: l.quantity + 1 })} title="Increase">
+            <Plus aria-hidden />
+          </DxButton>
+        </span>
+      ),
+    },
+    {
+      key: "unit_price",
+      header: "Unit price",
+      width: 120,
+      align: "right",
+      render: (l) => (
+        <input
+          type="number"
+          className="dx-editor dx-editor-sm dx-mono text-right"
+          value={String(l.unit_price)}
+          onChange={(e) => updateLine(l.key, { unit_price: Number(e.target.value) || 0 })}
+          aria-label="Unit price"
+        />
+      ),
+    },
+    { key: "amount", header: "Amount", width: 120, align: "right", render: (l) => <span className="dx-mono font-semibold">{formatNaira(l.quantity * l.unit_price)}</span> },
+    {
+      key: "remove",
+      header: "",
+      width: 40,
+      align: "center",
+      render: (l) => (
+        <DxButton size="sm" variant="text" icon onClick={() => removeLine(l.key)} title="Remove" className="text-[var(--dx-danger)]">
+          <Trash2 aria-hidden />
+        </DxButton>
+      ),
+    },
+  ];
 
   return (
-    <Modal
+    <DxPopup
       isOpen={ticket !== null}
-      onClose={() => { reset(); onClose(); }}
-      title="Record Services Rendered"
+      onClose={close}
+      title="Record services rendered"
       size="xl"
+      locked={recordMut.isPending}
       footer={
         done !== null ? (
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => { reset(); }}>Record more</Button>
-            <Button size="sm" onClick={() => { reset(); onClose(); }}>Done</Button>
-          </div>
+          <>
+            <DxButton onClick={reset}>Record more</DxButton>
+            <DxButton variant="primary" onClick={close}>
+              Done
+            </DxButton>
+          </>
         ) : (
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-bold text-secondary-900">Total: {naira(total)}</span>
-            <div className="flex gap-2">
-              <Button variant="secondary" size="sm" onClick={() => { reset(); onClose(); }}>Cancel</Button>
-              <Button size="sm" isLoading={recordMut.isPending} disabled={lines.length === 0} onClick={submit} leftIcon={<Receipt className="h-3.5 w-3.5" />}>
-                Record {lines.length > 0 ? `${lines.length} service(s)` : "services"}
-              </Button>
-            </div>
-          </div>
+          <>
+            <span className="mr-auto text-[13px]">
+              Total <b className="dx-mono">{formatNaira(total)}</b>
+            </span>
+            <DxButton onClick={close}>Cancel</DxButton>
+            <DxButton variant="primary" isLoading={recordMut.isPending} disabled={lines.length === 0} onClick={submit} leftIcon={<Receipt />}>
+              Record {lines.length > 0 ? `${lines.length} service(s)` : "services"}
+            </DxButton>
+          </>
         )
       }
     >
       {ticket ? (
-        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl bg-primary-500/5 px-4 py-3 text-sm">
-          <span className="font-black text-secondary-900">{ticket.queue_number}</span>
-          <span className="font-bold text-secondary-800">{ticketPatientName(ticket)}</span>
-          <span className="data-mono text-xs text-secondary-500">{ticket.hospital_number ?? `#${ticket.patient_id}`}</span>
-          {sdpName ? <span className="ml-auto text-xs font-semibold text-primary-600">at {sdpName}</span> : null}
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded border border-[var(--dx-border)] bg-[var(--dx-surface-alt)] px-3 py-2 text-[12.5px]">
+          <span className="dx-mono font-semibold">{ticket.queue_number}</span>
+          <span className="font-semibold">{ticketPatientName(ticket)}</span>
+          <span className="dx-mono dx-muted">{ticket.hospital_number ?? `#${ticket.patient_id}`}</span>
+          {sdpName ? <span className="ml-auto dx-muted">at {sdpName}</span> : null}
         </div>
       ) : null}
 
       {done !== null ? (
-        <div className="py-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
-            <Receipt className="h-6 w-6" />
-          </div>
-          <p className="font-bold text-secondary-900">{done} service(s) recorded</p>
-          <p className="mt-1 text-sm text-secondary-400">Charges were added to this visit's bill and tagged to the current service point.</p>
-        </div>
+        <DxMessage tone="success" title={`${done} service(s) recorded`}>
+          Charges were added to this visit's bill and tagged to the current service point.
+        </DxMessage>
       ) : (
-        <div className="grid gap-5 md:grid-cols-2">
-          {/* Catalogue */}
-          <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-widest text-secondary-400">Service catalogue</p>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-300" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search services…" className="pl-9" />
-            </div>
-            <div className="mt-3 max-h-72 space-y-1.5 overflow-y-auto pr-1">
-              {servicesQuery.isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-11 w-full rounded-xl" />)
-              ) : services.length === 0 ? (
-                <p className="py-6 text-center text-sm text-secondary-400">No services found.</p>
-              ) : (
-                services.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => addService(s)}
-                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-secondary-100 px-3 py-2 text-left transition-colors hover:border-primary-200 hover:bg-primary-500/5"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-secondary-800">{s.name}</span>
-                      <span className="data-mono text-[11px] text-secondary-400">{s.code}{s.category ? ` · ${s.category}` : ""}</span>
-                    </span>
-                    <span className="flex items-center gap-2 whitespace-nowrap text-xs font-bold text-secondary-600">
-                      {naira(Number(s.default_price) || 0)}
-                      <Plus className="h-4 w-4 text-primary-500" />
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-            <div className="mt-3 rounded-2xl border border-dashed border-secondary-200 p-3">
-              <p className="mb-2 text-[11px] font-black uppercase tracking-widest text-secondary-400">Custom service</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <p className="dx-caption">Service catalogue</p>
+            <DxSearchBox onSearch={setSearch} placeholder="Search services…" size="sm" />
+            <DxGrid
+              columns={catalogueColumns}
+              data={services}
+              rowKey={(s) => s.id}
+              isLoading={servicesQuery.isLoading}
+              onRowClick={addService}
+              maxHeight={260}
+              striped={false}
+              verticalLines={false}
+              empty={{ title: "No services found" }}
+            />
+            <div className="rounded border border-dashed border-[var(--dx-border-strong)] p-2">
+              <p className="dx-caption mb-1.5">Custom service</p>
               <div className="flex gap-2">
-                <Input value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="Service name" className="flex-1" />
-                <Input value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} placeholder="Price" type="number" className="w-24" />
-                <Button variant="secondary" size="sm" onClick={addCustom} disabled={!customName.trim()}>Add</Button>
+                <DxInput editorSize="sm" value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="Service name" fieldClassName="flex-1" className="flex-1" />
+                <DxInput editorSize="sm" type="number" value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} placeholder="Price" className="w-24" mono />
+                <DxButton size="sm" onClick={addCustom} disabled={!customName.trim()}>
+                  Add
+                </DxButton>
               </div>
             </div>
           </div>
 
-          {/* Selected lines */}
-          <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-widest text-secondary-400">Services to record</p>
-            {lines.length === 0 ? (
-              <div className="rounded-2xl border border-secondary-100 bg-secondary-50/50 p-8 text-center text-sm text-secondary-400">
-                Pick services from the catalogue — they'll appear here for you to confirm quantities.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {lines.map((l) => (
-                  <div key={l.key} className="rounded-2xl border border-secondary-100 p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-secondary-900">{l.service_name}</p>
-                        {l.service_code ? <p className="data-mono text-[11px] text-secondary-400">{l.service_code}</p> : null}
-                      </div>
-                      <button type="button" onClick={() => removeLine(l.key)} className="rounded-lg p-1 text-secondary-400 hover:bg-rose-500/10 hover:text-rose-500" aria-label="Remove">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="flex items-center rounded-xl border border-secondary-100">
-                        <button type="button" className="px-2.5 py-1 text-secondary-500 hover:text-secondary-900" onClick={() => updateLine(l.key, { quantity: Math.max(1, l.quantity - 1) })}>−</button>
-                        <span className="w-8 text-center text-sm font-bold">{l.quantity}</span>
-                        <button type="button" className="px-2.5 py-1 text-secondary-500 hover:text-secondary-900" onClick={() => updateLine(l.key, { quantity: l.quantity + 1 })}>+</button>
-                      </div>
-                      <span className="text-xs text-secondary-400">×</span>
-                      <Input
-                        type="number"
-                        value={String(l.unit_price)}
-                        onChange={(e) => updateLine(l.key, { unit_price: Number(e.target.value) || 0 })}
-                        className="h-9 w-28"
-                      />
-                      <span className="ml-auto text-sm font-black text-secondary-900">{naira(l.quantity * l.unit_price)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="space-y-2">
+            <p className="dx-caption">Services to record</p>
+            <DxGrid
+              columns={lineColumns}
+              data={lines}
+              rowKey={(l) => l.key}
+              striped={false}
+              maxHeight={340}
+              empty={{ title: "Nothing selected yet", description: "Pick services from the catalogue — confirm quantities here." }}
+              summary={lines.length ? { amount: <span className="dx-mono">{formatNaira(total)}</span>, service_name: "Total" } : undefined}
+            />
           </div>
         </div>
       )}
-    </Modal>
+    </DxPopup>
   );
 }

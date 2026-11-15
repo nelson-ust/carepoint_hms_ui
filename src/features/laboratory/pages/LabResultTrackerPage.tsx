@@ -1,67 +1,33 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ClipboardList, Download, FileText, RefreshCw } from "lucide-react";
-
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Spinner } from "@/components/ui/Spinner";
-import { SearchInput } from "@/components/forms/SearchInput";
-import { useToast } from "@/components/feedback/ToastProvider";
+import { CheckCircle2, ClipboardList, Download, ExternalLink, FileText, FlaskConical, RotateCcw, Search } from "lucide-react";
 import {
-  trackLabOrders,
-  downloadLabReport,
-  type LabTrackRow,
-} from "../api/lab-orders.api";
+  DxButton,
+  DxGrid,
+  DxKpi,
+  DxMessage,
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxSearchBox,
+  DxSelect,
+  DxStatusBadge,
+  DxStatusBar,
+  DxStatusItem,
+  DxToolbar,
+  DxToolbarSeparator,
+  DxToolbarSpacer,
+  apiErrorMessage,
+  formatDateTime,
+  type DxGridColumn,
+} from "@/components/dx";
+import { useToast } from "@/components/feedback/ToastProvider";
+import { routes } from "@/config/routes";
+import { downloadLabReport, trackLabOrders, type LabTrackItem, type LabTrackRow } from "../api/lab-orders.api";
+import { TRACK_STATUS_OPTIONS, normStatus } from "../lib/lab-worklist";
 
-const STATUS_OPTIONS = [
-  { value: "", label: "All statuses" },
-  { value: "ORDERED", label: "Ordered" },
-  { value: "SAMPLE_COLLECTED", label: "Sample collected" },
-  { value: "IN_PROGRESS", label: "In progress" },
-  { value: "RESULT_READY", label: "Result ready" },
-  { value: "COMPLETED", label: "Completed" },
-  { value: "CANCELLED", label: "Cancelled" },
-];
-
-function orderStatusVariant(status: string) {
-  switch (status) {
-    case "COMPLETED":
-    case "RESULT_READY":
-      return "soft-success" as const;
-    case "IN_PROGRESS":
-    case "SAMPLE_COLLECTED":
-      return "soft-info" as const;
-    case "CANCELLED":
-      return "soft-danger" as const;
-    default:
-      return "soft-warning" as const;
-  }
-}
-
-function resultStatusVariant(status: string) {
-  switch (status) {
-    case "RELEASED":
-      return "success" as const;
-    case "VERIFIED":
-      return "info" as const;
-    case "ENTERED":
-      return "warning" as const;
-    case "CANCELLED":
-      return "destructive" as const;
-    default:
-      return "outline" as const;
-  }
-}
-
-function fmt(dt: string | null): string {
-  if (!dt) return "—";
-  const d = new Date(dt);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
-}
+const stop = (e: MouseEvent) => e.stopPropagation();
 
 /**
  * Hospital-wide Lab Result Tracker.
@@ -76,162 +42,270 @@ export function LabResultTrackerPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [downloading, setDownloading] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const { data, isFetching, refetch } = useQuery({
+  const trackQuery = useQuery({
     queryKey: ["lab-track", query, status],
     queryFn: () => trackLabOrders({ query, status, limit: 100 }),
     placeholderData: (prev) => prev,
   });
+  const { isFetching, refetch } = trackQuery;
 
-  const rows: LabTrackRow[] = useMemo(() => data?.items ?? [], [data]);
+  const rows: LabTrackRow[] = useMemo(() => trackQuery.data?.items ?? [], [trackQuery.data]);
+  const selected = useMemo(() => rows.find((r) => r.order_id === selectedId) ?? null, [rows, selectedId]);
+
+  const stats = useMemo(() => {
+    let reports = 0;
+    let inProgress = 0;
+    let released = 0;
+    for (const r of rows) {
+      if (r.report_available) reports++;
+      if (!/(COMPLETED|CANCELLED)/.test(normStatus(r.status))) inProgress++;
+      released += r.items.filter((i) => normStatus(i.result_status) === "RELEASED").length;
+    }
+    return { reports, inProgress, released };
+  }, [rows]);
 
   const handleDownload = async (row: LabTrackRow) => {
     setDownloading(row.order_id);
     try {
       await downloadLabReport(row.order_id, row.order_no);
     } catch {
-      toast.error(
-        "Report unavailable",
-        "The report can be downloaded once the laboratory releases results for this order.",
-      );
+      toast.error("Report unavailable", "The report can be downloaded once the laboratory releases results for this order.");
     } finally {
       setDownloading(null);
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Laboratory"
-        title="Lab Result Tracker"
-        description="Track laboratory orders across the hospital and download released reports."
-        actions={
-          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
-            <RefreshCw className={`mr-1 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        }
-      />
-
-      <Card>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex-1">
-            <SearchInput
-              value={query}
-              onSearch={setQuery}
-              placeholder="Search by order number, patient name or hospital number…"
-            />
-          </div>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="h-11 rounded-xl border border-secondary-200 bg-white px-3 text-sm font-medium text-secondary-700 focus:border-primary-400 focus:outline-none"
+  const columns: DxGridColumn<LabTrackRow>[] = [
+    {
+      key: "order_no",
+      header: "Order",
+      width: 190,
+      sortable: true,
+      filter: true,
+      render: (r) => <span className="dx-mono dx-strong">{r.order_no}</span>,
+    },
+    {
+      key: "patient_name",
+      header: "Patient",
+      minWidth: 180,
+      sortable: true,
+      filter: true,
+      render: (r) => (
+        <div className="min-w-0">
+          <div className="dx-strong truncate">{r.patient_name || <span className="dx-faint">Unknown patient</span>}</div>
+          {r.hospital_number ? <div className="dx-mono dx-faint text-[11px]">{r.hospital_number}</div> : null}
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      width: 150,
+      sortable: true,
+      filter: { options: TRACK_STATUS_OPTIONS.filter((o) => o.value) },
+      accessor: (r) => normStatus(r.status),
+      render: (r) => <DxStatusBadge status={r.status} />,
+    },
+    {
+      key: "items",
+      header: "Tests",
+      width: 100,
+      align: "center",
+      sortable: true,
+      accessor: (r) => r.items.length,
+      render: (r) => {
+        const released = r.items.filter((i) => normStatus(i.result_status) === "RELEASED").length;
+        return (
+          <span className="dx-num">
+            {released}/{r.items.length}
+          </span>
+        );
+      },
+    },
+    {
+      key: "ordered_at",
+      header: "Ordered",
+      width: 150,
+      sortable: true,
+      accessor: (r) => r.ordered_at ?? "",
+      render: (r) => <span className="dx-mono">{formatDateTime(r.ordered_at)}</span>,
+    },
+    {
+      key: "report",
+      header: "Report",
+      width: 120,
+      align: "center",
+      accessor: (r) => (r.report_available ? "yes" : "no"),
+      filter: {
+        options: [
+          { value: "yes", label: "Available" },
+          { value: "no", label: "Not yet" },
+        ],
+      },
+      render: (r) =>
+        r.report_available ? (
+          <span className="inline-flex items-center gap-1 text-[var(--dx-success)]">
+            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Available
+          </span>
+        ) : (
+          <span className="dx-faint">Not yet</span>
+        ),
+    },
+    {
+      key: "actions",
+      header: "",
+      width: 200,
+      align: "right",
+      render: (r) => (
+        <div className="flex items-center justify-end gap-1" onClick={stop}>
+          {r.visit_id ? (
+            <Link to={routes.visitDetail.replace(":visitId", String(r.visit_id))} className="dx-btn dx-btn-sm dx-btn-text">
+              <FileText aria-hidden />
+              Visit
+            </Link>
+          ) : null}
+          <DxButton
+            size="sm"
+            variant={r.report_available ? "primary" : "default"}
+            leftIcon={<Download />}
+            disabled={!r.report_available || downloading === r.order_id}
+            isLoading={downloading === r.order_id}
+            title={r.report_available ? "Download the branded lab report (PDF)" : "Report becomes available once results are released"}
+            onClick={() => handleDownload(r)}
           >
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            {downloading === r.order_id ? "Preparing…" : "Report"}
+          </DxButton>
         </div>
-      </Card>
+      ),
+    },
+  ];
 
-      {isFetching && rows.length === 0 ? (
-        <div className="flex justify-center py-16">
-          <Spinner size="lg" />
+  const itemColumns: DxGridColumn<LabTrackItem>[] = [
+    { key: "test", header: "Test", minWidth: 200, sortable: true, render: (i) => <span className="dx-strong">{i.test}</span> },
+    {
+      key: "item_status",
+      header: "Order stage",
+      width: 160,
+      sortable: true,
+      accessor: (i) => normStatus(i.item_status),
+      render: (i) => <DxStatusBadge status={i.item_status} />,
+    },
+    {
+      key: "result_status",
+      header: "Result",
+      width: 150,
+      sortable: true,
+      accessor: (i) => normStatus(i.result_status),
+      render: (i) => <DxStatusBadge status={i.result_status} />,
+    },
+    {
+      key: "released_at",
+      header: "Released",
+      width: 160,
+      sortable: true,
+      accessor: (i) => i.released_at ?? "",
+      render: (i) => <span className="dx-mono">{formatDateTime(i.released_at)}</span>,
+    },
+  ];
+
+  const loadError = trackQuery.isError ? apiErrorMessage(trackQuery.error, "Unable to search lab orders.") : null;
+
+  return (
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Laboratory", to: routes.laboratory }, { label: "Result tracker" }]}
+        title="Lab result tracker"
+        subtitle="Track laboratory orders across the hospital and download released reports."
+        actions={
+          <Link to={routes.labOrders} className="dx-btn">
+            <FlaskConical aria-hidden />
+            Laboratory worklist
+          </Link>
+        }
+      >
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <DxKpi label="Orders found" value={rows.length} icon={Search} tone="accent" isLoading={trackQuery.isLoading} sub={trackQuery.data ? `of ${trackQuery.data.total} matching` : undefined} />
+          <DxKpi label="Still in the lab" value={stats.inProgress} icon={FlaskConical} tone="info" isLoading={trackQuery.isLoading} sub="not completed or cancelled" />
+          <DxKpi label="Released results" value={stats.released} icon={CheckCircle2} tone="success" isLoading={trackQuery.isLoading} sub="tests released to clinicians" />
+          <DxKpi label="Reports available" value={stats.reports} icon={Download} tone="warning" isLoading={trackQuery.isLoading} sub="branded PDF ready" />
         </div>
-      ) : rows.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon={ClipboardList}
-            title="No lab orders found"
-            description="Try a different order number, patient name or hospital number."
-          />
-        </Card>
+      </DxPageHeader>
+
+      <div>
+        <DxToolbar attached>
+          <DxSearchBox onSearch={setQuery} placeholder="Order number, patient name or hospital number…" className="w-96" />
+          <DxToolbarSeparator />
+          <DxSelect editorSize="sm" aria-label="Order status" value={status} onChange={(e) => setStatus(e.target.value)} options={TRACK_STATUS_OPTIONS} className="w-44" />
+          <DxToolbarSpacer />
+          <DxButton size="sm" variant="text" leftIcon={<RotateCcw className={isFetching ? "animate-spin" : undefined} />} onClick={() => refetch()} disabled={isFetching}>
+            Refresh
+          </DxButton>
+        </DxToolbar>
+        <DxGrid
+          attached
+          filterRow
+          columns={columns}
+          data={rows}
+          rowKey={(r) => r.order_id}
+          isLoading={trackQuery.isLoading}
+          error={loadError}
+          onRetry={() => refetch()}
+          onRowClick={(r) => setSelectedId(r.order_id)}
+          selectedKey={selected?.order_id ?? null}
+          empty={{ icon: ClipboardList, title: "No lab orders found", description: "Try a different order number, patient name or hospital number." }}
+        />
+      </div>
+
+      {selected ? (
+        <DxPanel
+          title={
+            <span className="inline-flex items-center gap-2">
+              <span className="dx-mono">{selected.order_no}</span>
+              <DxStatusBadge status={selected.status} />
+            </span>
+          }
+          icon={<ClipboardList />}
+          description={`${selected.patient_name}${selected.hospital_number ? ` · ${selected.hospital_number}` : ""} · ordered ${formatDateTime(selected.ordered_at)}`}
+          flush
+          actions={
+            <>
+              {selected.visit_id ? (
+                <Link to={routes.visitDetail.replace(":visitId", String(selected.visit_id))} className="dx-btn dx-btn-sm">
+                  <ExternalLink aria-hidden />
+                  Open visit
+                </Link>
+              ) : null}
+              <DxButton
+                size="sm"
+                variant={selected.report_available ? "primary" : "default"}
+                leftIcon={<Download />}
+                disabled={!selected.report_available || downloading === selected.order_id}
+                isLoading={downloading === selected.order_id}
+                onClick={() => handleDownload(selected)}
+              >
+                Download report
+              </DxButton>
+              <DxButton size="sm" variant="text" onClick={() => setSelectedId(null)}>
+                Close
+              </DxButton>
+            </>
+          }
+        >
+          <DxGrid borderless columns={itemColumns} data={selected.items} rowKey={(i) => i.item_id} empty={{ title: "No tests on this order" }} />
+        </DxPanel>
       ) : (
-        <div className="space-y-4">
-          {rows.map((row) => (
-            <Card key={row.order_id}>
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-bold text-primary-700">
-                      {row.order_no}
-                    </span>
-                    <Badge variant={orderStatusVariant(row.status)}>
-                      {row.status.replace(/_/g, " ")}
-                    </Badge>
-                  </div>
-                  <div className="mt-1 text-base font-bold text-secondary-900">
-                    {row.patient_name}
-                    {row.hospital_number ? (
-                      <span className="ml-2 font-mono text-xs font-medium text-secondary-500">
-                        {row.hospital_number}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="mt-0.5 text-xs text-secondary-500">
-                    Ordered {fmt(row.ordered_at)}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {row.visit_id ? (
-                    <Link to={`/visits/${row.visit_id}`}>
-                      <Button variant="ghost" size="sm">
-                        <FileText className="mr-1 h-4 w-4" />
-                        Visit
-                      </Button>
-                    </Link>
-                  ) : null}
-                  <Button
-                    variant={row.report_available ? "primary" : "outline"}
-                    size="sm"
-                    disabled={!row.report_available || downloading === row.order_id}
-                    onClick={() => handleDownload(row)}
-                    title={
-                      row.report_available
-                        ? "Download the branded lab report (PDF)"
-                        : "Report becomes available once results are released"
-                    }
-                  >
-                    <Download className="mr-1 h-4 w-4" />
-                    {downloading === row.order_id ? "Preparing…" : "Report"}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-secondary-400">
-                      <th className="pb-2 font-semibold">Test</th>
-                      <th className="pb-2 font-semibold">Order stage</th>
-                      <th className="pb-2 font-semibold">Result</th>
-                      <th className="pb-2 font-semibold">Released</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-secondary-100">
-                    {row.items.map((it) => (
-                      <tr key={it.item_id}>
-                        <td className="py-2 font-medium text-secondary-800">{it.test}</td>
-                        <td className="py-2 text-secondary-600">
-                          {it.item_status.replace(/_/g, " ")}
-                        </td>
-                        <td className="py-2">
-                          <Badge variant={resultStatusVariant(it.result_status)}>
-                            {it.result_status}
-                          </Badge>
-                        </td>
-                        <td className="py-2 text-secondary-500">{fmt(it.released_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <DxMessage tone="info">Select an order to see each test's stage, result status and release time.</DxMessage>
       )}
-    </div>
+
+      <DxStatusBar>
+        <DxStatusItem>
+          <b>{rows.length}</b> order{rows.length === 1 ? "" : "s"} shown
+          {trackQuery.data && trackQuery.data.total > rows.length ? ` of ${trackQuery.data.total} (showing the first ${rows.length})` : ""}
+        </DxStatusItem>
+        <span className="ml-auto">{isFetching ? "Searching…" : "Reports become downloadable once the laboratory releases results."}</span>
+      </DxStatusBar>
+    </DxPage>
   );
 }

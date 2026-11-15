@@ -242,6 +242,16 @@ export async function advanceVisit(visitId: number, payload: AdvanceVisitPayload
   return response.data;
 }
 
+/** POST /visits/{id}/return-to-consultation — after diagnostics, send the
+ * patient back to the consulting room for the doctor to review & prescribe. */
+export async function returnToConsultation(visitId: number) {
+  const response = await apiClient.post<RerouteVisitResponse>(
+    `/visits/${visitId}/return-to-consultation`,
+    {},
+  );
+  return response.data;
+}
+
 export async function getServiceDeliveryPoints(
   options: { skip?: number; limit?: number } = {},
 ): Promise<ServiceDeliveryPoint[]> {

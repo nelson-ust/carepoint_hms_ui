@@ -40,6 +40,10 @@ export type TenantSubscription = {
   start_date?: string;
   end_date?: string;
   trial_end_date?: string;
+  current_period_start?: string;
+  current_period_end?: string;
+  billing_interval?: string;
+  is_complimentary?: boolean;
   auto_renew?: boolean;
   plan?: SubscriptionPlan;
 };
@@ -52,6 +56,8 @@ export type Tenant = {
   is_provisioned?: boolean;
   provisioning_error?: string | null;
   aws_s3_bucket_name?: string | null;
+  deployment_mode?: string | null;
+  deployment_model?: string | null;
   domain_url?: string;
   custom_domain?: string;
   billing_email?: string;
@@ -60,6 +66,7 @@ export type Tenant = {
   billing_address?: string;
   tax_id?: string;
   subscriptions?: TenantSubscription[];
+  renewal_access_until?: string | null;
 };
 
 export type TenantsListResponse = {
@@ -88,6 +95,7 @@ export type TenantRegistrationPayload = {
   billing_contact_name: string;
   billing_address: string;
   tax_id?: string;
+  deployment_model?: string;
   plan_code: string;
   admin_email: string;
   admin_username: string;
@@ -207,6 +215,52 @@ export async function updateTenantStatus(
     status,
   } satisfies UpdateTenantStatusPayload);
   return response.data;
+}
+
+/** POST /tenants/{id}/grant-renewal-access — let an expired tenant's admin sign in to renew. */
+export async function grantRenewalAccess(tenantId: number | string, days = 7) {
+  const response = await apiClient.post(`/tenants/${tenantId}/grant-renewal-access`, null, { params: { days } });
+  return response.data as { renewal_access_until: string | null; message?: string };
+}
+
+/** POST /tenants/{id}/revoke-renewal-access — close the renewal-login window. */
+export async function revokeRenewalAccess(tenantId: number | string) {
+  const response = await apiClient.post(`/tenants/${tenantId}/revoke-renewal-access`);
+  return response.data as { renewal_access_until: string | null; message?: string };
+}
+
+export type ExtendSubscriptionPayload = { days?: number; months?: number; reason?: string };
+export type GrantFreeSubscriptionPayload = { days?: number; months?: number; reason?: string; plan_code?: string };
+
+export type TenantIncentive = {
+  id: number;
+  incentive_type: "SUBSCRIPTION_EXTENSION" | "COMPLIMENTARY_SUBSCRIPTION" | "TRIAL_EXTENSION" | string;
+  days?: number | null;
+  months?: number | null;
+  plan_code?: string | null;
+  reason?: string | null;
+  granted_by?: string | null;
+  effective_from?: string | null;
+  effective_until?: string | null;
+  created_at?: string | null;
+};
+
+/** POST /tenants/{id}/extend-subscription — push the subscription/trial forward, free. */
+export async function extendSubscription(tenantId: number | string, payload: ExtendSubscriptionPayload) {
+  const response = await apiClient.post(`/tenants/${tenantId}/extend-subscription`, payload);
+  return response.data as { success: boolean; message?: string; status?: string; trial_end_date?: string | null; current_period_end?: string | null };
+}
+
+/** POST /tenants/{id}/grant-free-subscription — grant a complimentary access window. */
+export async function grantFreeSubscription(tenantId: number | string, payload: GrantFreeSubscriptionPayload) {
+  const response = await apiClient.post(`/tenants/${tenantId}/grant-free-subscription`, payload);
+  return response.data as { success: boolean; message?: string; status?: string; is_complimentary?: boolean; current_period_end?: string | null };
+}
+
+/** GET /tenants/{id}/incentives — history of goodwill grants for a tenant. */
+export async function listTenantIncentives(tenantId: number | string): Promise<TenantIncentive[]> {
+  const response = await apiClient.get<{ items: TenantIncentive[] }>(`/tenants/${tenantId}/incentives`);
+  return response.data.items ?? [];
 }
 
 export async function listSubscriptionPlans(): Promise<SubscriptionPlan[]> {

@@ -1,6 +1,6 @@
 import { routes } from "@/config/routes";
 import { isDedicatedDeployment } from "@/config/env";
-import { ClipboardCheck, BookOpenCheck, BookOpen, Scale, KeyRound, 
+import { Bone, Eye, Gauge, ClipboardCheck, BookOpenCheck, BookOpen, Scale, KeyRound, 
   LayoutDashboard, 
   Users, 
   Stethoscope, 
@@ -30,6 +30,7 @@ import { ClipboardCheck, BookOpenCheck, BookOpen, Scale, KeyRound,
   Building2,
   Hospital,
   Truck,
+  Archive,
   Mail,
   Gift,
   ShoppingCart,
@@ -49,7 +50,7 @@ export type AppModule = {
   path: string;
   description: string;
   icon: any;
-  category: "Core" | "Clinical" | "Administrative" | "Financial" | "HR & Payroll" | "SaaS";
+  category: "Core" | "Clinical" | "Dental" | "Eye Clinic" | "Orthopaedics" | "Administrative" | "Financial" | "HR & Payroll" | "Mortuary" | "SaaS";
   /**
    * Backend subscription-module code gating this entry
    * (matches /tenant-modules/me/list codes). Omit for always-on core modules.
@@ -85,6 +86,7 @@ const allModules: AppModule[] = [
   { code: "VISITS", label: "Visits", path: routes.visits, icon: ClipboardList, category: "Clinical", description: "Patient visit lifecycle." },
   { code: "INTEROPERABILITY", label: "Interoperability", path: routes.interoperability, icon: Hospital, category: "Clinical", description: "Refer patients and exchange records with other hospitals." },
   { code: "MEDICAL_ACCESS", label: "Record Sharing", path: routes.medicalAccess, icon: ShieldCheck, category: "Clinical", description: "Request and authorize consent-gated access to patient medical histories with secure one-time links." },
+  { code: "SERVICE_DESK", label: "Service Desk", path: routes.serviceDesk, icon: ClipboardCheck, category: "Clinical", description: "Attend to patients routed to your service point — call, capture, send on." },
   { code: "QUEUES", label: "Queues", path: routes.queues, icon: Clock, category: "Clinical", description: "Service delivery point queues." },
   { code: "QUEUE_ANALYTICS", label: "Queue Analytics", path: routes.queueAnalytics, icon: BarChart3, category: "Clinical", description: "Wait times, throughput and no-show rates per service point." },
   { code: "QUEUE_DISPLAY", label: "Queue Display", path: routes.queueDisplayBoard, icon: LayoutDashboard, category: "Clinical", description: "Full-screen waiting-room now-serving board." },
@@ -99,8 +101,23 @@ const allModules: AppModule[] = [
   { code: "RADIOLOGY", moduleCode: "radiology", label: "Radiology", path: routes.radiology, icon: Activity, category: "Clinical", description: "Radiology orders and reports." },
   { code: "PHARMACY", moduleCode: "pharmacy", label: "Pharmacy", path: routes.pharmacy, icon: Pill, category: "Clinical", description: "Prescriptions and dispensing." },
   { code: "DRUGS", moduleCode: "pharmacy", label: "Drugs", path: routes.drugs, icon: Pill, category: "Administrative", description: "Drug formulary and categories." },
+  { code: "DATA_PROTECTION", label: "Data Protection", path: routes.dataProtection, icon: ShieldCheck, category: "Administrative", description: "NDPA: consent, data-subject rights, breach register, processing records and DPO settings.", permissions: ["DATA_PROTECTION_READ", "DATA_PROTECTION_MANAGE"] },
   { code: "ADMISSIONS", moduleCode: "inpatient", label: "Admissions", path: routes.admissions, icon: Bed, category: "Clinical", description: "Ward, bed, admission and discharge." },
   { code: "AMBULANCE", moduleCode: "ambulance", label: "Ambulance", path: routes.ambulances, icon: Truck, category: "Clinical", description: "Fleet management, driver certifications and readiness." },
+  { code: "MORTUARY", moduleCode: "mortuary", label: "Deceased Register", path: routes.mortuary, icon: Archive, category: "Mortuary", description: "Register deceased (in-hospital and brought-in), assign storage and release bodies." },
+  { code: "MORTUARY_UNITS", moduleCode: "mortuary", label: "Storage Units", path: routes.mortuaryUnits, icon: Boxes, category: "Mortuary", description: "Cold chambers, freezers and shelves with live occupancy." },
+  { code: "MORTUARY_AUTOPSY", moduleCode: "mortuary", label: "Autopsies", path: routes.mortuaryAutopsies, icon: Scissors, category: "Mortuary", description: "Post-mortem requests, scheduling and findings." },
+  { code: "MORTUARY_BILLING", moduleCode: "mortuary", label: "Mortuary Billing", path: routes.mortuaryBilling, icon: Receipt, category: "Mortuary", description: "Storage, embalming and autopsy charges." },
+  { code: "MORTUARY_ANALYTICS", moduleCode: "mortuary", label: "Analytics", path: routes.mortuaryAnalytics, icon: BarChart3, category: "Mortuary", description: "Intake trends, occupancy, length of stay, billing and more." },
+
+  // Dental clinic
+  { code: "DENTAL", moduleCode: "dental", label: "Dental Clinic", path: routes.dentalWorklist, icon: Stethoscope, category: "Dental", description: "Odontogram charting, dental examinations and treatment plans.", permissions: ["DENTAL_READ", "DENTAL_MANAGE"] },
+
+  // Eye / Ophthalmology clinic
+  { code: "EYE", moduleCode: "eye", label: "Eye Clinic", path: routes.eyeClinic, icon: Eye, category: "Eye Clinic", description: "Visual acuity, refraction, IOP, segment findings and spectacle prescriptions.", permissions: ["EYE_READ", "EYE_MANAGE"] },
+
+  // Orthopaedics clinic
+  { code: "ORTHO", moduleCode: "ortho", label: "Orthopaedics", path: routes.orthoWorklist, icon: Bone, category: "Orthopaedics", description: "Musculoskeletal assessments, fracture management, casting and treatment plans.", permissions: ["ORTHO_READ", "ORTHO_MANAGE"] },
   { code: "WARDS", moduleCode: "inpatient", label: "Wards", path: routes.wards, icon: Hospital, category: "Clinical", description: "Ward configuration and live bed occupancy." },
   { code: "BEDS", moduleCode: "inpatient", label: "Beds", path: routes.beds, icon: Bed, category: "Clinical", description: "Bed inventory across every ward." },
   { code: "MEDICATION_ADHERENCE", moduleCode: "pharmacy", label: "Medication Adherence", path: routes.medicationAdherence, icon: Timer, category: "Clinical", description: "Dose schedules, alerts, refills and follow-ups." },
@@ -110,6 +127,7 @@ const allModules: AppModule[] = [
   { code: "INSTRUMENT_SETS", moduleCode: "surgical", label: "Instrument Sets", path: routes.instrumentSets, icon: Boxes, category: "Clinical", description: "Instrument sets, sterilization and assignment." },
 
   // Financial
+  { code: "FINANCE_DASHBOARD", moduleCode: "billing", label: "Finance Dashboard", path: routes.financeDashboard, icon: Gauge, category: "Financial", description: "Command center: revenue, collections, AR/AP aging, cash and profitability at a glance." },
   { code: "BILLING", moduleCode: "billing", label: "Billing", path: routes.billing, icon: Receipt, category: "Financial", description: "Invoices, billing and charges." },
   { code: "PATIENT_PAYMENT", moduleCode: "billing", label: "Payment Gateways", path: routes.patientPaymentGateways, icon: CreditCard, category: "Financial", description: "Configure direct patient payment integrations." },
   { code: "PAYMENTS", moduleCode: "billing", label: "Payments", path: routes.payments, icon: CreditCard, category: "Financial", description: "Cash, transfer, gateway and membership card payments." },
@@ -160,6 +178,7 @@ const allModules: AppModule[] = [
   { code: "SAAS_DASHBOARD", label: "Overview", path: routes.saasDashboard, icon: LayoutDashboard, category: "SaaS", description: "Global performance metrics and tenant analytics." },
   { code: "TENANTS", label: "Tenants", path: routes.tenants, icon: Globe, category: "SaaS", description: "SaaS Tenant management." },
   { code: "SUBSCRIPTION_PLANS", label: "Subscription Plans", path: routes.subscriptionPlans, icon: Layers, category: "SaaS", description: "Create, price and manage subscription plan tiers." },
+  { code: "PLAN_CAMPAIGNS", label: "Plan Campaigns", path: routes.planCampaigns, icon: Gift, category: "SaaS", description: "Temporarily move tenants to a higher plan (promotional open window)." },
   { code: "TENANT_DOMAINS", label: "Custom Domains", path: routes.tenantDomains, icon: Globe, category: "SaaS", description: "Manage white-label domains and SSL." },
   { code: "SAAS_BILLING", label: "Subscription", path: routes.saasInvoices, icon: CreditCard, category: "SaaS", description: "Manage platform subscription and invoices." },
   { code: "PAYMENT_CONFIRMATIONS", label: "Payment Confirmations", path: routes.saasPaymentConfirmations, icon: Banknote, category: "SaaS", description: "Confirm manual tenant subscription payments." },
@@ -367,6 +386,7 @@ export const navGroups: NavGroup[] = [
  */
 export const PATH_MODULE_MAP: Array<{ prefix: string; module: string }> = [
   { prefix: "/laboratory", module: "laboratory" },
+  { prefix: "/mortuary", module: "mortuary" },
   { prefix: "/radiology", module: "radiology" },
   { prefix: "/pharmacy", module: "pharmacy" },
   { prefix: "/drugs", module: "pharmacy" },

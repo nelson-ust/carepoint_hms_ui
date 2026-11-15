@@ -1,93 +1,93 @@
-import { PageHeader } from "@/components/layout/PageHeader";
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
-  AlertCircle,
-  ArrowLeft,
   ArrowRight,
-  Building2,
-  Calendar,
-  CheckCircle2,
-  ChevronRight,
   ChevronsRight,
-  Clock,
+  ClipboardList,
   Edit3,
-  FileText,
-  Flame,
+  ExternalLink,
   Heart,
   History,
+  ListOrdered,
   LogOut,
-  MapPin,
   Plus,
-  RefreshCw,
+  Printer,
+  RotateCcw,
   Save,
-  SkipForward,
-  Stethoscope,
   Scissors,
-  Thermometer,
+  SkipForward,
+  Skull,
+  Stethoscope,
+  Ticket,
   Trash2,
-  Wind,
-  X,
+  UserRound,
+  Zap,
 } from "lucide-react";
+import {
+  DxBadge,
+  DxButton,
+  DxCheckbox,
+  DxConfirm,
+  DxForm,
+  DxGrid,
+  DxInput,
+  DxMessage,
+  DxPage,
+  DxPageHeader,
+  DxPageLoading,
+  DxPanel,
+  DxPopup,
+  DxProps,
+  DxSelect,
+  DxStatusBadge,
+  DxStatusBar,
+  DxStatusItem,
+  DxTabs,
+  DxTextarea,
+  apiErrorMessage,
+  formatDateTime,
+  humanize,
+  type DxGridColumn,
+} from "@/components/dx";
+import { useToast } from "@/components/feedback/ToastProvider";
 import { routes } from "@/config/routes";
-import {
-  advanceVisit,
-  deleteVisit,
-  getVisitDetails,
-  getServiceDeliveryPoints,
-  updateVisit,
-} from "../api/visits.api";
-import type { ServiceDeliveryPoint, Visit } from "../api/visits.api";
-import { VisitActivityTimeline } from "../components/VisitActivityTimeline";
-import {
-  getVitalSignsForVisit,
-  recordVitalSign,
-} from "@/features/vital-signs/api/vital-signs.api";
-import type { VitalSign } from "@/features/vital-signs/api/vital-signs.api";
-import { DiagnosesPanel } from "@/features/diagnoses/components/DiagnosesPanel";
+import { mortuaryApi } from "@/features/mortuary/api/mortuary.api";
 import { VisitBillingPanel } from "@/features/billing/components/VisitBillingPanel";
+import { DiagnosesPanel } from "@/features/diagnoses/components/DiagnosesPanel";
 import { BookCaseModal } from "@/features/surgery/components/BookCaseModal";
+import { getVitalSignsForVisit, recordVitalSign } from "@/features/vital-signs/api/vital-signs.api";
+import type { VitalSign } from "@/features/vital-signs/api/vital-signs.api";
+import { advanceVisit, deleteVisit, getServiceDeliveryPoints, getVisitDetails, updateVisit } from "../api/visits.api";
+import type { QueueTicket, Visit } from "../api/visits.api";
+import type { VisitStep } from "../api/visit-flows.api";
+import { VisitActivityTimeline } from "../components/VisitActivityTimeline";
+import { VisitBanner } from "../components/VisitBanner";
+import { nextPathwayStep, patientDisplayName, sdpTypeLabel, visitPriorityTone, workstationPathFor } from "../lib/clinic-flow";
+import {
+  VISIT_PRIORITY_OPTIONS,
+  VISIT_STATUS_OPTIONS,
+  currentFlowStep,
+  isVisitOpen,
+  sortedFlowSteps,
+  toNumberOrUndefined,
+} from "../lib/visit-options";
 
-const PRIORITY_OPTIONS = ["ROUTINE", "URGENT", "EMERGENCY"] as const;
-const STATUS_OPTIONS = [
-  "WAITING",
-  "IN_PROGRESS",
-  "ACTIVE",
-  "COMPLETED",
-  "CANCELLED",
-] as const;
+// ============================================================
+// Local form models
+// ============================================================
 
-const statusStyles: Record<string, string> = {
-  WAITING: "bg-amber-50 text-amber-600 border-amber-100",
-  IN_PROGRESS: "bg-primary-50 text-primary-600 border-primary-100",
-  ACTIVE: "bg-primary-50 text-primary-600 border-primary-100",
-  COMPLETED: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  CANCELLED: "bg-rose-50 text-rose-600 border-rose-100",
-  PENDING: "bg-secondary-50 text-secondary-600 border-secondary-400",
-  SKIPPED: "bg-secondary-100 text-secondary-500 border-secondary-200",
-};
+type TabKey = "pathway" | "tickets" | "clinical" | "activity";
+type PendingAction = "advance" | "skip" | "end" | "delete" | null;
 
-const priorityStyles: Record<string, string> = {
-  ROUTINE: "bg-emerald-500 text-white",
-  URGENT: "bg-amber-500 text-white",
-  EMERGENCY: "bg-rose-500 text-white",
-};
-
-function formatDateTime(value?: string) {
-  if (!value) return "—";
-  try {
-    return new Date(value).toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return value;
-  }
+// Format a Date as a value for <input type="datetime-local"> in local time.
+function toLocalInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+type EditForm = { visit_reason: string; priority: string; status: string; referred_from: string };
 
 type VitalsForm = {
   temperature_celsius: string;
@@ -101,7 +101,7 @@ type VitalsForm = {
   pain_score: string;
 };
 
-const emptyVitalsForm: VitalsForm = {
+const EMPTY_VITALS: VitalsForm = {
   temperature_celsius: "",
   pulse_rate: "",
   respiratory_rate: "",
@@ -113,132 +113,148 @@ const emptyVitalsForm: VitalsForm = {
   pain_score: "",
 };
 
-function toNumberOrUndefined(value: string): number | undefined {
-  if (value === "" || value === null || value === undefined) return undefined;
-  const parsed = Number(value);
-  return Number.isNaN(parsed) ? undefined : parsed;
-}
+const VITAL_FIELDS: { key: keyof VitalsForm; label: string; unit: string; placeholder: string; step: string }[] = [
+  { key: "temperature_celsius", label: "Temperature", unit: "°C", placeholder: "36.6", step: "0.1" },
+  { key: "pulse_rate", label: "Pulse", unit: "bpm", placeholder: "72", step: "1" },
+  { key: "respiratory_rate", label: "Respiratory rate", unit: "cpm", placeholder: "16", step: "1" },
+  { key: "oxygen_saturation", label: "SpO₂", unit: "%", placeholder: "98", step: "1" },
+  { key: "systolic_bp", label: "Systolic BP", unit: "mmHg", placeholder: "120", step: "1" },
+  { key: "diastolic_bp", label: "Diastolic BP", unit: "mmHg", placeholder: "80", step: "1" },
+  { key: "weight_kg", label: "Weight", unit: "kg", placeholder: "70", step: "0.1" },
+  { key: "height_cm", label: "Height", unit: "cm", placeholder: "170", step: "0.1" },
+  { key: "pain_score", label: "Pain score", unit: "/10", placeholder: "0", step: "1" },
+];
 
+const bp = (v: VitalSign) => (v.systolic_bp != null && v.diastolic_bp != null ? `${v.systolic_bp}/${v.diastolic_bp}` : "—");
+const show = (v: number | string | null | undefined, unit = "") => (v == null || v === "" ? "—" : `${v}${unit}`);
+
+// ============================================================
+// Page
+// ============================================================
+
+/**
+ * Visit record — the full encounter: pathway steps, queue tickets, vitals,
+ * diagnoses, charges and the audited activity stream, plus the lifecycle
+ * commands (advance, skip, re-route, end, edit, delete).
+ */
 export function VisitDetailPage() {
   const { visitId } = useParams<{ visitId: string }>();
+  const id = Number(visitId);
   const navigate = useNavigate();
-  const visitIdNum = Number(visitId);
+  const toast = useToast();
+  const qc = useQueryClient();
 
-  const [visit, setVisit] = useState<Visit | null>(null);
-  const [vitals, setVitals] = useState<VitalSign[]>([]);
-  const [sdps, setSdps] = useState<ServiceDeliveryPoint[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+  const [tab, setTab] = useState<TabKey>("pathway");
+  const [pending, setPending] = useState<PendingAction>(null);
   const [isEditOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState<{
-    visit_reason: string;
-    priority: string;
-    status: string;
-    referred_from: string;
-  }>({ visit_reason: "", priority: "", status: "", referred_from: "" });
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
+  const [editForm, setEditForm] = useState<EditForm>({ visit_reason: "", priority: "", status: "", referred_from: "" });
   const [isVitalsOpen, setVitalsOpen] = useState(false);
-  const [vitalsForm, setVitalsForm] = useState<VitalsForm>(emptyVitalsForm);
-  const [isSavingVitals, setSavingVitals] = useState(false);
-  const [vitalsError, setVitalsError] = useState<string | null>(null);
-
-  const [isCheckingOut, setCheckingOut] = useState(false);
-  const [isDeleting, setDeleting] = useState(false);
-  const [isAdvancing, setAdvancing] = useState<"complete" | "skip" | null>(null);
+  const [vitalsForm, setVitalsForm] = useState<VitalsForm>(EMPTY_VITALS);
   const [isBookSurgeryOpen, setBookSurgeryOpen] = useState(false);
+  const [isDeathOpen, setDeathOpen] = useState(false);
+  const [deathForm, setDeathForm] = useState({ date_of_death: "", cause_of_death: "", place_of_death: "Hospital", notes: "", deposit: false, mortuary_unit_id: "" });
 
-  const loadAll = async () => {
-    if (!visitId || Number.isNaN(visitIdNum)) {
-      setError("Invalid visit identifier.");
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      const [visitData, vitalsData, sdpData] = await Promise.all([
-        getVisitDetails(visitIdNum),
-        getVitalSignsForVisit(visitIdNum).catch(() => null),
-        getServiceDeliveryPoints().catch(() => []),
-      ]);
-      setVisit(visitData);
-      setVitals(vitalsData?.items ?? []);
-      setSdps(Array.isArray(sdpData) ? sdpData : []);
-    } catch (err) {
-      console.error("Failed to load visit", err);
-      setError(
-        "Unable to load this visit. The record may have been removed or the registry is offline.",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // ---------- Queries ----------
+  const visitQuery = useQuery({
+    queryKey: ["visits", "detail", id],
+    queryFn: () => getVisitDetails(id),
+    enabled: Number.isFinite(id),
+  });
+  const vitalsQuery = useQuery({
+    queryKey: ["vital-signs", "visit", id, "registry"],
+    queryFn: () => getVitalSignsForVisit(id),
+    enabled: Number.isFinite(id),
+  });
+  const sdpQuery = useQuery({
+    queryKey: ["service-delivery-points", "active"],
+    queryFn: () => getServiceDeliveryPoints({ limit: 200 }),
+    enabled: Number.isFinite(id),
+    staleTime: 5 * 60_000,
+  });
 
-  useEffect(() => {
-    loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visitId]);
+  const visit = visitQuery.data ?? null;
+  const steps = useMemo(() => sortedFlowSteps(visit), [visit]);
+  const currentStep = currentFlowStep(visit);
+  const nextStep = nextPathwayStep(visit);
+  const tickets: QueueTicket[] = visit?.queue_tickets ?? [];
+  const sdpName = (sdpId: number) => sdpQuery.data?.find((s) => s.id === sdpId)?.name ?? `SDP #${sdpId}`;
 
-  const sortedFlowSteps = useMemo(
+  const vitals = useMemo(
     () =>
-      visit?.flow_steps
-        ? [...visit.flow_steps].sort((a, b) => a.step_order - b.step_order)
-        : [],
-    [visit?.flow_steps],
-  );
-
-  const sortedVitals = useMemo(
-    () =>
-      [...vitals].sort(
+      [...(vitalsQuery.data?.items ?? [])].sort(
         (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime(),
       ),
-    [vitals],
+    [vitalsQuery.data],
   );
+  const latestVital = vitals[0];
 
-  const latestVital = sortedVitals[0];
-
-  const openEdit = () => {
-    if (!visit) return;
-    setEditForm({
-      visit_reason: visit.visit_reason ?? "",
-      priority: visit.priority ?? "ROUTINE",
-      status: visit.status ?? "ACTIVE",
-      referred_from: visit.referred_from ?? "",
-    });
-    setSaveError(null);
-    setEditOpen(true);
+  // ---------- Mutations ----------
+  const refreshVisit = () => {
+    qc.invalidateQueries({ queryKey: ["visits"] });
+    qc.invalidateQueries({ queryKey: ["queue"] });
   };
 
-  const handleSaveEdit = async () => {
-    if (!visit) return;
-    setIsSaving(true);
-    setSaveError(null);
-    try {
-      const updated = await updateVisit(visit.id, {
+  const updateMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof updateVisit>[1]) => updateVisit(id, payload),
+    onSuccess: (updated) => {
+      qc.setQueryData<Visit>(["visits", "detail", id], (prev) => (prev ? { ...prev, ...updated } : updated));
+      refreshVisit();
+    },
+  });
+
+  const saveEdit = () =>
+    updateMutation.mutate(
+      {
         visit_reason: editForm.visit_reason || undefined,
         priority: editForm.priority || undefined,
         status: editForm.status || undefined,
         referred_from: editForm.referred_from || undefined,
-      });
-      setVisit((prev) => (prev ? { ...prev, ...updated } : updated));
-      setEditOpen(false);
-    } catch (err: any) {
-      setSaveError(err?.response?.data?.message || "Failed to update visit metadata.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
+      },
+      {
+        onSuccess: () => {
+          setEditOpen(false);
+          toast.success("Visit updated", "Encounter details saved.");
+        },
+        onError: (err) => toast.error("Could not update visit", apiErrorMessage(err)),
+      },
+    );
 
-  const handleSaveVitals = async () => {
-    if (!visit) return;
-    setSavingVitals(true);
-    setVitalsError(null);
-    try {
-      const payload = {
-        visit_id: visit.id,
+  const endVisit = () =>
+    updateMutation.mutateAsync(
+      { status: "COMPLETED", check_out_time: new Date().toISOString() },
+      {
+        onSuccess: () => toast.success("Visit ended", `${patientDisplayName(visit?.patient)} has been checked out.`),
+        onError: (err) => toast.error("Could not end the visit", apiErrorMessage(err)),
+      },
+    );
+
+  const advanceMutation = useMutation({
+    mutationFn: (action: "complete" | "skip") => advanceVisit(id, { action }),
+    onSuccess: (res, action) => {
+      refreshVisit();
+      const dest = res.visit?.current_service_delivery_point?.name;
+      toast.success(
+        action === "skip" ? "Stage skipped" : "Stage completed",
+        res.message || (dest ? `Patient moved to ${dest}.` : "The visit has moved to its next step."),
+      );
+    },
+    onError: (err) => toast.error("Could not advance the visit", apiErrorMessage(err)),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteVisit(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["visits"] });
+      toast.success("Visit deleted", "The record was removed from the registry.");
+      navigate(routes.visits);
+    },
+    onError: (err) => toast.error("Could not delete this visit", apiErrorMessage(err)),
+  });
+
+  const vitalsMutation = useMutation({
+    mutationFn: () =>
+      recordVitalSign({
+        visit_id: id,
         temperature_celsius: toNumberOrUndefined(vitalsForm.temperature_celsius),
         pulse_rate: toNumberOrUndefined(vitalsForm.pulse_rate),
         respiratory_rate: toNumberOrUndefined(vitalsForm.respiratory_rate),
@@ -248,1001 +264,597 @@ export function VisitDetailPage() {
         weight_kg: toNumberOrUndefined(vitalsForm.weight_kg),
         height_cm: toNumberOrUndefined(vitalsForm.height_cm),
         pain_score: toNumberOrUndefined(vitalsForm.pain_score),
-      };
-      const result = await recordVitalSign(payload);
-      if (result?.vital_sign) {
-        setVitals((prev) => [result.vital_sign, ...prev]);
-      } else {
-        const refreshed = await getVitalSignsForVisit(visit.id);
-        setVitals(refreshed.items ?? []);
-      }
-      setVitalsForm(emptyVitalsForm);
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vital-signs", "visit", id] });
+      setVitalsForm(EMPTY_VITALS);
       setVitalsOpen(false);
-    } catch (err: any) {
-      setVitalsError(err?.response?.data?.message || "Failed to record vital signs.");
-    } finally {
-      setSavingVitals(false);
-    }
-  };
+      toast.success("Vital signs recorded");
+    },
+    onError: (err) => toast.error("Could not record vital signs", apiErrorMessage(err)),
+  });
 
-  const handleCheckOut = async () => {
+  // ---------- Handlers ----------
+  const openEdit = () => {
     if (!visit) return;
-    if (!confirm("Mark this visit as completed and check the patient out?")) return;
-    setCheckingOut(true);
-    try {
-      const updated = await updateVisit(visit.id, {
-        status: "COMPLETED",
-        check_out_time: new Date().toISOString(),
-      });
-      setVisit((prev) => (prev ? { ...prev, ...updated } : updated));
-    } catch (err: any) {
-      alert(err?.response?.data?.message || "Unable to check the patient out.");
-    } finally {
-      setCheckingOut(false);
-    }
+    setEditForm({
+      visit_reason: visit.visit_reason ?? "",
+      priority: visit.priority ?? "ROUTINE",
+      status: visit.status ?? "ACTIVE",
+      referred_from: visit.referred_from ?? "",
+    });
+    setEditOpen(true);
+  };
+  const setEdit = (key: keyof EditForm) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setEditForm((f) => ({ ...f, [key]: e.target.value }));
+  const setVital = (key: keyof VitalsForm) => (e: ChangeEvent<HTMLInputElement>) =>
+    setVitalsForm((f) => ({ ...f, [key]: e.target.value }));
+  const hasVitalValue = Object.values(vitalsForm).some((v) => v.trim() !== "");
+
+  const refetchAll = () => {
+    visitQuery.refetch();
+    vitalsQuery.refetch();
+    qc.invalidateQueries({ queryKey: ["visits", id, "timeline"] });
   };
 
-  const handleAdvance = async (action: "complete" | "skip") => {
-    if (!visit) return;
-    const verb = action === "skip" ? "skip this stage" : "complete this stage";
-    if (!confirm(`Are you sure you want to ${verb} and move the patient to the next stage?`))
-      return;
-    setAdvancing(action);
-    try {
-      const result = await advanceVisit(visit.id, { action });
-      // Refresh the full lifecycle so the timeline, current stage and queue reflect the move.
-      await loadAll();
-      if (result?.message) {
-        // Lightweight confirmation; the timeline update is the primary feedback.
-        console.info(result.message);
-      }
-    } catch (err: any) {
-      alert(err?.response?.data?.message || "Unable to advance the patient to the next stage.");
-    } finally {
-      setAdvancing(null);
-    }
-  };
+  // ---------- Grid columns ----------
+  const stepColumns: DxGridColumn<VisitStep>[] = [
+    { key: "step_order", header: "#", width: 48, align: "center", sortable: true, render: (s) => <span className="dx-mono">{s.step_order}</span> },
+    {
+      key: "service_point",
+      header: "Service point",
+      minWidth: 180,
+      sortable: true,
+      accessor: (s) => s.service_delivery_point?.name ?? "",
+      render: (s) => (
+        <span className="flex min-w-0 flex-col leading-tight">
+          <span className="truncate font-medium">{s.service_delivery_point?.name ?? `SDP #${s.service_delivery_point_id}`}</span>
+          <span className="dx-faint text-[11px]">{sdpTypeLabel(s.service_delivery_point?.service_point_type)}</span>
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      width: 190,
+      render: (s) => (
+        <span className="inline-flex flex-wrap items-center gap-1">
+          <DxStatusBadge status={s.is_skipped ? "SKIPPED" : s.status || "PENDING"} />
+          {s.id === currentStep?.id ? <DxBadge tone="accent">Current</DxBadge> : null}
+          {!s.is_required ? <DxBadge tone="outline">Optional</DxBadge> : null}
+        </span>
+      ),
+    },
+    { key: "started_at", header: "Started", width: 150, sortable: true, render: (s) => <span className="dx-mono">{formatDateTime(s.started_at)}</span> },
+    { key: "completed_at", header: "Completed", width: 150, sortable: true, render: (s) => <span className="dx-mono">{formatDateTime(s.completed_at)}</span> },
+    { key: "notes", header: "Notes", minWidth: 160, wrap: true, render: (s) => s.notes || <span className="dx-faint">—</span> },
+  ];
 
-  const handleDelete = async () => {
-    if (!visit) return;
-    if (!confirm("Delete this visit record? This cannot be undone.")) return;
-    setDeleting(true);
-    try {
-      await deleteVisit(visit.id);
-      navigate(routes.visits);
-    } catch (err: any) {
-      alert(err?.response?.data?.message || "Unable to delete this visit.");
-      setDeleting(false);
-    }
-  };
+  const ticketColumns: DxGridColumn<QueueTicket>[] = [
+    { key: "queue_number", header: "Ticket", width: 110, sortable: true, render: (t) => <span className="dx-mono dx-strong">{t.queue_number}</span> },
+    { key: "service_point", header: "Service point", minWidth: 170, sortable: true, accessor: (t) => sdpName(t.service_delivery_point_id), render: (t) => sdpName(t.service_delivery_point_id) },
+    { key: "queue_position", header: "Position", width: 90, align: "center", sortable: true, render: (t) => t.queue_position ?? "—" },
+    { key: "status", header: "Status", width: 120, sortable: true, render: (t) => <DxStatusBadge status={t.status || "WAITING"} /> },
+    { key: "created_at", header: "Issued", width: 150, sortable: true, render: (t) => <span className="dx-mono">{formatDateTime(t.created_at)}</span> },
+    { key: "called_at", header: "Called", width: 150, sortable: true, render: (t) => <span className="dx-mono">{formatDateTime(t.called_at)}</span> },
+    { key: "service_started_at", header: "Service started", width: 150, sortable: true, render: (t) => <span className="dx-mono">{formatDateTime(t.service_started_at)}</span> },
+    { key: "service_ended_at", header: "Service ended", width: 150, sortable: true, render: (t) => <span className="dx-mono">{formatDateTime(t.service_ended_at)}</span> },
+  ];
 
-  if (isLoading) {
+  const vitalsColumns: DxGridColumn<VitalSign>[] = [
+    { key: "recorded_at", header: "Recorded", width: 150, sortable: true, render: (r) => <span className="dx-mono">{formatDateTime(r.recorded_at)}</span> },
+    { key: "temperature_celsius", header: "Temp", align: "center", render: (r) => show(r.temperature_celsius, "°") },
+    { key: "pulse_rate", header: "Pulse", align: "center", render: (r) => show(r.pulse_rate) },
+    { key: "respiratory_rate", header: "RR", align: "center", render: (r) => show(r.respiratory_rate) },
+    { key: "bp", header: "BP", align: "center", render: (r) => <span className="dx-mono">{bp(r)}</span> },
+    { key: "oxygen_saturation", header: "SpO₂", align: "center", render: (r) => show(r.oxygen_saturation, "%") },
+    { key: "weight_kg", header: "Weight", align: "center", render: (r) => show(r.weight_kg, " kg") },
+    { key: "bmi", header: "BMI", align: "center", render: (r) => (r.bmi != null ? Number(r.bmi).toFixed(1) : "—") },
+    { key: "pain_score", header: "Pain", align: "center", render: (r) => show(r.pain_score) },
+  ];
+
+  // ---------- Render guards ----------
+  if (!Number.isFinite(id)) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
-        <div className="h-16 w-16 border-4 border-primary-500 border-t-transparent rounded animate-spin shadow-2xl shadow-primary-500/20" />
-        <p className="text-sm font-black text-secondary-400 uppercase tracking-[0.3em] animate-pulse">
-          Loading Visit Lifecycle...
-        </p>
-      </div>
+      <DxPage>
+        <DxMessage tone="danger" title="Invalid visit">
+          The visit record needs a valid identifier. Open a visit from the registry.
+        </DxMessage>
+      </DxPage>
+    );
+  }
+  if (visitQuery.isLoading) return <DxPageLoading label="Loading visit record…" />;
+  if (visitQuery.isError || !visit) {
+    return (
+      <DxPage>
+        <DxPageHeader crumbs={[{ label: "Visits", to: routes.visits }, { label: `#${id}` }]} title="Visit not found" />
+        <DxMessage
+          tone="danger"
+          title="Could not load this visit"
+          action={
+            <span className="flex gap-2">
+              <DxButton size="sm" onClick={() => visitQuery.refetch()} leftIcon={<RotateCcw />}>
+                Retry
+              </DxButton>
+              <DxButton size="sm" onClick={() => navigate(routes.visits)}>
+                Back to registry
+              </DxButton>
+            </span>
+          }
+        >
+          {apiErrorMessage(visitQuery.error, "The record may have been removed or the registry is offline.")}
+        </DxMessage>
+      </DxPage>
     );
   }
 
-  if (error || !visit) {
-    return (
-      <div className="max-w-2xl mx-auto py-20 text-center space-y-8 animate-fade-in">
-        <div className="h-24 w-24 bg-rose-50 rounded flex items-center justify-center mx-auto shadow-inner">
-          <AlertCircle className="h-12 w-12 text-rose-500" />
-        </div>
-        <div>
-          <h3 className="text-3xl font-black text-secondary-900 tracking-tight">Visit Not Resolved</h3>
-          <p className="text-secondary-500 mt-4 leading-relaxed max-w-md mx-auto">
-            {error ?? "We couldn't locate this visit in the registry."}
-          </p>
-        </div>
-        <button onClick={() => navigate(routes.visits)} className="btn-secondary px-8 py-4">
-          Return to Registry
-        </button>
-      </div>
-    );
-  }
-
-  const priorityKey = (visit.priority || "ROUTINE").toUpperCase();
-  const statusKey = (visit.status || "ACTIVE").toUpperCase();
+  const open = isVisitOpen(visit.status);
+  const completed = String(visit.status).toUpperCase() === "COMPLETED";
+  const deceased = String(visit.status).toUpperCase() === "DECEASED";
   const currentSdp = visit.current_service_delivery_point ?? visit.first_service_delivery_point;
+  const workstation = workstationPathFor(currentSdp?.service_point_type, visit.id);
+  const code = visit.visit_code || `#${visit.id}`;
+  const busy = advanceMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
-  return (
-    <div className="max-w-7xl mx-auto space-y-10 animate-fade-in pb-20">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-3">
-          <button
-            onClick={() => navigate(routes.visits)}
-            className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.25em] text-secondary-400 hover:text-secondary-700 transition-colors"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to Registry
-          </button>
-          <PageHeader
-            title={`Visit ${visit.visit_code || `#${visit.id}`}`}
-            description="Full clinical lifecycle: patient, pathway, queue tickets, and vital signs."
-          />
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={loadAll}
-            className="btn-secondary p-4 rounded bg-white/80 border-secondary-400"
-            title="Refresh"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
-          <button
-            onClick={openEdit}
-            className="btn-secondary gap-2 px-5 py-3 rounded bg-white/80 border-secondary-400"
-          >
-            <Edit3 className="h-4 w-4" />
-            <span className="text-sm font-bold">Edit</span>
-          </button>
-          <Link
-            to={`${routes.consultation}/${visit.id}`}
-            className="btn-primary gap-2 px-6 py-3 rounded bg-slate-900 hover:bg-black shadow-lg"
-          >
-            <Stethoscope className="h-4 w-4" />
-            <span className="text-sm font-bold">Open Consultation</span>
-          </Link>
-          <button
-            onClick={() => setBookSurgeryOpen(true)}
-            className="btn-primary gap-2 px-6 py-3 rounded bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-500/20"
-            title="Book a surgical case for this patient"
-          >
-            <Scissors className="h-4 w-4" />
-            <span className="text-sm font-bold">Book Surgery</span>
-          </button>
-          <BookCaseModal
-            isOpen={isBookSurgeryOpen}
-            onClose={() => setBookSurgeryOpen(false)}
-            presetPatient={{
-              id: visit.patient_id,
-              label: visit.patient
-                ? `${visit.patient.first_name} ${visit.patient.last_name} · ${visit.patient.hospital_number}`
-                : `Patient #${visit.patient_id}`,
-            }}
-            presetVisitId={visit.id}
-            onBooked={(c) => navigate(routes.surgeryCase.replace(":caseId", String(c.id)))}
-          />
-          {statusKey !== "COMPLETED" && statusKey !== "CANCELLED" && (
-            <>
-              <button
-                onClick={() => handleAdvance("complete")}
-                disabled={isAdvancing !== null}
-                className="btn-primary gap-2 px-6 py-3 rounded bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/20 disabled:opacity-50"
-                title="Complete the current stage and move the patient to the next stage"
-              >
-                <ChevronsRight className="h-4 w-4" />
-                <span className="text-sm font-bold">
-                  {isAdvancing === "complete" ? "Advancing..." : "Advance to Next Stage"}
-                </span>
-              </button>
-              <button
-                onClick={() => handleAdvance("skip")}
-                disabled={isAdvancing !== null}
-                className="btn-primary gap-2 px-4 py-3 rounded bg-white/80 border border-secondary-200 text-secondary-600 hover:bg-secondary-50 disabled:opacity-50"
-                title="Skip the current stage and move to the next"
-              >
-                <SkipForward className="h-4 w-4" />
-                <span className="text-sm font-bold">
-                  {isAdvancing === "skip" ? "Skipping..." : "Skip Stage"}
-                </span>
-              </button>
-            </>
-          )}
-          <Link
-            to={routes.visitReroute.replace(":visitId", String(visit.id))}
-            className="btn-primary gap-2 px-6 py-3 rounded bg-primary-600 hover:bg-primary-700 shadow-lg shadow-primary-500/20"
-          >
-            <ArrowRight className="h-4 w-4" />
-            <span className="text-sm font-bold">Reroute</span>
-          </Link>
-          {statusKey !== "COMPLETED" && (
-            <button
-              onClick={handleCheckOut}
-              disabled={isCheckingOut}
-              className="btn-primary gap-2 px-6 py-3 rounded bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="text-sm font-bold">
-                {isCheckingOut ? "Checking out..." : "Check Out"}
-              </span>
-            </button>
-          )}
-          <button
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="p-4 rounded bg-white/80 border border-rose-100 text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-50"
-            title="Delete visit"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+  const confirmCopy: Record<Exclude<PendingAction, null>, { title: string; description: ReactNode; label: string; tone: "danger" | "primary" }> = {
+    advance: {
+      title: "Advance to next step",
+      description: nextStep ? (
+        <>
+          Complete <b className="dx-strong">{currentStep?.service_delivery_point?.name ?? currentSdp?.name ?? "the current stage"}</b> and move{" "}
+          {patientDisplayName(visit.patient)} to <b className="dx-strong">{nextStep.service_delivery_point?.name ?? `step ${nextStep.step_order}`}</b>. A queue
+          ticket will be raised there.
+        </>
+      ) : steps.length ? (
+        <>This is the last step on the pathway. Completing it will end the visit.</>
+      ) : (
+        <>This visit has no pathway steps; the server will decide the next stop or refuse the move.</>
+      ),
+      label: nextStep ? `Move to ${nextStep.service_delivery_point?.name ?? "next step"}` : "Complete stage",
+      tone: "primary",
+    },
+    skip: {
+      title: "Skip current stage",
+      description: (
+        <>
+          Bypass <b className="dx-strong">{currentStep?.service_delivery_point?.name ?? currentSdp?.name ?? "the current stage"}</b> without completing it
+          {nextStep ? <> and move the patient to <b className="dx-strong">{nextStep.service_delivery_point?.name}</b></> : null}. The step is kept on the record as skipped.
+        </>
+      ),
+      label: "Skip stage",
+      tone: "primary",
+    },
+    end: {
+      title: "End visit",
+      description: (
+        <>
+          Mark visit <b className="dx-mono dx-strong">{code}</b> as completed and check {patientDisplayName(visit.patient)} out now. Open queue tickets stay on
+          the record; the encounter can no longer be advanced.
+        </>
+      ),
+      label: "End visit",
+      tone: "danger",
+    },
+    delete: {
+      title: "Delete visit",
+      description: (
+        <>
+          Permanently delete visit <b className="dx-mono dx-strong">{code}</b>. This cannot be undone and will be refused if clinical records depend on it.
+        </>
+      ),
+      label: "Delete visit",
+      tone: "danger",
+    },
+  };
 
-      <div className="grid gap-10 lg:grid-cols-12">
-        {/* LEFT: Patient + Visit Summary */}
-        <div className="lg:col-span-4 space-y-8">
-          <div className="glass-card rounded border border-secondary-400 shadow-premium bg-white/60 backdrop-blur-xl">
-            {/* <div className="flex items-center gap-4 mb-8">
-              <div className="h-12 w-12 rounded bg-slate-900 text-white flex items-center justify-center shadow-lg">
-                <User className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-black font-display tracking-tight">Patient</h3>
-                <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mt-0.5">
-                  Identity & Encounter Context
-                </p>
-              </div>
-            </div> */}
-
-            {visit.patient ? (
-              <div className="space-y-6">
-                <div className="relative p-7 rounded  text-white shadow-2xl overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                  <div className="flex flex-col items-center text-center space-y-5">
-                    <div className="h-20 w-20 rounded bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-2xl font-black shadow-2xl">
-                      {visit.patient.first_name?.[0]}
-                      {visit.patient.last_name?.[0]}
-                    </div>
-                    <div>
-                      <h4 className="text-xl font-black tracking-tight">
-                        {visit.patient.first_name} {visit.patient.last_name}
-                      </h4>
-                      <div className="inline-flex mt-2 px-3 py-1 bg-white/10 rounded-full text-[10px] font-mono font-bold tracking-widest uppercase">
-                        {visit.patient.hospital_number}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-7 space-y-3">
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded">
-                      <span className="text-[10px] font-bold uppercase tracking-widest">
-                        Gender
-                      </span>
-                      <span className="text-xs font-black uppercase">{visit.patient.gender}</span>
-                    </div>
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded">
-                      <span className="text-[10px] font-bold uppercase tracking-widest">
-                        Phone
-                      </span>
-                      <span className="text-xs font-black">{visit.patient.phone_number}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-secondary-400 text-sm font-bold">Patient #{visit.patient_id}</div>
-            )}
-          </div>
-
-          {/* Visit Summary */}
-          <div className="glass-card rounded p-10 border border-secondary-400 shadow-premium bg-white/60 backdrop-blur-xl space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded bg-primary-600 text-white flex items-center justify-center shadow-lg">
-                <Activity className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-black font-display tracking-tight">Encounter</h3>
-                <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mt-0.5">
-                  Live Lifecycle Snapshot
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded bg-secondary-50 border border-secondary-400">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                  Status
-                </span>
-                <span
-                  className={`px-3 py-1.5 rounded border text-[10px] font-bold uppercase tracking-widest ${statusStyles[statusKey] ?? statusStyles.PENDING
-                    }`}
-                >
-                  {statusKey}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-4 rounded bg-secondary-50 border border-secondary-400">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                  Priority
-                </span>
-                <span
-                  className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest ${priorityStyles[priorityKey] ?? priorityStyles.ROUTINE
-                    }`}
-                >
-                  {priorityKey}
-                </span>
-              </div>
-              <div className="p-4 rounded bg-secondary-50 border border-secondary-400 space-y-2">
-                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                  <Building2 className="h-3.5 w-3.5" />
-                  Current Service Point
-                </div>
-                {currentSdp ? (
-                  <div>
-                    <p className="text-sm font-black text-secondary-900">{currentSdp.name}</p>
-                    <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase mt-0.5">
-                      {currentSdp.code} · {currentSdp.service_point_type}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-secondary-400 font-bold">Unassigned</p>
-                )}
-              </div>
-              <div className="p-4 rounded bg-secondary-50 border border-secondary-400 space-y-2">
-                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                  <Calendar className="h-3.5 w-3.5" />
-                  Visit Date
-                </div>
-                <p className="text-sm font-black text-secondary-900">
-                  {formatDateTime(visit.visit_date)}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-4 rounded bg-secondary-50 border border-secondary-400 space-y-2">
-                  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                    <Clock className="h-3.5 w-3.5" /> Check-In
-                  </div>
-                  <p className="text-xs font-black text-secondary-900">
-                    {formatDateTime(visit.check_in_time)}
-                  </p>
-                </div>
-                <div className="p-4 rounded bg-secondary-50 border border-secondary-400 space-y-2">
-                  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                    <Clock className="h-3.5 w-3.5" /> Check-Out
-                  </div>
-                  <p className="text-xs font-black text-secondary-900">
-                    {formatDateTime(visit.check_out_time)}
-                  </p>
-                </div>
-              </div>
-              {visit.visit_reason && (
-                <div className="p-5 rounded bg-amber-50 border border-amber-100 space-y-2">
-                  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-amber-600">
-                    <FileText className="h-3.5 w-3.5" /> Clinical Indication
-                  </div>
-                  <p className="text-sm text-secondary-700 italic leading-relaxed">
-                    "{visit.visit_reason}"
-                  </p>
-                </div>
-              )}
-              {visit.referred_from && (
-                <div className="p-4 rounded bg-secondary-50 border border-secondary-400 flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                    Referred From
-                  </span>
-                  <span className="text-xs font-black text-secondary-900">
-                    {visit.referred_from}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT: Flow Timeline + Vitals + Tickets */}
-        <div className="lg:col-span-8 space-y-8">
-          {/* Unified activity timeline — every action in the encounter */}
-          {visit?.id ? <VisitActivityTimeline visitId={visit.id} /> : null}
-
-          {/* Flow Steps */}
-          <div className="glass-card rounded p-10 md:p-12 border border-secondary-400 bg-white/80 shadow-premium">
-            <div className="flex items-center justify-between border-b border-secondary-400 pb-8 mb-10">
-              <div className="flex items-center gap-5">
-                <div className="h-14 w-14 rounded bg-slate-900 text-white flex items-center justify-center shadow-2xl">
-                  <History className="h-7 w-7" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black font-display tracking-tight">Care Pathway</h3>
-                  <p className="text-secondary-400 font-bold text-[11px] uppercase tracking-[0.3em] mt-1">
-                    Sequential Service Checkpoints
-                  </p>
-                </div>
-              </div>
-              <span className="px-4 py-2 rounded bg-secondary-100 text-secondary-600 text-[10px] font-bold uppercase tracking-widest">
-                {sortedFlowSteps.length} {sortedFlowSteps.length === 1 ? "Step" : "Steps"}
-              </span>
-            </div>
-
-            {sortedFlowSteps.length === 0 ? (
-              <div className="py-16 text-center space-y-3">
-                <div className="h-16 w-16 mx-auto bg-secondary-50 rounded flex items-center justify-center">
-                  <ChevronRight className="h-8 w-8 text-secondary-300" />
-                </div>
-                <p className="text-secondary-500 font-bold">
-                  No flow steps recorded for this visit yet.
-                </p>
-              </div>
-            ) : (
-              <div className="relative">
-                <div className="absolute left-[39px] top-10 bottom-10 w-0.5 bg-gradient-to-b from-primary-500/20 via-primary-500 to-primary-500/20" />
-                <div className="space-y-8">
-                  {sortedFlowSteps.map((step) => {
-                    const stepStatus = (step.status || "PENDING").toUpperCase();
-                    const stepClass = statusStyles[stepStatus] ?? statusStyles.PENDING;
-                    const isCompleted = stepStatus === "COMPLETED" || step.completed_at;
-                    const ringColor = step.is_current
-                      ? "bg-primary-600 text-white ring-4 ring-primary-100"
-                      : isCompleted
-                        ? "bg-emerald-500 text-white"
-                        : "bg-secondary-100 text-secondary-500";
-                    return (
-                      <div key={step.id} className="flex items-start gap-8 relative">
-                        <div
-                          className={`h-20 w-20 rounded flex items-center justify-center shadow-lg z-10 shrink-0 ${ringColor}`}
-                        >
-                          {isCompleted ? (
-                            <CheckCircle2 className="h-7 w-7" />
-                          ) : step.is_current ? (
-                            <Activity className="h-7 w-7" />
-                          ) : (
-                            <Clock className="h-7 w-7" />
-                          )}
-                        </div>
-                        <div className="flex-1 p-6 rounded bg-secondary-50 border border-secondary-400">
-                          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                            <div>
-                              <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400 mb-1">
-                                Step {step.step_order}
-                              </p>
-                              <h5 className="text-base font-black text-secondary-900">
-                                {step.service_delivery_point?.name ??
-                                  `SDP #${step.service_delivery_point_id}`}
-                              </h5>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className={`px-3 py-1.5 rounded border text-[10px] font-bold uppercase tracking-widest ${stepClass}`}
-                              >
-                                {stepStatus}
-                              </span>
-                              {step.is_required && (
-                                <span className="px-3 py-1.5 rounded bg-rose-50 text-rose-600 border border-rose-100 text-[10px] font-bold uppercase tracking-widest">
-                                  Required
-                                </span>
-                              )}
-                              {step.is_skipped && (
-                                <span className="px-3 py-1.5 rounded bg-secondary-100 text-secondary-500 text-[10px] font-bold uppercase tracking-widest">
-                                  Skipped
-                                </span>
-                              )}
-                              {step.is_current && (
-                                <span className="px-3 py-1.5 rounded bg-primary-50 text-primary-600 border border-primary-100 text-[10px] font-bold uppercase tracking-widest">
-                                  Current
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3 text-[11px] font-bold text-secondary-500 mt-4">
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-3.5 w-3.5" />
-                              <span>Started: {formatDateTime(step.started_at)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              <span>Completed: {formatDateTime(step.completed_at)}</span>
-                            </div>
-                          </div>
-                          {step.notes && (
-                            <p className="mt-4 text-xs text-secondary-600 italic bg-white rounded p-4 border border-secondary-400">
-                              {step.notes}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Vital Signs */}
-          <div className="glass-card rounded p-10 md:p-12 border border-secondary-400 bg-white/80 shadow-premium">
-            <div className="flex items-center justify-between border-b border-secondary-400 pb-8 mb-10">
-              <div className="flex items-center gap-5">
-                <div className="h-14 w-14 rounded bg-rose-500 text-white flex items-center justify-center shadow-2xl">
-                  <Heart className="h-7 w-7" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black font-display tracking-tight">Vital Signs</h3>
-                  <p className="text-secondary-400 font-bold text-[11px] uppercase tracking-[0.3em] mt-1">
-                    Physiological Trend & Latest Read
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setVitalsForm(emptyVitalsForm);
-                  setVitalsError(null);
-                  setVitalsOpen(true);
-                }}
-                className="btn-primary gap-2 px-5 py-3 rounded bg-slate-900 hover:bg-black shadow-lg"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="text-sm font-bold">Record Vitals</span>
-              </button>
-            </div>
-
-            {latestVital ? (
-              <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 mb-10">
-                <VitalCard
-                  icon={Thermometer}
-                  label="Temperature"
-                  value={latestVital.temperature_celsius}
-                  unit="°C"
-                  tone="rose"
-                />
-                <VitalCard
-                  icon={Activity}
-                  label="Pulse"
-                  value={latestVital.pulse_rate}
-                  unit="bpm"
-                  tone="primary"
-                />
-                <VitalCard
-                  icon={Wind}
-                  label="Resp. Rate"
-                  value={latestVital.respiratory_rate}
-                  unit="rpm"
-                  tone="emerald"
-                />
-                <VitalCard
-                  icon={Stethoscope}
-                  label="BP"
-                  value={
-                    latestVital.systolic_bp != null && latestVital.diastolic_bp != null
-                      ? `${latestVital.systolic_bp}/${latestVital.diastolic_bp}`
-                      : null
-                  }
-                  unit="mmHg"
-                  tone="amber"
-                />
-                <VitalCard
-                  icon={Wind}
-                  label="SpO₂"
-                  value={latestVital.oxygen_saturation}
-                  unit="%"
-                  tone="primary"
-                />
-                <VitalCard
-                  icon={Activity}
-                  label="Weight"
-                  value={latestVital.weight_kg}
-                  unit="kg"
-                  tone="emerald"
-                />
-                <VitalCard
-                  icon={Activity}
-                  label="Height"
-                  value={latestVital.height_cm}
-                  unit="cm"
-                  tone="emerald"
-                />
-                <VitalCard
-                  icon={Flame}
-                  label="Pain"
-                  value={latestVital.pain_score}
-                  unit="/10"
-                  tone="rose"
-                />
-              </div>
-            ) : (
-              <div className="py-12 text-center space-y-3 mb-6">
-                <div className="h-16 w-16 mx-auto bg-rose-50 rounded flex items-center justify-center">
-                  <Heart className="h-8 w-8 text-rose-300" />
-                </div>
-                <p className="text-secondary-500 font-bold">
-                  No vital signs recorded yet for this visit.
-                </p>
-              </div>
-            )}
-
-            {sortedVitals.length > 1 && (
-              <div className="space-y-4">
-                <h4 className="text-[11px] font-bold uppercase tracking-[0.25em] text-secondary-500">
-                  Historical Records ({sortedVitals.length})
-                </h4>
-                <div className="overflow-x-auto rounded border border-secondary-400">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="bg-secondary-50">
-                        <th className="px-4 py-3 font-bold uppercase tracking-widest text-secondary-500 text-[10px]">
-                          Recorded
-                        </th>
-                        <th className="px-4 py-3 font-bold uppercase tracking-widest text-secondary-500 text-[10px]">
-                          Temp
-                        </th>
-                        <th className="px-4 py-3 font-bold uppercase tracking-widest text-secondary-500 text-[10px]">
-                          Pulse
-                        </th>
-                        <th className="px-4 py-3 font-bold uppercase tracking-widest text-secondary-500 text-[10px]">
-                          BP
-                        </th>
-                        <th className="px-4 py-3 font-bold uppercase tracking-widest text-secondary-500 text-[10px]">
-                          SpO₂
-                        </th>
-                        <th className="px-4 py-3 font-bold uppercase tracking-widest text-secondary-500 text-[10px]">
-                          Pain
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-secondary-100/50">
-                      {sortedVitals.map((v) => (
-                        <tr key={v.id} className="hover:bg-secondary-50/50">
-                          <td className="px-4 py-3 font-mono text-[11px]">
-                            {formatDateTime(v.recorded_at)}
-                          </td>
-                          <td className="px-4 py-3">{v.temperature_celsius ?? "—"}</td>
-                          <td className="px-4 py-3">{v.pulse_rate ?? "—"}</td>
-                          <td className="px-4 py-3">
-                            {v.systolic_bp != null && v.diastolic_bp != null
-                              ? `${v.systolic_bp}/${v.diastolic_bp}`
-                              : "—"}
-                          </td>
-                          <td className="px-4 py-3">{v.oxygen_saturation ?? "—"}</td>
-                          <td className="px-4 py-3">{v.pain_score ?? "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Diagnoses (read-only here — full editing happens in ConsultationPage) */}
-          <DiagnosesPanel visitId={visit.id} disabled />
-
-          {/* Visit Billing — charges accrued, partial payments, outstanding balance */}
-          <VisitBillingPanel visitId={visit.id} />
-
-          {/* Queue Tickets */}
-          <div className="glass-card rounded p-10 md:p-12 border border-secondary-400 bg-white/80 shadow-premium">
-            <div className="flex items-center justify-between border-b border-secondary-400 pb-8 mb-10">
-              <div className="flex items-center gap-5">
-                <div className="h-14 w-14 rounded bg-amber-500 text-white flex items-center justify-center shadow-2xl">
-                  <MapPin className="h-7 w-7" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black font-display tracking-tight">Queue Tickets</h3>
-                  <p className="text-secondary-400 font-bold text-[11px] uppercase tracking-[0.3em] mt-1">
-                    Service Point Tickets Issued
-                  </p>
-                </div>
-              </div>
-              <span className="px-4 py-2 rounded bg-secondary-100 text-secondary-600 text-[10px] font-bold uppercase tracking-widest">
-                {visit.queue_tickets?.length ?? 0} Tickets
-              </span>
-            </div>
-
-            {!visit.queue_tickets || visit.queue_tickets.length === 0 ? (
-              <div className="py-12 text-center space-y-3">
-                <div className="h-16 w-16 mx-auto bg-amber-50 rounded flex items-center justify-center">
-                  <MapPin className="h-8 w-8 text-amber-300" />
-                </div>
-                <p className="text-secondary-500 font-bold">
-                  No queue tickets have been issued for this visit.
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {visit.queue_tickets.map((ticket) => {
-                  const sdp = sdps.find((s) => s.id === ticket.service_delivery_point_id);
-                  const tStatus = (ticket.status || "WAITING").toUpperCase();
-                  const tStatusClass = statusStyles[tStatus] ?? statusStyles.PENDING;
-                  return (
-                    <div
-                      key={ticket.id}
-                      className="p-6 rounded bg-secondary-50 border border-secondary-400 hover:border-primary-200 transition-all"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-[10px] font-mono font-bold text-secondary-400 uppercase tracking-tight">
-                          Ticket #{ticket.queue_number}
-                        </span>
-                        <span
-                          className={`px-3 py-1 rounded border text-[10px] font-bold uppercase tracking-widest ${tStatusClass}`}
-                        >
-                          {tStatus}
-                        </span>
-                      </div>
-                      <p className="text-sm font-black text-secondary-900">
-                        {sdp?.name ?? `SDP #${ticket.service_delivery_point_id}`}
-                      </p>
-                      <div className="flex items-center justify-between mt-3 text-[11px] font-bold text-secondary-500">
-                        <span>Position #{ticket.queue_position}</span>
-                        <span>{formatDateTime(ticket.created_at)}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Edit Modal */}
-      {isEditOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-          <div className="bg-white border border-white rounded p-10 max-w-xl w-full shadow-2xl relative animate-slide-up shadow-2xl">
-            <button
-              onClick={() => setEditOpen(false)}
-              className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded transition-all"
-            >
-              <X className="h-5 w-5 text-secondary-400" />
-            </button>
-            <div className="flex items-center gap-5 mb-8">
-              <div className="h-14 w-14 rounded bg-primary-600 text-white flex items-center justify-center shadow-xl shadow-primary-500/20">
-                <Edit3 className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-black font-display tracking-tight">Edit Visit</h3>
-                <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-                  Update Encounter Metadata
-                </p>
-              </div>
-            </div>
-
-            {saveError && (
-              <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded flex items-center gap-3">
-                <AlertCircle className="h-5 w-5" />
-                <span className="text-sm font-bold">{saveError}</span>
-              </div>
-            )}
-
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                  Status
-                </label>
-                <select
-                  value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-                >
-                  {STATUS_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                  Priority
-                </label>
-                <select
-                  value={editForm.priority}
-                  onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}
-                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-                >
-                  {PRIORITY_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                  Referred From
-                </label>
-                <input
-                  type="text"
-                  value={editForm.referred_from}
-                  onChange={(e) => setEditForm({ ...editForm, referred_from: e.target.value })}
-                  placeholder="Referring facility or department"
-                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                  Clinical Indication
-                </label>
-                <textarea
-                  value={editForm.visit_reason}
-                  onChange={(e) => setEditForm({ ...editForm, visit_reason: e.target.value })}
-                  className="input-field h-28 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-                  placeholder="Reason for this clinical encounter"
-                />
-              </div>
-
-              <div className="pt-4 flex gap-4">
-                <button
-                  onClick={() => setEditOpen(false)}
-                  className="flex-1 btn-secondary py-4 rounded font-bold"
-                  disabled={isSaving}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveEdit}
-                  disabled={isSaving}
-                  className="flex-[2] btn-primary py-4 rounded font-black tracking-tight shadow-xl shadow-primary-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
-                >
-                  <Save className="h-4 w-4" />
-                  {isSaving ? "Saving..." : "Save Changes"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Vitals Modal */}
-      {isVitalsOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-          <div className="bg-white rounded p-10 max-w-2xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setVitalsOpen(false)}
-              className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded transition-all"
-            >
-              <X className="h-5 w-5 text-secondary-400" />
-            </button>
-            <div className="flex items-center gap-5 mb-8">
-              <div className="h-14 w-14 rounded bg-rose-500 text-white flex items-center justify-center shadow-xl shadow-rose-500/20">
-                <Heart className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-black font-display tracking-tight">Record Vital Signs</h3>
-                <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-                  Capture Physiological Snapshot
-                </p>
-              </div>
-            </div>
-
-            {vitalsError && (
-              <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded flex items-center gap-3">
-                <AlertCircle className="h-5 w-5" />
-                <span className="text-sm font-bold">{vitalsError}</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <VitalsField
-                label="Temperature (°C)"
-                value={vitalsForm.temperature_celsius}
-                onChange={(v) => setVitalsForm({ ...vitalsForm, temperature_celsius: v })}
-                placeholder="36.6"
-              />
-              <VitalsField
-                label="Pulse (bpm)"
-                value={vitalsForm.pulse_rate}
-                onChange={(v) => setVitalsForm({ ...vitalsForm, pulse_rate: v })}
-                placeholder="72"
-              />
-              <VitalsField
-                label="Respiratory Rate (rpm)"
-                value={vitalsForm.respiratory_rate}
-                onChange={(v) => setVitalsForm({ ...vitalsForm, respiratory_rate: v })}
-                placeholder="16"
-              />
-              <VitalsField
-                label="O₂ Saturation (%)"
-                value={vitalsForm.oxygen_saturation}
-                onChange={(v) => setVitalsForm({ ...vitalsForm, oxygen_saturation: v })}
-                placeholder="98"
-              />
-              <VitalsField
-                label="Systolic BP (mmHg)"
-                value={vitalsForm.systolic_bp}
-                onChange={(v) => setVitalsForm({ ...vitalsForm, systolic_bp: v })}
-                placeholder="120"
-              />
-              <VitalsField
-                label="Diastolic BP (mmHg)"
-                value={vitalsForm.diastolic_bp}
-                onChange={(v) => setVitalsForm({ ...vitalsForm, diastolic_bp: v })}
-                placeholder="80"
-              />
-              <VitalsField
-                label="Weight (kg)"
-                value={vitalsForm.weight_kg}
-                onChange={(v) => setVitalsForm({ ...vitalsForm, weight_kg: v })}
-                placeholder="70"
-              />
-              <VitalsField
-                label="Height (cm)"
-                value={vitalsForm.height_cm}
-                onChange={(v) => setVitalsForm({ ...vitalsForm, height_cm: v })}
-                placeholder="170"
-              />
-              <VitalsField
-                label="Pain Score (0–10)"
-                value={vitalsForm.pain_score}
-                onChange={(v) => setVitalsForm({ ...vitalsForm, pain_score: v })}
-                placeholder="0"
-              />
-            </div>
-
-            <div className="pt-8 flex gap-4">
-              <button
-                onClick={() => setVitalsOpen(false)}
-                className="flex-1 btn-secondary py-4 rounded font-bold"
-                disabled={isSavingVitals}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveVitals}
-                disabled={isSavingVitals}
-                className="flex-[2] btn-primary py-4 rounded font-black tracking-tight bg-rose-500 hover:bg-rose-600 shadow-xl shadow-rose-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                <Save className="h-4 w-4" />
-                {isSavingVitals ? "Saving..." : "Record Vitals"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+  const mortuaryUnitsQuery = useQuery({
+    queryKey: ["mortuary", "units", "for-death"],
+    queryFn: () => mortuaryApi.listUnits({ limit: 200 }),
+    enabled: isDeathOpen,
+  });
+  const deathUnitOptions = useMemo(
+    () =>
+      (mortuaryUnitsQuery.data?.items ?? [])
+        .filter((u) => u.status !== "OUT_OF_SERVICE" && u.available_slots > 0)
+        .map((u) => ({ value: String(u.id), label: `${u.name} (${u.available_slots} free)` })),
+    [mortuaryUnitsQuery.data],
   );
-}
+  const recordDeathMutation = useMutation({
+    mutationFn: () =>
+      mortuaryApi.recordDeath({
+        patient_id: visit!.patient_id,
+        visit_id: visit!.id,
+        date_of_death: deathForm.date_of_death || new Date().toISOString(),
+        cause_of_death: deathForm.cause_of_death || undefined,
+        place_of_death: deathForm.place_of_death || undefined,
+        notes: deathForm.notes || undefined,
+        deposit_to_mortuary: deathForm.deposit,
+        mortuary_unit_id: deathForm.deposit && deathForm.mortuary_unit_id ? Number(deathForm.mortuary_unit_id) : undefined,
+      }),
+    onSuccess: (res) => {
+      toast.success("Death recorded", res.record ? "Body deposited to the mortuary." : "The visit has been closed as deceased.");
+      setDeathOpen(false);
+      setDeathForm({ date_of_death: "", cause_of_death: "", place_of_death: "Hospital", notes: "", deposit: false, mortuary_unit_id: "" });
+      qc.invalidateQueries({ queryKey: ["mortuary"] });
+      refreshVisit();
+      refetchAll();
+    },
+    onError: (err) => toast.error("Could not record death", apiErrorMessage(err)),
+  });
 
-// ----- Helper Components -----
+  const runPending = async () => {
+    if (pending === "advance") await advanceMutation.mutateAsync("complete").catch(() => undefined);
+    else if (pending === "skip") await advanceMutation.mutateAsync("skip").catch(() => undefined);
+    else if (pending === "end") await endVisit().catch(() => undefined);
+    else if (pending === "delete") await deleteMutation.mutateAsync().catch(() => undefined);
+  };
 
-type Tone = "primary" | "rose" | "emerald" | "amber";
+  const encounterItems = [
+    { label: "Status", value: <DxStatusBadge status={visit.status} /> },
+    { label: "Priority", value: <DxBadge tone={visitPriorityTone(visit.priority)}>{humanize(visit.priority || "ROUTINE")}</DxBadge> },
+    { label: "Visit date", value: formatDateTime(visit.visit_date) },
+    { label: "Check-in", value: formatDateTime(visit.check_in_time) },
+    { label: "Check-out", value: formatDateTime(visit.check_out_time) },
+    { label: "Current point", value: currentSdp ? `${currentSdp.name} (${currentSdp.code})` : "—" },
+    { label: "First point", value: visit.first_service_delivery_point?.name ?? "—" },
+    { label: "Reason", value: visit.visit_reason || "—" },
+    { label: "Referred from", value: visit.referred_from || "—" },
+    {
+      label: "Appointment",
+      value: visit.appointment ? (
+        <span className="flex flex-col leading-tight">
+          <span className="dx-mono">{visit.appointment.appointment_code}</span>
+          <span className="dx-faint text-[11px]">{formatDateTime(visit.appointment.scheduled_start_at)}</span>
+        </span>
+      ) : visit.appointment_id ? (
+        `#${visit.appointment_id}`
+      ) : (
+        "Walk-in"
+      ),
+    },
+    { label: "Last updated", value: formatDateTime(visit.updated_at) },
+  ];
 
-const toneStyles: Record<Tone, string> = {
-  primary: "bg-primary-50 text-primary-600 border-primary-100",
-  rose: "bg-rose-50 text-rose-600 border-rose-100",
-  emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  amber: "bg-amber-50 text-amber-600 border-amber-100",
-};
-
-type VitalCardProps = {
-  icon: typeof Heart;
-  label: string;
-  value: number | string | null | undefined;
-  unit: string;
-  tone: Tone;
-};
-
-function VitalCard({ icon: Icon, label, value, unit, tone }: VitalCardProps) {
-  const display = value === null || value === undefined || value === "" ? "—" : value;
   return (
-    <div className={`p-5 rounded border ${toneStyles[tone]}`}>
-      <div className="flex items-center gap-2 mb-3">
-        <Icon className="h-4 w-4" />
-        <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
-      </div>
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-2xl font-black tracking-tight">{display}</span>
-        {display !== "—" && (
-          <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">{unit}</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-type VitalsFieldProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-};
-
-function VitalsField({ label, value, onChange, placeholder }: VitalsFieldProps) {
-  return (
-    <div className="space-y-2">
-      <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-        {label}
-      </label>
-      <input
-        type="number"
-        step="any"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Visits", to: routes.visits }, { label: code }]}
+        title={`Visit ${code}`}
+        subtitle="Full clinical lifecycle: pathway, queue tickets, vitals, diagnoses, charges and activity."
+        actions={
+          <>
+            <DxButton icon title="Refresh" onClick={refetchAll} isLoading={visitQuery.isFetching}>
+              <RotateCcw />
+            </DxButton>
+            <DxButton leftIcon={<Printer />} onClick={() => window.print()}>
+              Print
+            </DxButton>
+            <DxButton leftIcon={<Edit3 />} onClick={openEdit} disabled={busy}>
+              Edit
+            </DxButton>
+            <DxButton leftIcon={<ArrowRight />} onClick={() => navigate(routes.visitReroute.replace(":visitId", String(visit.id)))} disabled={busy}>
+              Re-route
+            </DxButton>
+            {open ? (
+              <>
+                <DxButton leftIcon={<SkipForward />} onClick={() => setPending("skip")} disabled={busy} title="Skip the current stage and move to the next">
+                  Skip stage
+                </DxButton>
+                <DxButton
+                  variant="primary"
+                  leftIcon={<ChevronsRight />}
+                  onClick={() => setPending("advance")}
+                  isLoading={advanceMutation.isPending}
+                  disabled={busy}
+                  title="Complete the current stage and move the patient to the next step"
+                >
+                  Advance to next step
+                </DxButton>
+              </>
+            ) : null}
+            {open && !deceased ? (
+              <DxButton variant="outline-danger" leftIcon={<Skull />} onClick={() => { setDeathForm((f) => ({ ...f, date_of_death: toLocalInput(new Date()) })); setDeathOpen(true); }} disabled={busy} title="Record this patient's death">
+                Record death
+              </DxButton>
+            ) : null}
+            {!completed && !deceased ? (
+              <DxButton variant="outline-danger" leftIcon={<LogOut />} onClick={() => setPending("end")} disabled={busy}>
+                End visit
+              </DxButton>
+            ) : null}
+            <DxButton variant="text" icon title="Delete visit" className="text-[var(--dx-danger)]" onClick={() => setPending("delete")} disabled={busy}>
+              <Trash2 />
+            </DxButton>
+          </>
+        }
       />
-    </div>
+
+      <VisitBanner visit={visit} />
+
+      <div className="grid gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-8">
+          <DxTabs<TabKey>
+            value={tab}
+            onChange={setTab}
+            items={[
+              { key: "pathway", label: "Pathway", icon: <ListOrdered />, count: steps.length },
+              { key: "tickets", label: "Queue tickets", icon: <Ticket />, count: tickets.length },
+              { key: "clinical", label: "Clinical", icon: <Stethoscope />, count: vitals.length || null },
+              { key: "activity", label: "Activity", icon: <History /> },
+            ]}
+            className="mb-3"
+          />
+
+          {tab === "pathway" ? (
+            <DxGrid<VisitStep>
+              columns={stepColumns}
+              data={steps}
+              rowKey={(s) => s.id}
+              selectedKey={currentStep?.id ?? null}
+              striped={false}
+              empty={{
+                icon: ListOrdered,
+                title: "No pathway on this visit",
+                description: "Flow steps are created when a visit is initiated from a template or re-routed. Use Re-route to send the patient to a service point.",
+                action: (
+                  <DxButton size="sm" leftIcon={<ArrowRight />} onClick={() => navigate(routes.visitReroute.replace(":visitId", String(visit.id)))}>
+                    Re-route
+                  </DxButton>
+                ),
+              }}
+            />
+          ) : null}
+
+          {tab === "tickets" ? (
+            <DxGrid<QueueTicket>
+              columns={ticketColumns}
+              data={tickets}
+              rowKey={(t) => t.id}
+              isLoading={sdpQuery.isLoading && tickets.length > 0}
+              empty={{ icon: Ticket, title: "No queue tickets", description: "Tickets are raised as the visit reaches each service point." }}
+            />
+          ) : null}
+
+          {tab === "clinical" ? (
+            <div className="space-y-4">
+              <DxPanel
+                title="Vital signs"
+                icon={<Heart />}
+                description={latestVital ? `Latest reading ${formatDateTime(latestVital.recorded_at)} · ${vitals.length} on this visit` : "No readings recorded on this visit yet."}
+                actions={
+                  <DxButton
+                    size="sm"
+                    leftIcon={<Plus />}
+                    onClick={() => {
+                      setVitalsForm(EMPTY_VITALS);
+                      setVitalsOpen(true);
+                    }}
+                  >
+                    Record vitals
+                  </DxButton>
+                }
+                flush
+              >
+                {latestVital ? (
+                  <DxProps
+                    tight
+                    className="px-3 py-1"
+                    items={[
+                      { label: "Temperature", value: show(latestVital.temperature_celsius, " °C") },
+                      { label: "Pulse", value: show(latestVital.pulse_rate, " bpm") },
+                      { label: "Respiratory rate", value: show(latestVital.respiratory_rate, " cpm") },
+                      { label: "Blood pressure", value: <span className="dx-mono">{bp(latestVital)}{bp(latestVital) !== "—" ? " mmHg" : ""}</span> },
+                      { label: "SpO₂", value: show(latestVital.oxygen_saturation, " %") },
+                      { label: "Weight / height", value: `${show(latestVital.weight_kg, " kg")} / ${show(latestVital.height_cm, " cm")}` },
+                      { label: "BMI", value: latestVital.bmi != null ? Number(latestVital.bmi).toFixed(1) : "—" },
+                      { label: "Pain score", value: show(latestVital.pain_score, " / 10") },
+                    ]}
+                  />
+                ) : vitalsQuery.isError ? (
+                  <DxMessage tone="warning" className="m-3">
+                    {apiErrorMessage(vitalsQuery.error, "Vital signs could not be loaded.")}
+                  </DxMessage>
+                ) : null}
+                {vitals.length > 1 ? (
+                  <DxGrid<VitalSign> borderless columns={vitalsColumns} data={vitals} rowKey={(r) => r.id} isLoading={vitalsQuery.isLoading} maxHeight={320} />
+                ) : vitals.length === 0 && !vitalsQuery.isError ? (
+                  <p className="px-3 py-6 text-center text-[12.5px] text-[var(--dx-text-muted)]">
+                    {vitalsQuery.isLoading ? "Loading readings…" : "Record the first set of vitals from triage or with the button above."}
+                  </p>
+                ) : null}
+              </DxPanel>
+
+              {/* Diagnoses are read-only here; editing happens in the consultation workstation. */}
+              <DiagnosesPanel visitId={visit.id} disabled />
+
+              {/* Charges accrued, payments and outstanding balance. */}
+              <VisitBillingPanel visitId={visit.id} />
+            </div>
+          ) : null}
+
+          {tab === "activity" ? <VisitActivityTimeline visitId={visit.id} /> : null}
+        </div>
+
+        <div className="space-y-4 xl:col-span-4">
+          <DxPanel title="Encounter" icon={<ClipboardList />} flush actions={<DxButton size="sm" variant="text" leftIcon={<Edit3 />} onClick={openEdit}>Edit</DxButton>}>
+            <DxProps items={encounterItems} />
+          </DxPanel>
+
+          <DxPanel title="Quick actions" icon={<Zap />} description={currentSdp ? `Patient is at ${currentSdp.name}.` : "No current service point."}>
+            <div className="flex flex-col gap-2">
+              <DxButton variant="primary" leftIcon={<ExternalLink />} onClick={() => navigate(workstation.path)} className="justify-start">
+                {workstation.label}
+              </DxButton>
+              <DxButton leftIcon={<Stethoscope />} onClick={() => navigate(`${routes.consultation}/${visit.id}`)} className="justify-start">
+                Open consultation
+              </DxButton>
+              <DxButton leftIcon={<Activity />} onClick={() => navigate(`${routes.triage}/${visit.id}`)} className="justify-start">
+                Open triage
+              </DxButton>
+              <DxButton leftIcon={<Scissors />} onClick={() => setBookSurgeryOpen(true)} className="justify-start" title="Book a surgical case for this patient">
+                Book surgery
+              </DxButton>
+              <DxButton leftIcon={<UserRound />} onClick={() => navigate(routes.patientDetail.replace(":patientId", String(visit.patient_id)))} className="justify-start">
+                Patient record
+              </DxButton>
+              <DxButton leftIcon={<ArrowRight />} onClick={() => navigate(routes.visitReroute.replace(":visitId", String(visit.id)))} className="justify-start">
+                Re-route to another service point
+              </DxButton>
+            </div>
+          </DxPanel>
+        </div>
+      </div>
+
+      <DxStatusBar>
+        <DxStatusItem>
+          Visit <b className="dx-mono">{visit.visit_code}</b>
+        </DxStatusItem>
+        <DxStatusItem>
+          Steps: <b>{steps.length}</b>
+        </DxStatusItem>
+        <DxStatusItem>
+          Tickets: <b>{tickets.length}</b>
+        </DxStatusItem>
+        <DxStatusItem>
+          Vitals: <b>{vitals.length}</b>
+        </DxStatusItem>
+        {nextStep && open ? (
+          <DxStatusItem>
+            Next: <b>{nextStep.service_delivery_point?.name}</b>
+          </DxStatusItem>
+        ) : null}
+        <span className="ml-auto">Updated {formatDateTime(visit.updated_at)}</span>
+      </DxStatusBar>
+
+      {/* ---------- Overlays ---------- */}
+      <DxConfirm
+        isOpen={pending != null}
+        onClose={() => setPending(null)}
+        onConfirm={runPending}
+        title={pending ? confirmCopy[pending].title : ""}
+        description={pending ? confirmCopy[pending].description : null}
+        confirmLabel={pending ? confirmCopy[pending].label : "Confirm"}
+        tone={pending ? confirmCopy[pending].tone : "primary"}
+      />
+
+      <DxPopup
+        isOpen={isDeathOpen}
+        onClose={() => setDeathOpen(false)}
+        title="Record patient death"
+        locked={recordDeathMutation.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setDeathOpen(false)} disabled={recordDeathMutation.isPending}>Cancel</DxButton>
+            <DxButton variant="primary" leftIcon={<Skull />} isLoading={recordDeathMutation.isPending} onClick={() => recordDeathMutation.mutate()}>
+              {deathForm.deposit ? "Record & deposit" : "Record death"}
+            </DxButton>
+          </>
+        }
+      >
+        <DxMessage tone="warning" className="mb-3">
+          Recording a death closes visit <b className="dx-mono dx-strong">{code}</b> for {patientDisplayName(visit.patient)} and marks it as deceased. This drives mortuary intake.
+        </DxMessage>
+        <DxForm cols={2}>
+          <DxInput label="Date / time of death" type="datetime-local" value={deathForm.date_of_death} onChange={(e) => setDeathForm((f) => ({ ...f, date_of_death: e.target.value }))} />
+          <DxInput label="Place of death" value={deathForm.place_of_death} onChange={(e) => setDeathForm((f) => ({ ...f, place_of_death: e.target.value }))} />
+          <DxTextarea label="Cause of death" fieldClassName="dx-col-span-full" rows={2} value={deathForm.cause_of_death} onChange={(e) => setDeathForm((f) => ({ ...f, cause_of_death: e.target.value }))} />
+          <DxTextarea label="Notes" fieldClassName="dx-col-span-full" rows={2} value={deathForm.notes} onChange={(e) => setDeathForm((f) => ({ ...f, notes: e.target.value }))} />
+          <DxCheckbox label="Deposit the body at the mortuary now" className="dx-col-span-full" checked={deathForm.deposit} onChange={(e) => setDeathForm((f) => ({ ...f, deposit: (e.target as HTMLInputElement).checked }))} />
+          {deathForm.deposit ? (
+            <DxSelect label="Storage unit (optional)" fieldClassName="dx-col-span-full" value={deathForm.mortuary_unit_id} onChange={(e) => setDeathForm((f) => ({ ...f, mortuary_unit_id: e.target.value }))}
+              placeholder="Register only — assign storage later"
+              options={deathUnitOptions}
+              hint={deathUnitOptions.length ? undefined : "No storage units with free space — the body will be registered without a unit."} />
+          ) : null}
+        </DxForm>
+      </DxPopup>
+
+      <DxPopup
+        isOpen={isEditOpen}
+        onClose={() => setEditOpen(false)}
+        title="Edit visit"
+        locked={updateMutation.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setEditOpen(false)} disabled={updateMutation.isPending}>
+              Cancel
+            </DxButton>
+            <DxButton variant="primary" leftIcon={<Save />} onClick={saveEdit} isLoading={updateMutation.isPending}>
+              Save changes
+            </DxButton>
+          </>
+        }
+      >
+        <DxForm cols={2}>
+          <DxSelect label="Status" value={editForm.status} onChange={setEdit("status")} options={VISIT_STATUS_OPTIONS} />
+          <DxSelect label="Priority" value={editForm.priority} onChange={setEdit("priority")} options={VISIT_PRIORITY_OPTIONS} />
+          <DxInput
+            label="Referred from"
+            fieldClassName="dx-col-span-full"
+            value={editForm.referred_from}
+            onChange={setEdit("referred_from")}
+            placeholder="Referring facility or department"
+          />
+          <DxTextarea
+            label="Reason for visit"
+            fieldClassName="dx-col-span-full"
+            rows={4}
+            value={editForm.visit_reason}
+            onChange={setEdit("visit_reason")}
+            placeholder="Clinical indication for this encounter"
+          />
+        </DxForm>
+      </DxPopup>
+
+      <DxPopup
+        isOpen={isVitalsOpen}
+        onClose={() => setVitalsOpen(false)}
+        title="Record vital signs"
+        size="lg"
+        locked={vitalsMutation.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setVitalsOpen(false)} disabled={vitalsMutation.isPending}>
+              Cancel
+            </DxButton>
+            <DxButton variant="primary" leftIcon={<Save />} onClick={() => vitalsMutation.mutate()} isLoading={vitalsMutation.isPending} disabled={!hasVitalValue}>
+              Record vitals
+            </DxButton>
+          </>
+        }
+      >
+        <DxMessage tone="info" className="mb-3">
+          For a full triage with BMI and MEWS scoring, use the triage workstation. This quick entry attaches a plain reading to the encounter.
+        </DxMessage>
+        <DxForm cols={3}>
+          {VITAL_FIELDS.map((f) => (
+            <DxInput
+              key={f.key}
+              label={f.label}
+              type="number"
+              inputMode="decimal"
+              step={f.step}
+              unit={f.unit}
+              mono
+              placeholder={f.placeholder}
+              value={vitalsForm[f.key]}
+              onChange={setVital(f.key)}
+              disabled={vitalsMutation.isPending}
+            />
+          ))}
+        </DxForm>
+      </DxPopup>
+
+      <BookCaseModal
+        isOpen={isBookSurgeryOpen}
+        onClose={() => setBookSurgeryOpen(false)}
+        presetPatient={{
+          id: visit.patient_id,
+          label: visit.patient ? `${patientDisplayName(visit.patient)} · ${visit.patient.hospital_number}` : `Patient #${visit.patient_id}`,
+        }}
+        presetVisitId={visit.id}
+        onBooked={(c) => navigate(routes.surgeryCase.replace(":caseId", String(c.id)))}
+      />
+    </DxPage>
   );
 }

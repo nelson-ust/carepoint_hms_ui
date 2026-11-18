@@ -13,6 +13,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import {
   DxBadge,
@@ -46,6 +47,7 @@ import {
   listSubscriptionPlans,
   TENANT_STATUSES,
   updateTenantStatus,
+  dropTenant,
 } from "../api/tenants.api";
 import type { SubscriptionPlan, Tenant } from "../api/tenants.api";
 
@@ -57,7 +59,7 @@ const DEPLOYMENT_LABELS: Record<string, string> = {
 const deploymentLabel = (model?: string | null): string =>
   !model ? "Cloud – Platform" : DEPLOYMENT_LABELS[model] ?? model;
 
-type ActionKind = "approve" | "status" | "plan" | null;
+type ActionKind = "approve" | "status" | "plan" | "drop" | null;
 
 export function TenantDetailPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -82,6 +84,7 @@ export function TenantDetailPage() {
   const [plansLoading, setPlansLoading] = useState(false);
   const [planForm, setPlanForm] = useState<string>("");
   const [intervalForm, setIntervalForm] = useState<"MONTHLY" | "YEARLY">("MONTHLY");
+  const [dropConfirm, setDropConfirm] = useState("");
 
   const load = async () => {
     if (!tenantId) {
@@ -161,6 +164,28 @@ export function TenantDetailPage() {
     if (actionPending) return;
     setActionKind(null);
     setActionError(null);
+  };
+
+  const openDrop = () => {
+    setDropConfirm("");
+    setActionKind("drop");
+    setActionError(null);
+  };
+
+  const handleDrop = async () => {
+    if (!tenant) return;
+    setActionPending(true);
+    setActionError(null);
+    try {
+      const res = await dropTenant(tenant.id, dropConfirm.trim());
+      toast.success(res.message || `Tenant ${tenant.code} dropped.`);
+      setActionKind(null);
+      navigate(routes.tenants);
+    } catch (err) {
+      setActionError(apiErrorMessage(err) || "Failed to drop tenant.");
+    } finally {
+      setActionPending(false);
+    }
   };
 
   const handleApprove = async () => {
@@ -474,6 +499,26 @@ export function TenantDetailPage() {
         </div>
       </div>
 
+      {/* Danger zone */}
+      <DxPanel
+        title="Danger zone"
+        icon={<Trash2 className="h-4 w-4" />}
+        description="Irreversible platform actions."
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-[var(--dx-text)]">Drop this tenant</p>
+            <p className="mt-0.5 text-[12px] text-[var(--dx-text-muted)]">
+              Permanently deletes the tenant's database, its object-storage bucket and all
+              platform records. This cannot be undone.
+            </p>
+          </div>
+          <DxButton variant="danger" leftIcon={<Trash2 className="h-4 w-4" />} onClick={openDrop}>
+            Drop tenant
+          </DxButton>
+        </div>
+      </DxPanel>
+
       {/* Grant one free month */}
       <DxPopup
         isOpen={freeOpen}
@@ -661,6 +706,54 @@ export function TenantDetailPage() {
             </div>
           </div>
         )}
+      </DxPopup>
+
+      {/* Drop tenant (danger) */}
+      <DxPopup
+        isOpen={actionKind === "drop"}
+        onClose={closeAction}
+        title="Drop tenant"
+        size="md"
+        footer={
+          <>
+            <DxButton onClick={closeAction} disabled={actionPending}>
+              Cancel
+            </DxButton>
+            <DxButton
+              variant="danger"
+              leftIcon={<Trash2 className="h-4 w-4" />}
+              isLoading={actionPending}
+              disabled={dropConfirm.trim().toLowerCase() !== (tenant.code || "").toLowerCase()}
+              onClick={handleDrop}
+            >
+              Permanently drop
+            </DxButton>
+          </>
+        }
+      >
+        {actionError && (
+          <DxMessage tone="danger" className="mb-4">
+            {actionError}
+          </DxMessage>
+        )}
+        <DxMessage tone="danger" title="This cannot be undone">
+          Dropping <strong>{tenant.name}</strong> permanently deletes its database, its
+          object-storage bucket
+          {tenant.aws_s3_bucket_name ? (
+            <> (<span className="dx-mono">{tenant.aws_s3_bucket_name}</span>)</>
+          ) : null}{" "}
+          and every platform record for this tenant.
+        </DxMessage>
+        <div className="mt-4">
+          <p className="dx-field-label mb-1.5">
+            Type the tenant code <span className="dx-mono font-semibold">{tenant.code}</span> to confirm
+          </p>
+          <DxInput
+            value={dropConfirm}
+            onChange={(e) => setDropConfirm(e.target.value)}
+            placeholder={tenant.code}
+          />
+        </div>
       </DxPopup>
     </DxPage>
   );

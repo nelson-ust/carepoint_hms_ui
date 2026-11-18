@@ -297,3 +297,30 @@ export async function syncTenantDefaults(tenantId: number | string): Promise<Rep
   const response = await apiClient.post<RepairResult>(`/tenants/${tenantId}/sync-defaults`);
   return response.data;
 }
+
+export type DropTenantStep = { step: string; detail: string; status: string };
+export type DropTenantResult = {
+  success: boolean;
+  message: string;
+  tenant_id: number;
+  code: string;
+  dropped_database?: string | null;
+  dropped_bucket?: string | null;
+  warnings?: string[];
+  steps?: DropTenantStep[];
+};
+
+/**
+ * Permanently drop a tenant from the platform: its database, its object-storage
+ * bucket and all platform records. Irreversible. ``confirmCode`` must equal the
+ * tenant's own code (the backend re-checks this).
+ */
+export async function dropTenant(
+  tenantId: number | string,
+  confirmCode: string,
+): Promise<DropTenantResult> {
+  const response = await apiClient.post<DropTenantResult>(`/tenants/${tenantId}/drop`, {
+    confirm_code: confirmCode,
+  });
+  return response.data;
+}

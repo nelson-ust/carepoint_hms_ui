@@ -27,8 +27,8 @@ const backgroundGradients = [
 export function SaasLoginPage() {
   const navigate = useNavigate();
 
-  const [identifier, setIdentifier] = useState("superadmin@carepointhms.com");
-  const [password, setPassword] = useState("SuperAdmin123!");
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);

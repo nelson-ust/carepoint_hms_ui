@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowUpCircle,
   BadgeCheck,
   Check,
   CheckCircle2,
@@ -14,13 +13,19 @@ import {
   Sparkles,
 } from "lucide-react";
 import { format, isValid } from "date-fns";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
-import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxBadge,
+  DxButton,
+  DxGrid,
+  DxSegmented,
+  DxPopup,
+  DxMessage,
+  type DxGridColumn,
+  type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { useMySaaSInvoices } from "../hooks/use-saas-billing";
 import type { SaaSInvoice } from "../api/saas-billing.api";
@@ -80,6 +85,12 @@ function formatMoney(value: number | string | null | undefined, currency?: strin
   }
 }
 
+function invoiceTone(status: string): DxBadgeTone {
+  if (status === "PAID") return "success";
+  if (status === "OVERDUE") return "danger";
+  return "warning";
+}
+
 export function PlanBillingPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -115,7 +126,7 @@ export function PlanBillingPage() {
         toast.success(
           "Plan upgraded",
           amt > 0
-            ? `${res.message} Amount due now: ${(res.currency || "NGN")} ${amt.toLocaleString()}.`
+            ? `${res.message} Amount due now: ${res.currency || "NGN"} ${amt.toLocaleString()}.`
             : res.message,
         );
       } else {
@@ -174,17 +185,17 @@ export function PlanBillingPage() {
     return [...set].filter((c) => MODULE_LABELS[c]).sort((a, b) => MODULE_LABELS[a].localeCompare(MODULE_LABELS[b]));
   }, [plans]);
 
-  const invoiceColumns: DataTableColumn<SaaSInvoice>[] = [
+  const invoiceColumns: DxGridColumn<SaaSInvoice>[] = [
     {
       key: "number",
       header: "Invoice",
-      render: (inv) => <span className="data-mono text-xs">{(inv as any).invoice_number || `INV-${inv.id}`}</span>,
+      render: (inv) => <span className="dx-mono text-[12px]">{(inv as any).invoice_number || `INV-${inv.id}`}</span>,
     },
     {
       key: "period",
       header: "Period",
       render: (inv) => (
-        <span className="text-xs font-medium text-secondary-500">
+        <span className="text-[12px] font-medium text-[var(--dx-text-muted)]">
           {safeDate((inv as any).period_start)} — {safeDate((inv as any).period_end)}
         </span>
       ),
@@ -193,74 +204,78 @@ export function PlanBillingPage() {
       key: "amount",
       header: "Amount",
       align: "right",
-      render: (inv) => <span className="data-mono text-xs">{money((inv as any).total_amount ?? (inv as any).amount)}</span>,
+      render: (inv) => <span className="dx-mono text-[12px]">{money((inv as any).total_amount ?? (inv as any).amount)}</span>,
     },
     {
       key: "status",
       header: "Status",
       render: (inv) => {
         const st = String((inv as any).status || "").toUpperCase();
-        const variant = st === "PAID" ? "soft-success" : st === "OVERDUE" ? "soft-danger" : "soft-warning";
-        return <Badge variant={variant as any}>{st || "—"}</Badge>;
+        return <DxBadge tone={invoiceTone(st)} dot>{st || "—"}</DxBadge>;
       },
     },
-    { key: "due", header: "Due", render: (inv) => <span className="text-xs text-secondary-500">{safeDate((inv as any).due_date)}</span> },
+    {
+      key: "due",
+      header: "Due",
+      render: (inv) => <span className="text-[12px] text-[var(--dx-text-muted)]">{safeDate((inv as any).due_date)}</span>,
+    },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Settings" }, { label: "Plan & Billing" }]}
         title="Plan & Billing"
-        description="Your hospital's subscription, module access and invoices — upgrade any time."
+        subtitle="Your hospital's subscription, module access and invoices — upgrade any time."
       />
 
       {/* Current subscription */}
-      <Card variant="panel">
+      <DxPanel>
         {subQuery.isLoading ? (
           <div className="space-y-3">
-            <Skeleton className="h-6 w-40" />
-            <Skeleton className="h-4 w-72" />
+            <div className="dx-skeleton h-6 w-40" />
+            <div className="dx-skeleton h-4 w-72" />
           </div>
         ) : currentPlan ? (
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="flex items-center gap-5">
-              <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-primary-500/10 text-primary-500 shadow-glow-sm">
+              <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]">
                 <Crown className="h-7 w-7" />
               </div>
               <div>
                 <div className="flex items-center gap-3">
-                  <h3 className="font-display text-2xl font-bold text-secondary-900">{currentPlan.name}</h3>
+                  <h3 className="text-[22px] font-bold text-[var(--dx-text)]">{currentPlan.name}</h3>
                   {hasPendingPayment ? (
-                    <Badge variant="soft-info">Payment under review</Badge>
+                    <DxBadge tone="info" dot>Payment under review</DxBadge>
                   ) : paymentDue ? (
-                    <Badge variant="soft-danger">Payment due</Badge>
+                    <DxBadge tone="danger" dot>Payment due</DxBadge>
                   ) : isSettled ? (
-                    <Badge variant="soft-success">Paid</Badge>
+                    <DxBadge tone="success" dot>Paid</DxBadge>
                   ) : (
-                    <Badge variant={isTrialing ? "soft-info" : "soft-success"}>{subStatus || "ACTIVE"}</Badge>
+                    <DxBadge tone={isTrialing ? "info" : "success"} dot>{subStatus || "ACTIVE"}</DxBadge>
                   )}
                 </div>
-                <p className="mt-1 text-sm font-medium text-secondary-500">
+                <p className="mt-1 text-[13px] font-medium text-[var(--dx-text-muted)]">
                   {formatPlanPrice(currentPlan, currentInterval)} ·{" "}
-                  <span className="font-bold text-secondary-600">{currentInterval === "YEARLY" ? "Annual" : "Monthly"}</span> ·
+                  <span className="font-bold text-[var(--dx-text)]">{currentInterval === "YEARLY" ? "Annual" : "Monthly"}</span> ·
                   since {safeDate(subQuery.data?.start_date)} ·{" "}
                   {Object.values(currentPlan.modules ?? {}).filter(Boolean).length} modules included
                 </p>
                 {isTrialing ? (
-                  <p className="mt-1.5 text-xs font-bold text-cyan-600 dark:text-cyan-300">
+                  <p className="mt-1.5 text-[12px] font-semibold" style={{ color: "var(--dx-info)" }}>
                     Free trial — ends {safeDate(trialEnds, "MMM d, yyyy")}. Pay before it ends to keep access.
                   </p>
                 ) : hasPendingPayment ? (
-                  <p className="mt-1.5 flex items-center gap-1.5 text-xs font-bold text-cyan-600 dark:text-cyan-300">
+                  <p className="mt-1.5 flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: "var(--dx-info)" }}>
                     <Clock className="h-3.5 w-3.5" />
                     Payment received — awaiting confirmation from the platform team.
                   </p>
                 ) : paymentDue ? (
-                  <p className="mt-1.5 text-xs font-bold text-rose-600 dark:text-rose-300">
+                  <p className="mt-1.5 text-[12px] font-semibold" style={{ color: "var(--dx-danger)" }}>
                     {formatMoney(amountDue, subQuery.data?.currency)} due for the current period.
                   </p>
                 ) : isSettled ? (
-                  <p className="mt-1.5 flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-300">
+                  <p className="mt-1.5 flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: "var(--dx-success)" }}>
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     Current period paid{subQuery.data?.current_period_end ? ` — active through ${safeDate(subQuery.data.current_period_end, "MMM d, yyyy")}` : ""}.
                   </p>
@@ -269,172 +284,165 @@ export function PlanBillingPage() {
             </div>
             <div className="flex items-center gap-3">
               {hasPendingPayment ? (
-                <span className="inline-flex items-center gap-2 rounded-xl bg-cyan-500/10 px-4 py-2 text-xs font-bold text-cyan-600 dark:text-cyan-300">
-                  <Clock className="h-4 w-4" /> Under review
-                </span>
+                <DxBadge tone="info" dot>Under review</DxBadge>
               ) : currentPrice > 0 && (paymentDue || isTrialing) ? (
-                <Button size="sm" onClick={() => setPayTarget(currentPlan)} leftIcon={<CreditCard className="h-4 w-4" />}>
+                <DxButton variant="primary" size="sm" onClick={() => setPayTarget(currentPlan)} leftIcon={<CreditCard className="h-4 w-4" />}>
                   {isTrialing ? "Pay & activate" : "Pay now"}
-                </Button>
+                </DxButton>
               ) : isSettled ? (
-                <span className="inline-flex items-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-600 dark:text-emerald-300">
-                  <CheckCircle2 className="h-4 w-4" /> Paid
-                </span>
+                <DxBadge tone="success" dot>Paid</DxBadge>
               ) : null}
-              <div className="hidden items-center gap-2 text-xs font-bold text-secondary-400 sm:flex">
-                <ShieldCheck className="h-4 w-4 text-primary-500" />
+              <div className="hidden items-center gap-2 text-[12px] font-semibold text-[var(--dx-text-muted)] sm:flex">
+                <ShieldCheck className="h-4 w-4 text-[var(--dx-accent)]" />
                 Changes apply immediately.
               </div>
             </div>
           </div>
         ) : (
-          <p className="text-sm font-medium text-secondary-500">
+          <p className="text-[13px] font-medium text-[var(--dx-text-muted)]">
             No active subscription found — choose a plan below to get started.
           </p>
         )}
-      </Card>
+      </DxPanel>
 
       {/* Plan catalog */}
-      <div>
+      <div className="space-y-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <CardHeader
-            title="Available plans"
-            description="Compare what each plan unlocks. Upgrading is instant; the new modules appear in your menu right away."
-          />
-          {/* Billing cycle switch */}
-          <div className="inline-flex shrink-0 items-center gap-1 rounded-2xl bg-secondary-100 p-1 dark:bg-white/5">
-            <button
-              type="button"
-              onClick={() => setBillingInterval("MONTHLY")}
-              className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-                interval === "MONTHLY"
-                  ? "bg-white text-primary-600 shadow-sm dark:bg-secondary-900 dark:text-primary-300"
-                  : "text-secondary-500"
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              type="button"
-              onClick={() => setBillingInterval("YEARLY")}
-              className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-                interval === "YEARLY"
-                  ? "bg-white text-primary-600 shadow-sm dark:bg-secondary-900 dark:text-primary-300"
-                  : "text-secondary-500"
-              }`}
-            >
-              Annual
-              <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-600">
-                Save
-              </span>
-            </button>
+          <div>
+            <h3 className="text-[16px] font-bold text-[var(--dx-text)]">Available plans</h3>
+            <p className="mt-0.5 text-[13px] text-[var(--dx-text-muted)]">
+              Compare what each plan unlocks. Upgrading is instant; the new modules appear in your menu right away.
+            </p>
           </div>
+          {/* Billing cycle switch */}
+          <DxSegmented<BillingInterval>
+            ariaLabel="Billing cycle"
+            className="shrink-0"
+            items={[
+              { key: "MONTHLY", label: "Monthly" },
+              {
+                key: "YEARLY",
+                label: (
+                  <span className="flex items-center gap-1.5">
+                    Annual
+                    <span
+                      className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+                      style={{ background: "var(--dx-success-soft)", color: "var(--dx-success)" }}
+                    >
+                      Save
+                    </span>
+                  </span>
+                ),
+              },
+            ]}
+            value={interval}
+            onChange={setBillingInterval}
+          />
         </div>
         {plansQuery.isLoading ? (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i}><Skeleton className="h-64 w-full" /></Card>
+              <div key={i} className="dx-skeleton h-64 w-full" />
             ))}
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {plans.map((plan) => {
               const isCurrent = currentPlan?.code === plan.code;
               const isUpgrade = Number(plan.price) > currentPrice;
               const includedCount = Object.values(plan.modules ?? {}).filter(Boolean).length;
               return (
-                <Card
+                <div
                   key={plan.code}
-                  variant="panel"
-                  className={isCurrent ? "ring-2 ring-primary-500/40 shadow-glow-sm" : ""}
+                  className="flex flex-col rounded-lg border bg-[var(--dx-surface)] p-6"
+                  style={{ borderColor: isCurrent ? "var(--dx-accent)" : "var(--dx-border)" }}
                 >
-                  <div className="flex h-full flex-col">
-                    <div className="mb-4 flex items-start justify-between">
-                      <div>
-                        <h4 className="font-display text-lg font-bold text-secondary-900">{plan.name}</h4>
-                        <p className="mt-1 font-display text-2xl font-bold text-gradient">{formatPlanPrice(plan, interval)}</p>
-                        {interval === "YEARLY" && Number(plan.price) > 0 && annualSavings(plan) > 0 ? (
-                          <p className="mt-0.5 text-[11px] font-bold text-emerald-600">Save {formatSavings(plan)}/yr vs monthly</p>
-                        ) : null}
-                      </div>
-                      {isCurrent ? (
-                        <Badge variant="default"><BadgeCheck className="mr-1 h-3 w-3" />Current</Badge>
-                      ) : isUpgrade ? (
-                        <Badge variant="soft-info"><Sparkles className="mr-1 h-3 w-3" />Upgrade</Badge>
+                  <div className="mb-4 flex items-start justify-between">
+                    <div>
+                      <h4 className="text-[16px] font-bold text-[var(--dx-text)]">{plan.name}</h4>
+                      <p className="mt-1 text-[22px] font-bold text-[var(--dx-accent)]">{formatPlanPrice(plan, interval)}</p>
+                      {interval === "YEARLY" && Number(plan.price) > 0 && annualSavings(plan) > 0 ? (
+                        <p className="mt-0.5 text-[11px] font-semibold" style={{ color: "var(--dx-success)" }}>
+                          Save {formatSavings(plan)}/yr vs monthly
+                        </p>
                       ) : null}
                     </div>
-                    {plan.description ? (
-                      <p className="mb-3 text-xs font-medium leading-relaxed text-secondary-500">{plan.description}</p>
+                    {isCurrent ? (
+                      <DxBadge tone="accent"><BadgeCheck className="mr-1 h-3 w-3" />Current</DxBadge>
+                    ) : isUpgrade ? (
+                      <DxBadge tone="info"><Sparkles className="mr-1 h-3 w-3" />Upgrade</DxBadge>
                     ) : null}
-                    <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-secondary-400">
-                      {includedCount} modules · up to {plan.max_users ?? "∞"} users
-                    </p>
-                    <ul className="mb-6 flex-1 space-y-1.5">
-                      {allModuleCodes.map((code) => {
-                        const included = !!plan.modules?.[code];
-                        return (
-                          <li key={code} className="flex items-center gap-2 text-xs">
-                            {included ? (
-                              <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                            ) : (
-                              <Minus className="h-3.5 w-3.5 shrink-0 text-secondary-300 dark:text-secondary-600" />
-                            )}
-                            <span className={included ? "font-semibold text-secondary-700" : "text-secondary-400"}>
-                              {MODULE_LABELS[code]}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    {(() => {
-                      const isPaid = Number(plan.price) > 0;
-                      if (isCurrent) {
-                        return (
-                          <Button variant="secondary" size="sm" className="w-full" disabled leftIcon={<BadgeCheck className="h-4 w-4" />}>
-                            Your plan
-                          </Button>
-                        );
-                      }
-                      if (!isPaid) {
-                        // Free / trial plan — switch directly, no payment.
-                        return (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            disabled={changePlan.isPending}
-                            onClick={() => setUpgradeTarget(plan)}
-                          >
-                            Switch to {plan.name}
-                          </Button>
-                        );
-                      }
-                      return (
-                        <div className="space-y-2">
-                          <Button
-                            variant={isUpgrade ? "primary" : "outline"}
-                            size="sm"
-                            className="w-full"
-                            onClick={() => setPayTarget(plan)}
-                            leftIcon={<CreditCard className="h-4 w-4" />}
-                          >
-                            {isUpgrade ? `Subscribe to ${plan.name}` : `Switch to ${plan.name}`}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full"
-                            isLoading={startTrial.isPending && startTrial.variables?.code === plan.code}
-                            onClick={() => startTrial.mutate({ code: plan.code, interval })}
-                            leftIcon={<Sparkles className="h-4 w-4" />}
-                          >
-                            Start 14-day free trial
-                          </Button>
-                        </div>
-                      );
-                    })()}
                   </div>
-                </Card>
+                  {plan.description ? (
+                    <p className="mb-3 text-[12px] font-medium leading-relaxed text-[var(--dx-text-muted)]">{plan.description}</p>
+                  ) : null}
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
+                    {includedCount} modules · up to {plan.max_users ?? "∞"} users
+                  </p>
+                  <ul className="mb-6 flex-1 space-y-1.5">
+                    {allModuleCodes.map((code) => {
+                      const included = !!plan.modules?.[code];
+                      return (
+                        <li key={code} className="flex items-center gap-2 text-[12px]">
+                          {included ? (
+                            <Check className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--dx-success)" }} />
+                          ) : (
+                            <Minus className="h-3.5 w-3.5 shrink-0 text-[var(--dx-text-faint)]" />
+                          )}
+                          <span className={included ? "font-semibold text-[var(--dx-text)]" : "text-[var(--dx-text-muted)]"}>
+                            {MODULE_LABELS[code]}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {(() => {
+                    const isPaid = Number(plan.price) > 0;
+                    if (isCurrent) {
+                      return (
+                        <DxButton size="sm" className="w-full" disabled leftIcon={<BadgeCheck className="h-4 w-4" />}>
+                          Your plan
+                        </DxButton>
+                      );
+                    }
+                    if (!isPaid) {
+                      // Free / trial plan — switch directly, no payment.
+                      return (
+                        <DxButton
+                          size="sm"
+                          className="w-full"
+                          disabled={changePlan.isPending}
+                          onClick={() => setUpgradeTarget(plan)}
+                        >
+                          Switch to {plan.name}
+                        </DxButton>
+                      );
+                    }
+                    return (
+                      <div className="space-y-2">
+                        <DxButton
+                          variant={isUpgrade ? "primary" : "default"}
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setPayTarget(plan)}
+                          leftIcon={<CreditCard className="h-4 w-4" />}
+                        >
+                          {isUpgrade ? `Subscribe to ${plan.name}` : `Switch to ${plan.name}`}
+                        </DxButton>
+                        <DxButton
+                          variant="text"
+                          size="sm"
+                          className="w-full"
+                          isLoading={startTrial.isPending && startTrial.variables?.code === plan.code}
+                          onClick={() => startTrial.mutate({ code: plan.code, interval })}
+                          leftIcon={<Sparkles className="h-4 w-4" />}
+                        >
+                          Start 14-day free trial
+                        </DxButton>
+                      </div>
+                    );
+                  })()}
+                </div>
               );
             })}
           </div>
@@ -442,34 +450,30 @@ export function PlanBillingPage() {
       </div>
 
       {/* Invoices */}
-      <Card padding="none">
-        <div className="flex items-center gap-3 px-6 pt-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-500">
-            <ReceiptText className="h-5 w-5" />
-          </div>
-          <div>
-            <h3 className="text-lg font-display font-bold text-secondary-900">Subscription invoices</h3>
-            <p className="text-sm font-medium text-secondary-500">Billing history for your hospital's subscription.</p>
-          </div>
-        </div>
-        <div className="mt-4">
-          <DataTable
-            columns={invoiceColumns}
-            data={(invoicesQuery.data as any)?.items ?? (Array.isArray(invoicesQuery.data) ? (invoicesQuery.data as any) : [])}
-            rowKey={(inv) => inv.id}
-            isLoading={invoicesQuery.isLoading}
-            error={invoicesQuery.error ? "Unable to load invoices." : null}
-            onRetry={() => invoicesQuery.refetch()}
-            empty={{
-              icon: CreditCard,
-              title: "No invoices yet",
-              description: "Invoices appear here as your billing periods close.",
-            }}
-          />
-        </div>
-      </Card>
+      <DxPanel
+        flush
+        title="Subscription invoices"
+        description="Billing history for your hospital's subscription."
+        icon={<ReceiptText className="h-5 w-5 text-[var(--dx-accent)]" />}
+      >
+        <DxGrid
+          columns={invoiceColumns}
+          data={(invoicesQuery.data as any)?.items ?? (Array.isArray(invoicesQuery.data) ? (invoicesQuery.data as any) : [])}
+          rowKey={(inv) => inv.id}
+          isLoading={invoicesQuery.isLoading}
+          error={invoicesQuery.error ? "Unable to load invoices." : null}
+          onRetry={() => invoicesQuery.refetch()}
+          borderless
+          empty={{
+            icon: CreditCard,
+            title: "No invoices yet",
+            description: "Invoices appear here as your billing periods close.",
+          }}
+        />
+      </DxPanel>
 
-      <ConfirmDialog
+      {/* Plan change confirm */}
+      <DxPopup
         isOpen={!!upgradeTarget}
         onClose={() => setUpgradeTarget(null)}
         title={
@@ -479,24 +483,36 @@ export function PlanBillingPage() {
               ? `Upgrade to ${upgradeTarget?.name}?`
               : `Switch to ${upgradeTarget?.name}?`
         }
-        tone="primary"
-        confirmLabel={
-          changeIsDowngrade ? "Schedule downgrade" : changeIsUpgrade ? "Upgrade now" : "Switch plan"
+        size="md"
+        locked={changePlan.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setUpgradeTarget(null)} disabled={changePlan.isPending}>
+              Cancel
+            </DxButton>
+            <DxButton
+              variant="primary"
+              isLoading={changePlan.isPending}
+              onClick={async () => {
+                if (!upgradeTarget) return;
+                await changePlan.mutateAsync({ code: upgradeTarget.code, interval });
+              }}
+            >
+              {changeIsDowngrade ? "Schedule downgrade" : changeIsUpgrade ? "Upgrade now" : "Switch plan"}
+            </DxButton>
+          </>
         }
-        description={
-          upgradeTarget
+      >
+        <DxMessage tone={changeIsDowngrade ? "warning" : "info"}>
+          {upgradeTarget
             ? changeIsDowngrade
               ? `Your hospital keeps the current ${currentPlan?.name ?? "plan"} and all its features until the current period ends${currentPeriodEnd ? ` on ${safeDate(currentPeriodEnd)}` : ""}. The ${upgradeTarget.name} plan (${formatPlanPrice(upgradeTarget, interval)}) then takes effect automatically at the next renewal — nothing is charged now.`
               : changeIsUpgrade
                 ? `Your hospital moves to the ${upgradeTarget.name} plan (${formatPlanPrice(upgradeTarget, interval)}, billed ${interval === "YEARLY" ? "annually" : "monthly"}) immediately, and newly included modules appear right away. A prorated invoice for the price difference over the days left in your current period is issued now — settle it below to complete the upgrade.`
                 : `Your hospital switches to the ${upgradeTarget.name} plan (${formatPlanPrice(upgradeTarget, interval)}, billed ${interval === "YEARLY" ? "annually" : "monthly"}) immediately.`
-            : undefined
-        }
-        onConfirm={async () => {
-          if (!upgradeTarget) return;
-          await changePlan.mutateAsync({ code: upgradeTarget.code, interval });
-        }}
-      />
+            : null}
+        </DxMessage>
+      </DxPopup>
 
       <PaySubscriptionModal
         isOpen={!!payTarget}
@@ -504,6 +520,6 @@ export function PlanBillingPage() {
         plan={payTarget}
         interval={payTarget?.code === currentPlan?.code ? currentInterval : interval}
       />
-    </div>
+    </DxPage>
   );
 }

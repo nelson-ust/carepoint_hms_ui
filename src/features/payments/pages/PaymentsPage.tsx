@@ -1,39 +1,19 @@
 import { useMemo, useState } from "react";
+import { Banknote, Clock, CreditCard, Plus, RotateCcw, Undo2, Wallet } from "lucide-react";
 import {
-  Banknote,
-  Clock,
-  CreditCard,
-  Plus,
-  RotateCcw,
-  Undo2,
-  Wallet,
-} from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
-import { Modal } from "@/components/ui/Modal";
-import { Badge, type BadgeProps } from "@/components/ui/Badge";
+  DxPage, DxPageHeader, DxPanel, DxButton, DxBadge, DxKpi, DxInput, DxSelect, DxTextarea,
+  DxPopup, DxGrid, type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { SearchInput } from "@/components/forms/SearchInput";
-import { MetricCard } from "@/components/charts/MetricCard";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
 import { Pagination } from "@/components/data-table/Pagination";
 import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { useDisclosure } from "@/hooks/useDisclosure";
 import {
-  formatMoney,
-  PAYMENT_METHODS,
-  PAYMENT_STATUSES,
-  type Payment,
+  formatMoney, PAYMENT_METHODS, PAYMENT_STATUSES, type Payment,
 } from "../api/payments.api";
 import {
-  usePayments,
-  usePaymentsSummary,
-  useReceivePayment,
-  useRefundPayment,
+  usePayments, usePaymentsSummary, useReceivePayment, useRefundPayment,
 } from "../hooks/use-payments";
 
 const PAGE_SIZE = 20;
@@ -42,43 +22,24 @@ const METHOD_OPTIONS = [
   { value: "", label: "All methods" },
   ...PAYMENT_METHODS.map((m) => ({ value: m, label: m.replace(/_/g, " ") })),
 ];
-
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
   ...PAYMENT_STATUSES.map((s) => ({ value: s, label: s })),
 ];
 
-const STATUS_VARIANTS: Record<string, BadgeProps["variant"]> = {
-  SUCCESSFUL: "soft-success",
-  PENDING: "soft-warning",
-  FAILED: "soft-danger",
-  REVERSED: "soft-danger",
-  CANCELLED: "secondary",
+const STATUS_TONES: Record<string, DxBadgeTone> = {
+  SUCCESSFUL: "success", PENDING: "warning", FAILED: "danger", REVERSED: "danger", CANCELLED: "neutral",
 };
-
-const METHOD_VARIANTS: Record<string, BadgeProps["variant"]> = {
-  CASH: "soft-success",
-  CARD: "soft-info",
-  BANK_TRANSFER: "soft-info",
-  MOBILE_MONEY: "soft-info",
-  INSURANCE: "soft-warning",
-  LOYALTY: "secondary",
-  WAIVER: "secondary",
-  MEMBERSHIP_CARD: "secondary",
-  OTHER: "secondary",
+const METHOD_TONES: Record<string, DxBadgeTone> = {
+  CASH: "success", CARD: "info", BANK_TRANSFER: "info", MOBILE_MONEY: "info",
+  INSURANCE: "warning", LOYALTY: "neutral", WAIVER: "neutral", MEMBERSHIP_CARD: "neutral", OTHER: "neutral",
 };
 
 function formatDateTime(value?: string | null): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return date.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function RecordPaymentModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -91,103 +52,45 @@ function RecordPaymentModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
   const [error, setError] = useState<string | null>(null);
 
   const handleClose = () => {
-    setInvoiceId("");
-    setAmount("");
-    setMethod("CASH");
-    setNote("");
-    setError(null);
-    onClose();
+    setInvoiceId(""); setAmount(""); setMethod("CASH"); setNote(""); setError(null); onClose();
   };
 
   const handleSubmit = () => {
     const parsedInvoiceId = Number(invoiceId);
     const parsedAmount = Number(amount);
-    if (!parsedInvoiceId || parsedInvoiceId <= 0) {
-      setError("A valid invoice ID is required.");
-      return;
-    }
-    if (!parsedAmount || parsedAmount <= 0) {
-      setError("Enter an amount greater than zero.");
-      return;
-    }
+    if (!parsedInvoiceId || parsedInvoiceId <= 0) { setError("A valid invoice ID is required."); return; }
+    if (!parsedAmount || parsedAmount <= 0) { setError("Enter an amount greater than zero."); return; }
     setError(null);
     receive.mutate(
+      { invoice_id: parsedInvoiceId, amount: parsedAmount, payment_method: method, note: note.trim() || undefined },
       {
-        invoice_id: parsedInvoiceId,
-        amount: parsedAmount,
-        payment_method: method,
-        note: note.trim() || undefined,
-      },
-      {
-        onSuccess: (payment) => {
-          toast.success("Payment recorded", `Reference ${payment.payment_reference}`);
-          handleClose();
-        },
-        onError: (err: any) => {
-          toast.error(
-            "Failed to record payment",
-            err?.response?.data?.detail?.toString?.() ?? err?.message,
-          );
-        },
+        onSuccess: (payment) => { toast.success("Payment recorded", `Reference ${payment.payment_reference}`); handleClose(); },
+        onError: (err: any) => toast.error("Failed to record payment", err?.response?.data?.detail?.toString?.() ?? err?.message),
       },
     );
   };
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={handleClose}
-      title="Record Payment"
+      title="Record payment"
       size="sm"
       footer={
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            isLoading={receive.isPending}
-            leftIcon={<CreditCard className="h-4 w-4" />}
-          >
-            Record Payment
-          </Button>
-        </div>
+        <>
+          <DxButton variant="text" onClick={handleClose}>Cancel</DxButton>
+          <DxButton variant="primary" onClick={handleSubmit} isLoading={receive.isPending} leftIcon={<CreditCard className="h-4 w-4" />}>Record payment</DxButton>
+        </>
       }
     >
-      <div className="space-y-5">
-        <Input
-          label="Invoice ID"
-          type="number"
-          min={1}
-          value={invoiceId}
-          onChange={(e) => setInvoiceId(e.target.value)}
-          placeholder="e.g. 128"
-        />
-        <Input
-          label="Amount"
-          type="number"
-          min={0}
-          step="0.01"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.00"
-        />
-        <Select
-          label="Payment Method"
-          options={METHOD_OPTIONS.slice(1)}
-          value={method}
-          onChange={(e) => setMethod(e.target.value)}
-        />
-        <Textarea
-          label="Note (optional)"
-          rows={3}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="e.g. POS terminal 2, teller ref…"
-        />
-        {error ? <p className="text-xs font-semibold text-rose-500">{error}</p> : null}
+      <div className="space-y-4">
+        <DxInput label="Invoice ID" type="number" mono min={1} value={invoiceId} onChange={(e) => setInvoiceId(e.target.value)} placeholder="e.g. 128" />
+        <DxInput label="Amount" type="number" mono min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+        <DxSelect label="Payment method" options={METHOD_OPTIONS.slice(1)} value={method} onChange={(e) => setMethod(e.target.value)} />
+        <DxTextarea label="Note (optional)" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. POS terminal 2, teller ref…" />
+        {error ? <p className="text-[12px] font-semibold text-[var(--dx-danger,#e11d48)]">{error}</p> : null}
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -205,29 +108,18 @@ export function PaymentsPage() {
   const refundPayment = useRefundPayment();
 
   const filters = useMemo(
-    () => ({
-      skip: (page - 1) * PAGE_SIZE,
-      limit: PAGE_SIZE,
-      payment_method: method || undefined,
-      payment_status: status || undefined,
-    }),
+    () => ({ skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE, payment_method: method || undefined, payment_status: status || undefined }),
     [page, method, status],
   );
 
   const paymentsQuery = usePayments(filters);
   const summaryQuery = usePaymentsSummary();
 
-  // The backend list endpoint has no search / date-range params, so the
-  // reference search and date window are applied client-side on the page.
   const rows = useMemo(() => {
     let items = paymentsQuery.data?.items ?? [];
     if (search) {
       const term = search.toLowerCase();
-      items = items.filter(
-        (p) =>
-          p.payment_reference.toLowerCase().includes(term) ||
-          String(p.invoice_id).includes(term),
-      );
+      items = items.filter((p) => p.payment_reference.toLowerCase().includes(term) || String(p.invoice_id).includes(term));
     }
     if (dateFrom) {
       const from = new Date(dateFrom).getTime();
@@ -251,171 +143,55 @@ export function PaymentsPage() {
       toast.success("Payment refunded", `Reference ${refundTarget.payment_reference} reversed.`);
       setRefundTarget(null);
     } catch (err: any) {
-      toast.error(
-        "Failed to refund payment",
-        err?.response?.data?.detail?.toString?.() ?? err?.message,
-      );
+      toast.error("Failed to refund payment", err?.response?.data?.detail?.toString?.() ?? err?.message);
     }
   };
 
-  const columns: DataTableColumn<Payment>[] = [
-    {
-      key: "payment_reference",
-      header: "Reference",
-      render: (p) => (
+  const columns: DxGridColumn<Payment>[] = [
+    { key: "payment_reference", header: "Reference", render: (p) => (
         <div>
-          <p className="data-mono text-sm font-bold text-secondary-900">{p.payment_reference}</p>
-          <p className="mt-0.5 text-xs text-secondary-400">{formatDateTime(p.paid_at)}</p>
-        </div>
-      ),
-    },
-    {
-      key: "invoice_id",
-      header: "Invoice",
-      render: (p) => (
-        <span className="data-mono text-sm text-secondary-600">#{p.invoice_id}</span>
-      ),
-    },
-    {
-      key: "payment_method",
-      header: "Method",
-      render: (p) => {
+          <p className="dx-mono text-[13px] font-semibold text-[var(--dx-text)]">{p.payment_reference}</p>
+          <p className="mt-0.5 text-[11.5px] text-[var(--dx-text-faint)]">{formatDateTime(p.paid_at)}</p>
+        </div>) },
+    { key: "invoice_id", header: "Invoice", render: (p) => <span className="dx-mono text-[13px] text-[var(--dx-text-muted)]">#{p.invoice_id}</span> },
+    { key: "payment_method", header: "Method", render: (p) => {
         const m = p.payment_method ?? "OTHER";
-        return (
-          <Badge variant={METHOD_VARIANTS[m] ?? "secondary"}>{m.replace(/_/g, " ")}</Badge>
-        );
-      },
-    },
-    {
-      key: "payment_status",
-      header: "Status",
-      render: (p) => (
-        <Badge variant={STATUS_VARIANTS[p.payment_status] ?? "secondary"}>
-          {p.payment_status}
-        </Badge>
-      ),
-    },
-    {
-      key: "amount",
-      header: "Amount",
-      align: "right",
-      render: (p) => (
-        <span className="data-mono text-sm font-bold text-secondary-900">
-          {formatMoney(p.amount, p.currency)}
-        </span>
-      ),
-    },
-    {
-      key: "actions",
-      header: "",
-      align: "right",
-      render: (p) =>
+        return <DxBadge tone={METHOD_TONES[m] ?? "neutral"}>{m.replace(/_/g, " ")}</DxBadge>;
+      } },
+    { key: "payment_status", header: "Status", render: (p) => <DxBadge dot tone={STATUS_TONES[p.payment_status] ?? "neutral"}>{p.payment_status}</DxBadge> },
+    { key: "amount", header: "Amount", align: "right", render: (p) => <span className="dx-mono font-semibold text-[var(--dx-text)]">{formatMoney(p.amount, p.currency)}</span> },
+    { key: "actions", header: "", align: "right", render: (p) =>
         p.payment_status === "SUCCESSFUL" ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Undo2 className="h-3.5 w-3.5" />}
-            onClick={(e) => {
-              e.stopPropagation();
-              setRefundTarget(p);
-            }}
-          >
-            Refund
-          </Button>
-        ) : null,
-    },
+          <DxButton variant="text" size="sm" leftIcon={<Undo2 className="h-3.5 w-3.5" />} onClick={(e) => { e.stopPropagation(); setRefundTarget(p); }}>Refund</DxButton>
+        ) : null },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Billing" }, { label: "Payments" }]}
         title="Payments"
-        description="Ledger of all payments received across invoices, with refunds and reconciliation."
-        actions={
-          <Button leftIcon={<Plus className="h-4 w-4" />} onClick={recordModal.open}>
-            Record Payment
-          </Button>
-        }
+        subtitle="Ledger of all payments received across invoices, with refunds and reconciliation."
+        actions={<DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={recordModal.open}>Record payment</DxButton>}
       />
 
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Total Payments"
-          value={summary ? summary.totalPayments.toLocaleString() : "—"}
-          icon={Wallet}
-          tone="primary"
-          isLoading={summaryQuery.isLoading}
-        />
-        <MetricCard
-          label="Collected (Successful)"
-          value={summary ? formatMoney(summary.totalCollected) : "—"}
-          icon={Banknote}
-          tone="cyan"
-          isLoading={summaryQuery.isLoading}
-        />
-        <MetricCard
-          label="Pending"
-          value={summary ? summary.pendingCount.toLocaleString() : "—"}
-          icon={Clock}
-          tone="amber"
-          isLoading={summaryQuery.isLoading}
-        />
-        <MetricCard
-          label="Reversed Amount"
-          value={summary ? formatMoney(summary.reversedAmount) : "—"}
-          icon={RotateCcw}
-          tone="rose"
-          isLoading={summaryQuery.isLoading}
-        />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <DxKpi label="Total payments" value={summary ? summary.totalPayments.toLocaleString() : "—"} icon={Wallet} tone="accent" isLoading={summaryQuery.isLoading} />
+        <DxKpi label="Collected (successful)" value={summary ? formatMoney(summary.totalCollected) : "—"} icon={Banknote} tone="info" isLoading={summaryQuery.isLoading} />
+        <DxKpi label="Pending" value={summary ? summary.pendingCount.toLocaleString() : "—"} icon={Clock} tone="warning" isLoading={summaryQuery.isLoading} />
+        <DxKpi label="Reversed amount" value={summary ? formatMoney(summary.reversedAmount) : "—"} icon={RotateCcw} tone="danger" isLoading={summaryQuery.isLoading} />
       </div>
 
-      <Card padding="none">
-        <div className="flex flex-wrap items-end gap-3 px-6 py-4">
-          <SearchInput
-            onSearch={setSearch}
-            placeholder="Search reference or invoice…"
-            className="w-72"
-          />
-          <Select
-            aria-label="Filter by method"
-            options={METHOD_OPTIONS}
-            value={method}
-            onChange={(e) => {
-              setMethod(e.target.value);
-              setPage(1);
-            }}
-            className="w-44 py-2.5"
-          />
-          <Select
-            aria-label="Filter by status"
-            options={STATUS_OPTIONS}
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(1);
-            }}
-            className="w-40 py-2.5"
-          />
-          <div className="w-40">
-            <Input
-              aria-label="From date"
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="py-2.5"
-            />
-          </div>
-          <div className="w-40">
-            <Input
-              aria-label="To date"
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="py-2.5"
-            />
-          </div>
+      <DxPanel flush>
+        <div className="flex flex-wrap items-end gap-2 px-4 py-3">
+          <SearchInput onSearch={setSearch} placeholder="Search reference or invoice…" className="w-72" />
+          <DxSelect aria-label="Filter by method" options={METHOD_OPTIONS} value={method} onChange={(e) => { setMethod(e.target.value); setPage(1); }} className="w-44" />
+          <DxSelect aria-label="Filter by status" options={STATUS_OPTIONS} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="w-40" />
+          <div className="w-40"><DxInput aria-label="From date" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
+          <div className="w-40"><DxInput aria-label="To date" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
         </div>
-        <DataTable
+        <DxGrid<Payment>
+          borderless
           columns={columns}
           data={rows}
           rowKey={(p) => p.id}
@@ -425,19 +201,8 @@ export function PaymentsPage() {
           empty={{
             icon: CreditCard,
             title: "No payments found",
-            description:
-              search || dateFrom || dateTo
-                ? "No payments match your filters on this page."
-                : "Payments will appear here as they are received.",
-            action: (
-              <Button
-                size="sm"
-                leftIcon={<Plus className="h-3.5 w-3.5" />}
-                onClick={recordModal.open}
-              >
-                Record Payment
-              </Button>
-            ),
+            description: search || dateFrom || dateTo ? "No payments match your filters on this page." : "Payments will appear here as they are received.",
+            action: <DxButton size="sm" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={recordModal.open}>Record payment</DxButton>,
           }}
           footer={
             <Pagination
@@ -450,7 +215,7 @@ export function PaymentsPage() {
             />
           }
         />
-      </Card>
+      </DxPanel>
 
       <RecordPaymentModal isOpen={recordModal.isOpen} onClose={recordModal.close} />
 
@@ -467,6 +232,6 @@ export function PaymentsPage() {
         }
         confirmLabel="Refund"
       />
-    </div>
+    </DxPage>
   );
 }

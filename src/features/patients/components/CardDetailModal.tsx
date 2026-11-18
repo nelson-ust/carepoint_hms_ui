@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { format, isValid } from "date-fns";
 import {
   ArrowDownCircle,
@@ -12,13 +13,10 @@ import {
   QrCode,
   Wallet,
 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Badge } from "@/components/ui/Badge";
+import { DxPopup, DxButton, DxInput, DxSelect, DxBadge } from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
+import { routes } from "@/config/routes";
 import { membershipApi, formatCardMoney, type MembershipCard } from "../api/membership.api";
 
 function safeDate(v?: string | null): string {
@@ -45,6 +43,7 @@ export function CardDetailModal({
 }) {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [funding, setFunding] = useState(false);
   const [amount, setAmount] = useState("");
   const [source, setSource] = useState("CASH");
@@ -134,38 +133,38 @@ export function CardDetailModal({
   const isActive = status === "ACTIVE";
 
   return (
-    <Modal isOpen={!!card} onClose={onClose} title="Membership card" size="lg">
+    <DxPopup isOpen={!!card} onClose={onClose} title="Membership card" size="lg">
       <div className="space-y-6">
-        {/* Card face */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-secondary-900 to-secondary-800 p-6 text-white shadow-xl">
-          <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary-500/20 blur-2xl" />
+        {/* Card face — intentional dark "physical card" visual */}
+        <div className="relative overflow-hidden rounded-xl p-6 text-white shadow-lg" style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)" }}>
+          <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full" style={{ background: "rgba(56,130,246,0.18)", filter: "blur(36px)" }} />
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/10">
                 <CreditCard className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">Cardholder</p>
-                <p className="text-sm font-bold">{card.patient_name || `Patient #${card.patient_id}`}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50">Cardholder</p>
+                <p className="text-[14px] font-semibold">{card.patient_name || `Patient #${card.patient_id}`}</p>
                 {(detail?.global_patient_id || card.global_patient_id) ? (
                   <p className="mt-0.5 flex items-center gap-1 text-[9px] font-medium text-white/60">
-                    <span className="font-bold uppercase tracking-[0.15em] text-white/40">Global ID</span>
-                    <span className="data-mono tracking-wider">{detail?.global_patient_id || card.global_patient_id}</span>
+                    <span className="font-semibold uppercase tracking-[0.15em] text-white/40">Global ID</span>
+                    <span className="dx-mono tracking-wider">{detail?.global_patient_id || card.global_patient_id}</span>
                   </p>
                 ) : null}
               </div>
             </div>
-            <Badge variant={isActive ? "success" : "warning"}>{status}</Badge>
+            <DxBadge tone={isActive ? "solid-accent" : "warning"}>{status}</DxBadge>
           </div>
-          <p className="data-mono mt-6 text-xl font-bold tracking-[0.25em]">{card.card_number}</p>
+          <p className="dx-mono mt-6 text-[20px] font-bold tracking-[0.25em]">{card.card_number}</p>
           <div className="mt-4 flex items-end justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Wallet balance</p>
-              <p className="font-display text-2xl font-bold">{formatCardMoney(detail?.balance ?? card.balance)}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">Wallet balance</p>
+              <p className="text-[24px] font-bold">{formatCardMoney(detail?.balance ?? card.balance)}</p>
             </div>
             <div className="text-right">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Valid thru</p>
-              <p className="text-sm font-bold">{safeDate(card.expiry_date)}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">Valid thru</p>
+              <p className="text-[14px] font-semibold">{safeDate(card.expiry_date)}</p>
             </div>
             {qrUrl ? (
               <div className="rounded-lg bg-white p-1.5 shadow-sm" title="Scan to verify this card">
@@ -178,120 +177,69 @@ export function CardDetailModal({
         </div>
 
         {/* Actions */}
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2">
           {!funding ? (
-            <Button size="sm" onClick={() => setFunding(true)} leftIcon={<Wallet className="h-4 w-4" />}>
-              Fund wallet
-            </Button>
+            <DxButton size="sm" variant="primary" onClick={() => setFunding(true)} leftIcon={<Wallet className="h-4 w-4" />}>Fund wallet</DxButton>
           ) : null}
           {isActive ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => statusMut.mutate("SUSPENDED")}
-              isLoading={statusMut.isPending}
-              leftIcon={<Ban className="h-4 w-4" />}
-            >
-              Suspend card
-            </Button>
+            <DxButton size="sm" onClick={() => statusMut.mutate("SUSPENDED")} isLoading={statusMut.isPending} leftIcon={<Ban className="h-4 w-4" />}>Suspend card</DxButton>
           ) : (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => statusMut.mutate("ACTIVE")}
-              isLoading={statusMut.isPending}
-              leftIcon={<CheckCircle2 className="h-4 w-4" />}
-            >
-              Activate card
-            </Button>
+            <DxButton size="sm" onClick={() => statusMut.mutate("ACTIVE")} isLoading={statusMut.isPending} leftIcon={<CheckCircle2 className="h-4 w-4" />}>Activate card</DxButton>
           )}
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={printCard}
-            isLoading={printing}
-            leftIcon={<Printer className="h-4 w-4" />}
-          >
-            Print card
-          </Button>
+          <DxButton size="sm" onClick={printCard} isLoading={printing} leftIcon={<Printer className="h-4 w-4" />}>Print card</DxButton>
         </div>
 
         {/* Fund form */}
         {funding ? (
-          <div className="space-y-4 rounded-2xl border border-secondary-200 p-4 dark:border-white/10">
+          <div className="space-y-4 rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] p-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                label="Amount"
-                type="number"
-                min={1}
-                placeholder="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-              <Select
-                label="Payment source"
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                options={PAYMENT_SOURCES}
-              />
+              <DxInput label="Amount" type="number" min={1} placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <DxSelect label="Payment source" value={source} onChange={(e) => setSource(e.target.value)} options={PAYMENT_SOURCES} />
             </div>
-            <div className="flex justify-end gap-3">
-              <Button variant="ghost" size="sm" onClick={() => setFunding(false)} disabled={fundMut.isPending}>
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => fundMut.mutate()}
-                isLoading={fundMut.isPending}
-                disabled={!amount || Number(amount) <= 0}
-              >
-                Add funds
-              </Button>
+            <div className="flex justify-end gap-2">
+              <DxButton variant="text" size="sm" onClick={() => setFunding(false)} disabled={fundMut.isPending}>Cancel</DxButton>
+              <DxButton size="sm" variant="primary" onClick={() => fundMut.mutate()} isLoading={fundMut.isPending} disabled={!amount || Number(amount) <= 0}>Add funds</DxButton>
             </div>
           </div>
         ) : null}
 
         {/* Transactions */}
         <div>
-          <p className="mb-2 text-xs font-black uppercase tracking-widest text-secondary-400">Transaction history</p>
-          <div className="max-h-64 overflow-y-auto rounded-2xl border border-secondary-200 dark:border-white/10">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">Transaction history</p>
+            {card ? (
+              <button type="button" className="text-[11px] font-semibold text-[var(--dx-accent)] hover:underline" onClick={() => navigate(routes.cardUsageLog.replace(":cardId", String(card.id)))}>
+                Open full usage log →
+              </button>
+            ) : null}
+          </div>
+          <div className="max-h-64 overflow-y-auto rounded-md border border-[var(--dx-border)]">
             {detailQuery.isLoading ? (
-              <div className="flex items-center justify-center gap-2 p-6 text-xs text-secondary-400">
+              <div className="flex items-center justify-center gap-2 p-6 text-[12px] text-[var(--dx-text-muted)]">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading…
               </div>
             ) : transactions.length === 0 ? (
-              <p className="p-6 text-center text-xs font-medium text-secondary-400">No transactions yet.</p>
+              <p className="p-6 text-center text-[12px] font-medium text-[var(--dx-text-muted)]">No transactions yet.</p>
             ) : (
               transactions.map((t) => {
                 const credit = String(t.transaction_type).toUpperCase() === "CREDIT";
                 return (
-                  <div
-                    key={t.id}
-                    className="flex items-center justify-between border-b border-secondary-100 px-4 py-3 last:border-0 dark:border-white/5"
-                  >
+                  <div key={t.id} className="flex items-center justify-between border-b border-[var(--dx-border)] px-4 py-3 last:border-0">
                     <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                          credit ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
-                        }`}
-                      >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md" style={credit ? { background: "var(--dx-success-soft)", color: "var(--dx-success)" } : { background: "var(--dx-danger-soft)", color: "var(--dx-danger)" }}>
                         {credit ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />}
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-secondary-800 dark:text-secondary-100">
-                          {t.narration || t.transaction_type}
-                        </p>
-                        <p className="text-[10px] text-secondary-400">
-                          {safeDate(t.transaction_date)} · {t.payment_source || "—"}
-                        </p>
+                        <p className="text-[12px] font-semibold text-[var(--dx-text)]">{t.narration || t.transaction_type}</p>
+                        <p className="text-[10px] text-[var(--dx-text-muted)]">{safeDate(t.transaction_date)} · {t.payment_source || "—"}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className={`data-mono text-xs font-bold ${credit ? "text-emerald-600" : "text-rose-600"}`}>
+                      <p className="dx-mono text-[12px] font-bold" style={{ color: credit ? "var(--dx-success)" : "var(--dx-danger)" }}>
                         {credit ? "+" : "−"}
                         {formatCardMoney(t.amount)}
                       </p>
-                      <p className="text-[10px] text-secondary-400">Bal {formatCardMoney(t.balance_after)}</p>
+                      <p className="text-[10px] text-[var(--dx-text-muted)]">Bal {formatCardMoney(t.balance_after)}</p>
                     </div>
                   </div>
                 );
@@ -300,6 +248,6 @@ export function CardDetailModal({
           </div>
         </div>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

@@ -10,13 +10,15 @@ import {
   Unlock,
 } from "lucide-react";
 import {
+  applyFacilityProfile,
   bulkSetTenantModules,
+  listFacilityProfiles,
   listModuleCatalog,
   listTenantModules,
   resetTenantModule,
   setTenantModule,
 } from "../api/tenant-modules.api";
-import type { ModuleCatalogEntry, TenantModule } from "../api/tenant-modules.api";
+import type { FacilityProfile, ModuleCatalogEntry, TenantModule } from "../api/tenant-modules.api";
 import {
   DxBadge,
   DxButton,
@@ -77,16 +79,23 @@ export function TenantModulesManager({ tenantId, showHeader = true }: Props) {
   const [resettingCode, setResettingCode] = useState<string | null>(null);
   const [localToggles, setLocalToggles] = useState<Record<string, boolean>>({});
 
+  const [profiles, setProfiles] = useState<FacilityProfile[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState("");
+  const [applyingProfile, setApplyingProfile] = useState(false);
+  const [profileConfirm, setProfileConfirm] = useState(false);
+
   const load = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [cat, mods] = await Promise.all([
+      const [cat, mods, profs] = await Promise.all([
         listModuleCatalog().catch(() => [] as ModuleCatalogEntry[]),
         listTenantModules(tenantId).catch(() => [] as TenantModule[]),
+        listFacilityProfiles().catch(() => [] as FacilityProfile[]),
       ]);
       setCatalog(cat);
       setTenantModulesState(mods);
+      setProfiles(profs);
     } catch (err) {
       setError(apiErrorMessage(err) || "Unable to load modules.");
     } finally {
@@ -98,6 +107,23 @@ export function TenantModulesManager({ tenantId, showHeader = true }: Props) {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
+
+  const applyProfileNow = async () => {
+    if (!selectedProfile) return;
+    setApplyingProfile(true);
+    try {
+      await applyFacilityProfile(tenantId, selectedProfile);
+      const label = profiles.find((p) => p.code === selectedProfile)?.label ?? selectedProfile;
+      toast.success(`Applied the ${label} profile.`);
+      setProfileConfirm(false);
+      setSelectedProfile("");
+      await load();
+    } catch (err) {
+      toast.error(apiErrorMessage(err) || "Failed to apply the facility profile.");
+    } finally {
+      setApplyingProfile(false);
+    }
+  };
 
   const rows = useMemo<RowState[]>(() => {
     const tenantMap = new Map(tenantModules.map((m) => [m.code || m.module_code || "", m]));
@@ -264,6 +290,46 @@ export function TenantModulesManager({ tenantId, showHeader = true }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Facility profile quick-apply (one-click vertical preset) */}
+      {profiles.length > 0 ? (
+        <div className="flex flex-col gap-2 rounded-[var(--dx-radius)] border border-[var(--dx-border)] bg-[var(--dx-surface)] p-3 md:flex-row md:items-center">
+          <div className="flex-1">
+            <p className="text-[13px] font-semibold text-[var(--dx-text)]">Facility profile</p>
+            <p className="text-[12px] text-[var(--dx-text-muted)]">
+              Apply a one-click preset: enable only a vertical's modules (Dental / Eye / Pharmacy), or restore the full hospital.
+            </p>
+          </div>
+          <DxSelect
+            value={selectedProfile}
+            onChange={(e) => setSelectedProfile(e.target.value)}
+            aria-label="Facility profile"
+            className="w-56"
+            options={[
+              { value: "", label: "Choose a profile…" },
+              ...profiles.map((p) => ({ value: p.code, label: p.label })),
+            ]}
+          />
+          <DxButton
+            variant="primary"
+            leftIcon={<Sparkles className="h-3.5 w-3.5" />}
+            disabled={!selectedProfile}
+            onClick={() => setProfileConfirm(true)}
+          >
+            Apply profile
+          </DxButton>
+        </div>
+      ) : null}
+
+      <DxConfirm
+        isOpen={profileConfirm}
+        onClose={() => !applyingProfile && setProfileConfirm(false)}
+        onConfirm={applyProfileNow}
+        title="Apply facility profile?"
+        description="This enables the selected vertical's modules and disables the rest for this tenant. It overwrites existing module overrides; data is not deleted and you can re-apply another profile at any time."
+        confirmLabel="Apply profile"
+        tone="primary"
+      />
+
       {showHeader && (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-2">

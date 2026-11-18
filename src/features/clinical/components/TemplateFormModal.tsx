@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { GripVertical, Plus, Star, Trash2 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
+import { DxPopup, DxButton, DxInput, DxSelect, DxTextarea } from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import {
   clinicalTemplatesApi,
@@ -126,112 +122,82 @@ export function TemplateFormModal({
   const canSave = name.trim().length > 0 && sections.some((s) => s.title.trim());
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={onClose}
       title={isEdit ? `Edit "${template?.name}"` : "Create clinical template"}
       size="lg"
+      locked={save.isPending}
       footer={
         <div className="flex w-full items-center justify-between gap-3">
           <button
             type="button"
             onClick={() => setIsFavorite((v) => !v)}
-            className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-colors ${
-              isFavorite ? "bg-amber-500/15 text-amber-500" : "text-secondary-400 hover:bg-secondary-100 dark:hover:bg-white/5"
-            }`}
+            className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] font-semibold transition-colors"
+            style={
+              isFavorite
+                ? { background: "var(--dx-warning-soft)", color: "var(--dx-warning)" }
+                : { color: "var(--dx-text-muted)" }
+            }
           >
-            <Star className={`h-4 w-4 ${isFavorite ? "fill-current" : ""}`} />
+            <Star className="h-4 w-4" style={{ fill: isFavorite ? "currentColor" : "none" }} />
             {isFavorite ? "Marked as commonly used" : "Mark as commonly used"}
           </button>
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={onClose} disabled={save.isPending}>
-              Cancel
-            </Button>
-            <Button onClick={() => save.mutate()} isLoading={save.isPending} disabled={!canSave}>
+          <div className="flex gap-2">
+            <DxButton onClick={onClose} disabled={save.isPending}>Cancel</DxButton>
+            <DxButton variant="primary" onClick={() => save.mutate()} isLoading={save.isPending} disabled={!canSave}>
               {isEdit ? "Save changes" : "Create template"}
-            </Button>
+            </DxButton>
           </div>
         </div>
       }
     >
       <div className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="Template name"
-            placeholder="e.g. Adult Malaria Follow-up"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <Input
-            label="Specialty (optional)"
-            placeholder="e.g. Internal Medicine"
-            value={specialty}
-            onChange={(e) => setSpecialty(e.target.value)}
-          />
+          <DxInput label="Template name" placeholder="e.g. Adult Malaria Follow-up" value={name} onChange={(e) => setName(e.target.value)} />
+          <DxInput label="Specialty (optional)" placeholder="e.g. Internal Medicine" value={specialty} onChange={(e) => setSpecialty(e.target.value)} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select
-            label="Template type"
-            value={templateType}
-            onChange={(e) => handleTypeChange(e.target.value)}
-            options={TEMPLATE_TYPES.map((t) => ({ value: t.value, label: t.label }))}
-          />
-          <Input
-            label="Description (optional)"
-            placeholder="When should clinicians reach for this?"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
+          <DxSelect label="Template type" value={templateType} onChange={(e) => handleTypeChange(e.target.value)}
+            options={TEMPLATE_TYPES.map((t) => ({ value: t.value, label: t.label }))} />
+          <DxInput label="Description (optional)" placeholder="When should clinicians reach for this?" value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
 
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <label className="block text-xs font-bold uppercase tracking-widest text-secondary-500">
-              Sections
-            </label>
-            <button
-              type="button"
-              onClick={() => setSections((prev) => [...prev, { title: "", content: "" }])}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-primary-500 hover:underline"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add section
-            </button>
+            <span className="dx-field-label">Sections</span>
+            <DxButton size="sm" variant="accent-text" leftIcon={<Plus className="h-3.5 w-3.5" />}
+              onClick={() => setSections((prev) => [...prev, { title: "", content: "" }])}>
+              Add section
+            </DxButton>
           </div>
           <div className="space-y-3">
             {sections.map((section, idx) => (
-              <div
-                key={idx}
-                className="rounded-2xl border border-secondary-200 p-4 dark:border-white/10"
-              >
+              <div key={idx} className="rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface)] p-4">
                 <div className="mb-2 flex items-center gap-2">
-                  <GripVertical className="h-4 w-4 shrink-0 text-secondary-300" />
+                  <GripVertical className="h-4 w-4 shrink-0 text-[var(--dx-text-faint)]" />
                   <input
                     value={section.title}
                     onChange={(e) => updateSection(idx, { title: e.target.value })}
                     placeholder={`Section ${idx + 1} title`}
-                    className="w-full bg-transparent text-sm font-bold text-secondary-900 outline-none placeholder:text-secondary-300"
+                    className="dx-editor flex-1 border-0 bg-transparent px-0 font-semibold shadow-none focus:ring-0"
                   />
-                  <button
-                    type="button"
-                    onClick={() => removeSection(idx)}
-                    className="rounded-lg p-1.5 text-secondary-300 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
-                    aria-label="Remove section"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <DxButton icon size="sm" variant="outline-danger" title="Remove section" onClick={() => removeSection(idx)}>
+                    <Trash2 />
+                  </DxButton>
                 </div>
                 <textarea
                   value={section.content}
                   onChange={(e) => updateSection(idx, { content: e.target.value })}
                   placeholder="Pre-filled text or prompts for the clinician…"
                   rows={2}
-                  className="w-full resize-y rounded-xl bg-secondary-50 px-3 py-2 text-sm font-medium text-secondary-700 outline-none placeholder:text-secondary-300 dark:bg-white/5 dark:text-secondary-200"
+                  className="dx-editor w-full resize-y"
                 />
               </div>
             ))}
           </div>
         </div>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

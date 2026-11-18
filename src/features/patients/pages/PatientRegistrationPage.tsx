@@ -1,33 +1,36 @@
-import { PageHeader } from "@/components/layout/PageHeader";
 import { useForm, useFieldArray } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
   User,
-  Mail,
   Phone,
-  MapPin,
-  Calendar,
   ShieldCheck,
   Save,
   X,
-  Activity,
-  Users,
-  Contact,
   FileText,
-  AlertCircle,
   Heart,
-  CreditCard,
   Award,
   Plus,
-  Trash2
+  Trash2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { routes } from "@/config/routes";
 import { useState, useEffect } from "react";
-import Select from "react-select";
-import { Controller } from "react-hook-form";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxForm,
+  DxInput,
+  DxSelect,
+  DxTextarea,
+  DxButton,
+  DxMessage,
+  DxTabs,
+} from "@/components/dx";
+import { useToast } from "@/components/feedback/ToastProvider";
+import { useInsuranceProviders } from "@/features/insurance/hooks/use-insurance";
 import { createPatient, getLoyaltyPrograms } from "../api/patients.api";
 import type { LoyaltyProgram } from "../api/patients.api";
 
@@ -90,12 +93,33 @@ const patientSchema = z.object({
 });
 
 type FormData = z.infer<typeof patientSchema>;
+type SectionKey = "basic" | "clinical" | "insurance" | "loyalty";
+
+const GENDER_OPTIONS = [
+  { value: "MALE", label: "Male" },
+  { value: "FEMALE", label: "Female" },
+  { value: "OTHER", label: "Other" },
+];
+const MARITAL_OPTIONS = [
+  { value: "SINGLE", label: "Single" },
+  { value: "MARRIED", label: "Married" },
+  { value: "DIVORCED", label: "Divorced" },
+  { value: "WIDOWED", label: "Widowed" },
+];
+const BLOOD_GROUP_OPTIONS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((v) => ({ value: v, label: v }));
+const GENOTYPE_OPTIONS = ["AA", "AS", "SS", "SC", "AC"].map((v) => ({ value: v, label: v }));
+const PATIENT_CLASS_OPTIONS = [
+  { value: "SELF_PAY", label: "Normal (Self-pay)" },
+  { value: "HMO", label: "HMO / Insurance" },
+  { value: "RETAINERSHIP", label: "Retainership (Company-billed)" },
+];
 
 export function PatientRegistrationPage() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<"basic" | "clinical" | "insurance" | "loyalty">("basic");
+  const [activeSection, setActiveSection] = useState<SectionKey>("basic");
   const [loyaltyPrograms, setLoyaltyPrograms] = useState<LoyaltyProgram[]>([]);
 
   useEffect(() => {
@@ -126,12 +150,15 @@ export function PatientRegistrationPage() {
 
   const { fields: identifierFields, append: appendIdentifier, remove: removeIdentifier } = useFieldArray({
     control,
-    name: "previous_identifiers"
+    name: "previous_identifiers",
   });
 
-  // Auto-generate membership number when loyalty program is selected
+  // Auto-generate membership number when a loyalty program is selected.
   const watchLoyaltyProgram = watch("loyalty_enrollment.loyalty_program_id");
   const currentMembershipNo = watch("loyalty_enrollment.membership_no");
+  const patientClass = watch("patient_class");
+  const providersQuery = useInsuranceProviders();
+  const providers = providersQuery.data ?? [];
 
   useEffect(() => {
     if (watchLoyaltyProgram && !currentMembershipNo) {
@@ -141,8 +168,6 @@ export function PatientRegistrationPage() {
     }
   }, [watchLoyaltyProgram, setValue, currentMembershipNo]);
 
-  const payerType = watch("payer_type");
-
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
     setError(null);
@@ -150,15 +175,15 @@ export function PatientRegistrationPage() {
       // Deep clean: OMIT empty strings, nulls, undefined, and empty objects
       // entirely. The backend rejects `null` on optional string fields and
       // expects them to be absent from the payload.
-      const cleanData = (obj: any): any => {
+      const cleanData = (obj: unknown): unknown => {
         if (Array.isArray(obj)) {
           return obj
             .map(cleanData)
             .filter((v) => v !== undefined && v !== null && v !== "");
         }
         if (obj !== null && typeof obj === "object") {
-          const out: Record<string, any> = {};
-          for (const [k, v] of Object.entries(obj)) {
+          const out: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
             const cleaned = cleanData(v);
             if (cleaned === undefined || cleaned === null || cleaned === "") continue;
             // Drop empty arrays / objects entirely
@@ -166,7 +191,7 @@ export function PatientRegistrationPage() {
             if (
               typeof cleaned === "object" &&
               !Array.isArray(cleaned) &&
-              Object.keys(cleaned).length === 0
+              Object.keys(cleaned as object).length === 0
             )
               continue;
             out[k] = cleaned;
@@ -176,7 +201,12 @@ export function PatientRegistrationPage() {
         return obj;
       };
 
-      const payload = cleanData(data) as any;
+      const payload = cleanData(data) as {
+        preferred_payer_id?: number;
+        insurance_enrollment?: { insurance_provider_id?: number };
+        loyalty_enrollment?: { loyalty_program_id?: number };
+        [k: string]: unknown;
+      };
 
       // Final sanitization for backend alignment
       if (payload.preferred_payer_id === 0) delete payload.preferred_payer_id;
@@ -185,533 +215,247 @@ export function PatientRegistrationPage() {
       if (payload.insurance_enrollment && !payload.insurance_enrollment.insurance_provider_id) {
         delete payload.insurance_enrollment;
       }
+      if (payload.patient_class === "SELF_PAY") {
+        delete payload.insurance_enrollment;
+      }
       if (payload.loyalty_enrollment && !payload.loyalty_enrollment.loyalty_program_id) {
         delete payload.loyalty_enrollment;
       }
 
-      await createPatient(payload, { forceCreateIfPossibleDuplicate: false });
+      await createPatient(payload as Parameters<typeof createPatient>[0], { forceCreateIfPossibleDuplicate: false });
+      toast.success("Patient registered", `${data.first_name} ${data.last_name} was added successfully.`);
       navigate(routes.patients);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Surface the most informative error available (FastAPI uses `detail`,
       // some endpoints use `message`, validation errors come back as arrays).
-      const data = err?.response?.data;
+      const ax = err as {
+        response?: { data?: { message?: unknown; detail?: unknown } };
+        message?: string;
+      };
+      const resp = ax?.response?.data;
       const message =
-        (typeof data?.message === "string" && data.message) ||
-        (typeof data?.detail === "string" && data.detail) ||
-        (Array.isArray(data?.detail) &&
-          data.detail
-            .map((d: any) => `${d.loc?.join(".") ?? "field"}: ${d.msg ?? "invalid"}`)
+        (typeof resp?.message === "string" && resp.message) ||
+        (typeof resp?.detail === "string" && resp.detail) ||
+        (Array.isArray(resp?.detail) &&
+          resp.detail
+            .map((d: { loc?: unknown[]; msg?: string }) => `${d.loc?.join(".") ?? "field"}: ${d.msg ?? "invalid"}`)
             .join(" · ")) ||
-        (err?.message?.includes("Network Error")
+        (ax?.message?.includes("Network Error")
           ? "Server returned an error. Please double-check the form and try again."
           : null) ||
         "Failed to register patient. Please verify the information.";
       setError(message);
+      toast.error("Registration failed", message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const SectionTab = ({ id, label, icon: Icon }: { id: typeof activeSection, label: string, icon: any }) => (
-    <button
-      type="button"
-      onClick={() => setActiveSection(id)}
-      className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all duration-300 font-bold text-sm ${activeSection === id
-          ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20 translate-y-[-2px]"
-          : "text-secondary-500 hover:bg-secondary-50"
-        }`}
-    >
-      <Icon className="h-4 w-4" />
-      <span>{label}</span>
-    </button>
-  );
-
-  const selectStyles = {
-    control: (base: any, state: any) => ({
-      ...base,
-      minHeight: '3.5rem',
-      borderRadius: '1rem',
-      borderColor: state.isFocused ? '#0ea5e9' : '#e2e8f0',
-      boxShadow: state.isFocused ? '0 0 0 1px #0ea5e9' : 'none',
-      backgroundColor: 'white',
-      '&:hover': {
-        borderColor: '#0ea5e9'
-      },
-      paddingLeft: '0.5rem',
-      fontSize: '0.875rem',
-      fontWeight: '600'
-    }),
-    option: (base: any, state: any) => ({
-      ...base,
-      backgroundColor: state.isSelected ? '#0ea5e9' : state.isFocused ? '#f0f9ff' : 'white',
-      color: state.isSelected ? 'white' : '#1e293b',
-      padding: '0.75rem 1.25rem',
-      fontSize: '0.875rem',
-      fontWeight: '600',
-      '&:active': {
-        backgroundColor: '#0ea5e9'
-      }
-    }),
-    menu: (base: any) => ({
-      ...base,
-      zIndex: 9999,
-      borderRadius: '1rem',
-      overflow: 'hidden',
-      border: '1px solid #e2e8f0',
-      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
-    }),
-    menuPortal: (base: any) => ({
-      ...base,
-      zIndex: 9999
-    }),
-    placeholder: (base: any) => ({
-      ...base,
-      color: '#94a3b8'
-    })
+  // When validation fails on a tab the user isn't viewing, jump to the first
+  // tab (where the required identity/contact fields live) so errors are seen.
+  const onInvalid = () => {
+    setActiveSection("basic");
+    toast.error("Check the form", "Some required fields need your attention.");
   };
 
+  const tabs: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
+    { key: "basic", label: "Identity & Contact", icon: <User className="h-4 w-4" /> },
+    { key: "clinical", label: "Clinical Profile", icon: <Heart className="h-4 w-4" /> },
+    { key: "insurance", label: "Insurance Details", icon: <ShieldCheck className="h-4 w-4" /> },
+    { key: "loyalty", label: "Loyalty Program", icon: <Award className="h-4 w-4" /> },
+  ];
+
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20">
-      <div className="flex items-center justify-between">
-        <PageHeader
-          title="Patient Onboarding"
-          description="Register new patients with full enterprise clinical and administrative profiles."
-        />
-        <button
-          onClick={() => navigate(routes.patients)}
-          className="btn-secondary px-4 py-2 flex items-center gap-2"
-        >
-          <X className="h-4 w-4" />
-          <span>Exit</span>
-        </button>
-      </div>
+    <DxPage className="max-w-6xl pb-10">
+      <DxPageHeader
+        title="Patient Registration"
+        subtitle="Register new patients with full clinical and administrative profiles."
+        crumbs={[
+          { label: "Patients", to: routes.patients },
+          { label: "Register" },
+        ]}
+        actions={
+          <DxButton variant="default" leftIcon={<X className="h-4 w-4" />} onClick={() => navigate(routes.patients)}>
+            Exit
+          </DxButton>
+        }
+      />
 
-      <div className="flex gap-4 p-2 bg-white/50 backdrop-blur-md rounded-[2rem] border border-secondary-400 overflow-x-auto scrollbar-hide">
-        <SectionTab id="basic" label="Identity & Contact" icon={User} />
-        <SectionTab id="clinical" label="Clinical Profile" icon={Heart} />
-        <SectionTab id="insurance" label="Insurance Details" icon={ShieldCheck} />
-        <SectionTab id="loyalty" label="Loyalty Program" icon={Award} />
-      </div>
+      <DxTabs items={tabs} value={activeSection} onChange={setActiveSection} />
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-4">
         {error && (
-          <div className="p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl text-sm flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-rose-500" />
+          <DxMessage tone="danger" title="Registration failed">
             {error}
+          </DxMessage>
+        )}
+
+        {/* ---- Identity & Contact ---- */}
+        {activeSection === "basic" && (
+          <div className="space-y-4">
+            <DxPanel title="Demographics" icon={<User className="h-4 w-4" />}>
+              <DxForm cols={3}>
+                <DxInput label="First name" required placeholder="Nelson" error={errors.first_name?.message} {...register("first_name")} />
+                <DxInput label="Middle name" placeholder="Optional" {...register("middle_name")} />
+                <DxInput label="Last name" required placeholder="Mandela" error={errors.last_name?.message} {...register("last_name")} />
+              </DxForm>
+              <DxForm cols={3} className="mt-3">
+                <DxInput type="date" label="Date of birth" required error={errors.date_of_birth?.message} {...register("date_of_birth")} />
+                <DxSelect label="Gender" required placeholder="Select…" options={GENDER_OPTIONS} error={errors.gender?.message} {...register("gender")} />
+                <DxSelect label="Marital status" placeholder="Select…" options={MARITAL_OPTIONS} {...register("marital_status")} />
+              </DxForm>
+            </DxPanel>
+
+            <DxPanel title="Contact & Location" icon={<Phone className="h-4 w-4" />}>
+              <DxForm cols={2}>
+                <DxInput label="Primary phone" required placeholder="+234…" error={errors.phone_number?.message} {...register("phone_number")} />
+                <DxInput label="Alternate phone" placeholder="Optional" {...register("alternate_phone_number")} />
+              </DxForm>
+              <DxForm cols={2} className="mt-3">
+                <DxInput type="email" label="Email address" placeholder="nelson@mandela.org" error={errors.email?.message} {...register("email")} />
+              </DxForm>
+              <div className="mt-3">
+                <DxTextarea label="Residential address" required rows={3} placeholder="Residential details…" error={errors.address?.message} {...register("address")} />
+              </div>
+              <DxForm cols={3} className="mt-3">
+                <DxInput label="City" required error={errors.city?.message} {...register("city")} />
+                <DxInput label="State" required error={errors.state?.message} {...register("state")} />
+                <DxInput label="Country" required error={errors.country?.message} {...register("country")} />
+              </DxForm>
+            </DxPanel>
           </div>
         )}
 
-        <div className="grid gap-8 lg:grid-cols-1">
-          {/* Identity Section */}
-          {activeSection === "basic" && (
-            <div className="space-y-8 animate-slide-up">
-              <div className="glass-card rounded-[2.5rem] p-10 md:p-12 space-y-10">
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-xl bg-primary-500 flex items-center justify-center text-white">
-                    <User className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-xl font-bold font-display">Demographics</h3>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">First Name</label>
-                    <input {...register("first_name")} className="input-field" placeholder="Nelson" />
-                    {errors.first_name && <p className="text-[10px] font-bold text-rose-500 mt-1">{errors.first_name.message}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Middle Name</label>
-                    <input {...register("middle_name")} className="input-field" placeholder="Optional" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Last Name</label>
-                    <input {...register("last_name")} className="input-field" placeholder="Mandela" />
-                    {errors.last_name && <p className="text-[10px] font-bold text-rose-500 mt-1">{errors.last_name.message}</p>}
-                  </div>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Date of Birth</label>
-                    <input type="date" {...register("date_of_birth")} className="input-field" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Gender</label>
-                    <Controller
-                      name="gender"
-                      control={control}
-                      render={({ field }) => (
-                        <Select
-                          {...field}
-                          options={[
-                            { value: "MALE", label: "Male" },
-                            { value: "FEMALE", label: "Female" },
-                            { value: "OTHER", label: "Other" }
-                          ]}
-                          styles={selectStyles}
-                          menuPortalTarget={document.body}
-                          value={[{ value: "MALE", label: "Male" }, { value: "FEMALE", label: "Female" }, { value: "OTHER", label: "Other" }].find(opt => opt.value === field.value)}
-                          onChange={(val: any) => field.onChange(val?.value)}
-                          placeholder="Select..."
-                        />
-                      )}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Marital Status</label>
-                    <Controller
-                      name="marital_status"
-                      control={control}
-                      render={({ field }) => (
-                        <Select
-                          {...field}
-                          options={[
-                            { value: "SINGLE", label: "Single" },
-                            { value: "MARRIED", label: "Married" },
-                            { value: "DIVORCED", label: "Divorced" },
-                            { value: "WIDOWED", label: "Widowed" }
-                          ]}
-                          styles={selectStyles}
-                          menuPortalTarget={document.body}
-                          value={[{ value: "SINGLE", label: "Single" }, { value: "MARRIED", label: "Married" }, { value: "DIVORCED", label: "Divorced" }, { value: "WIDOWED", label: "Widowed" }].find(opt => opt.value === field.value)}
-                          onChange={(val: any) => field.onChange(val?.value)}
-                          placeholder="Select..."
-                        />
-                      )}
-                    />
-                  </div>
-                </div>
+        {/* ---- Clinical Profile ---- */}
+        {activeSection === "clinical" && (
+          <div className="space-y-4">
+            <DxPanel title="Medical Markers" icon={<Heart className="h-4 w-4" />}>
+              <DxForm cols={2}>
+                <DxSelect label="Blood group" placeholder="Select…" options={BLOOD_GROUP_OPTIONS} {...register("blood_group")} />
+                <DxSelect label="Genotype" placeholder="Select…" options={GENOTYPE_OPTIONS} {...register("genotype")} />
+              </DxForm>
+              <div className="mt-3">
+                <DxTextarea label="Known allergies" rows={4} placeholder="List clinical sensitivities…" {...register("allergies")} />
               </div>
+            </DxPanel>
 
-              <div className="glass-card rounded-[2.5rem] p-10 md:p-12 space-y-10">
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-xl bg-slate-900 flex items-center justify-center text-white">
-                    <Phone className="h-5 w-5" />
+            <DxPanel
+              title="Historical Identifiers"
+              icon={<FileText className="h-4 w-4" />}
+              actions={
+                <DxButton
+                  variant="default"
+                  size="sm"
+                  leftIcon={<Plus className="h-4 w-4" />}
+                  onClick={() => appendIdentifier({ identifier_type: "HOSPITAL_ID", identifier_value: "", is_primary: false, is_active: true })}
+                >
+                  Add ID
+                </DxButton>
+              }
+            >
+              <div className="space-y-3">
+                {identifierFields.map((field, index) => (
+                  <div key={field.id} className="flex items-end gap-3 rounded-md border border-[var(--dx-border)] p-3">
+                    <DxForm cols={2} className="flex-1">
+                      <DxInput label="ID type" placeholder="e.g. OLD_MRN" {...register(`previous_identifiers.${index}.identifier_type`)} />
+                      <DxInput label="ID value" placeholder="Value…" {...register(`previous_identifiers.${index}.identifier_value`)} />
+                    </DxForm>
+                    <DxButton
+                      variant="outline-danger"
+                      size="sm"
+                      icon
+                      title="Remove identifier"
+                      onClick={() => removeIdentifier(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </DxButton>
                   </div>
-                  <h3 className="text-xl font-bold font-display">Contact & Location</h3>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Primary Phone</label>
-                    <input {...register("phone_number")} className="input-field" placeholder="+234..." />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Email Address</label>
-                    <input {...register("email")} className="input-field" placeholder="nelson@mandela.org" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Residential Address</label>
-                  <textarea {...register("address")} className="input-field h-24 pt-3 resize-none" placeholder="Residential details..." />
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">City</label>
-                    <input {...register("city")} className="input-field" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">State</label>
-                    <input {...register("state")} className="input-field" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Country</label>
-                    <input {...register("country")} className="input-field" />
-                  </div>
-                </div>
+                ))}
+                {identifierFields.length === 0 && (
+                  <p className="dx-muted py-6 text-center text-sm">No historical identifiers added.</p>
+                )}
               </div>
-            </div>
-          )}
+            </DxPanel>
+          </div>
+        )}
 
-          {/* Clinical Section */}
-          {activeSection === "clinical" && (
-            <div className="space-y-8 animate-slide-up">
-              <div className="glass-card rounded-[2.5rem] p-10 md:p-12 space-y-10">
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-xl bg-rose-500 flex items-center justify-center text-white">
-                    <Heart className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-xl font-bold font-display">Medical Markers</h3>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Blood Group</label>
-                    <Controller
-                      name="blood_group"
-                      control={control}
-                      render={({ field }) => (
-                        <Select
-                          {...field}
-                          options={[
-                            { value: "A+", label: "A+" },
-                            { value: "A-", label: "A-" },
-                            { value: "B+", label: "B+" },
-                            { value: "B-", label: "B-" },
-                            { value: "AB+", label: "AB+" },
-                            { value: "AB-", label: "AB-" },
-                            { value: "O+", label: "O+" },
-                            { value: "O-", label: "O-" }
-                          ]}
-                          styles={selectStyles}
-                          menuPortalTarget={document.body}
-                          value={[
-                            { value: "A+", label: "A+" },
-                            { value: "A-", label: "A-" },
-                            { value: "B+", label: "B+" },
-                            { value: "B-", label: "B-" },
-                            { value: "AB+", label: "AB+" },
-                            { value: "AB-", label: "AB-" },
-                            { value: "O+", label: "O+" },
-                            { value: "O-", label: "O-" }
-                          ].find(opt => opt.value === field.value)}
-                          onChange={(val: any) => field.onChange(val?.value)}
-                          placeholder="Select..."
-                        />
-                      )}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Genotype</label>
-                    <Controller
-                      name="genotype"
-                      control={control}
-                      render={({ field }) => (
-                        <Select
-                          {...field}
-                          options={[
-                            { value: "AA", label: "AA" },
-                            { value: "AS", label: "AS" },
-                            { value: "SS", label: "SS" },
-                            { value: "SC", label: "SC" },
-                            { value: "AC", label: "AC" }
-                          ]}
-                          styles={selectStyles}
-                          menuPortalTarget={document.body}
-                          value={[
-                            { value: "AA", label: "AA" },
-                            { value: "AS", label: "AS" },
-                            { value: "SS", label: "SS" },
-                            { value: "SC", label: "SC" },
-                            { value: "AC", label: "AC" }
-                          ].find(opt => opt.value === field.value)}
-                          onChange={(val: any) => field.onChange(val?.value)}
-                          placeholder="Select..."
-                        />
-                      )}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Known Allergies</label>
-                  <textarea {...register("allergies")} className="input-field h-32 pt-3 resize-none" placeholder="List clinical sensitivities..." />
-                </div>
-              </div>
-
-              <div className="glass-card rounded-[2.5rem] p-10 md:p-12 space-y-10">
-                <div className="flex items-center gap-4 justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-xl bg-indigo-500 flex items-center justify-center text-white">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    <h3 className="text-xl font-bold font-display">Historical Identifiers</h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => appendIdentifier({ identifier_type: "HOSPITAL_ID", identifier_value: "", is_primary: false, is_active: true })}
-                    className="btn-secondary gap-2 px-4 py-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>Add ID</span>
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  {identifierFields.map((field, index) => (
-                    <div key={field.id} className="p-6 bg-secondary-50/50 rounded-2xl border border-secondary-400 flex gap-6 items-end">
-                      <div className="flex-1 grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">ID Type</label>
-                          <input {...register(`previous_identifiers.${index}.identifier_type`)} className="input-field bg-white" placeholder="e.g. OLD_MRN" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">ID Value</label>
-                          <input {...register(`previous_identifiers.${index}.identifier_value`)} className="input-field bg-white" placeholder="Value..." />
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeIdentifier(index)}
-                        className="p-3 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    </div>
-                  ))}
-                  {identifierFields.length === 0 && (
-                    <p className="text-center py-10 text-secondary-400 text-sm italic">No historical identifiers added.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Insurance Section */}
-          {activeSection === "insurance" && (
-            <div className="animate-slide-up">
-              <div className="glass-card rounded-[2.5rem] p-10 md:p-12 space-y-10">
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white">
-                    <ShieldCheck className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-xl font-bold font-display">Health Coverage Enrollment</h3>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Patient Class</label>
-                  <Controller
-                    name="patient_class"
-                    control={control}
-                    render={({ field }) => {
-                      const opts = [
-                        { value: "SELF_PAY", label: "Normal (Self-pay)" },
-                        { value: "HMO", label: "HMO / Insurance" },
-                        { value: "RETAINERSHIP", label: "Retainership (Company-billed)" },
-                      ];
-                      return (
-                        <Select
-                          {...field}
-                          options={opts}
-                          styles={selectStyles}
-                          menuPortalTarget={document.body}
-                          value={opts.find((o) => o.value === field.value)}
-                          onChange={(val: any) => field.onChange(val?.value)}
-                          placeholder="Select patient class..."
-                        />
-                      );
-                    }}
+        {/* ---- Insurance Details ---- */}
+        {activeSection === "insurance" && (
+          <DxPanel title="Health Coverage Enrollment" icon={<ShieldCheck className="h-4 w-4" />}>
+            <DxSelect
+              label="Patient class"
+              options={PATIENT_CLASS_OPTIONS}
+              hint="Normal patients pay for their own services. HMO/Insurance and Retainership patients are covered by their provider/company — add the enrollment details below so covered charges are billed to the sponsor."
+              {...register("patient_class")}
+            />
+            {patientClass === "SELF_PAY" ? (
+              <DxMessage tone="info" className="mt-3" title="No enrollment needed">
+                Self-pay patients cover their own charges. Switch the patient class to HMO/Insurance or Retainership to record sponsor cover.
+              </DxMessage>
+            ) : (
+              <>
+                <DxForm cols={2} className="mt-3">
+                  <DxSelect
+                    label="Insurance provider"
+                    required
+                    placeholder={providersQuery.isLoading ? "Loading providers…" : "Select provider…"}
+                    options={providers.map((pr) => ({ value: String(pr.id), label: pr.code ? `${pr.name} (${pr.code})` : pr.name }))}
+                    hint={!providersQuery.isLoading && providers.length === 0 ? "No providers configured yet — add one under Insurance first." : undefined}
+                    {...register("insurance_enrollment.insurance_provider_id")}
                   />
-                  <p className="text-[11px] text-secondary-500">
-                    Normal patients pay for their own services. HMO/Insurance and Retainership
-                    patients are covered by their provider/company &mdash; add the enrollment
-                    details below so covered charges are billed to the sponsor.
-                  </p>
-                </div>
+                  <DxInput label="Policy number" placeholder="POL-12345" {...register("insurance_enrollment.policy_number")} />
+                </DxForm>
+                <DxForm cols={2} className="mt-3">
+                  <DxInput label="Plan name" placeholder="Premium Gold" {...register("insurance_enrollment.plan_name")} />
+                  <DxInput label="Member ID" placeholder="MEM-990" {...register("insurance_enrollment.member_id")} />
+                </DxForm>
+                <DxForm cols={2} className="mt-3">
+                  <DxInput type="date" label="Valid from" {...register("insurance_enrollment.valid_from")} />
+                  <DxInput type="date" label="Valid to" {...register("insurance_enrollment.valid_to")} />
+                </DxForm>
+              </>
+            )}
+          </DxPanel>
+        )}
 
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Provider ID</label>
-                    <input type="number" {...register("insurance_enrollment.insurance_provider_id")} className="input-field" placeholder="1" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Policy Number</label>
-                    <input {...register("insurance_enrollment.policy_number")} className="input-field" placeholder="POL-12345" />
-                  </div>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Plan Name</label>
-                    <input {...register("insurance_enrollment.plan_name")} className="input-field" placeholder="Premium Gold" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Member ID</label>
-                    <input {...register("insurance_enrollment.member_id")} className="input-field" placeholder="MEM-990" />
-                  </div>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Valid From</label>
-                    <input type="date" {...register("insurance_enrollment.valid_from")} className="input-field" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Valid To</label>
-                    <input type="date" {...register("insurance_enrollment.valid_to")} className="input-field" />
-                  </div>
-                </div>
-              </div>
+        {/* ---- Loyalty Program ---- */}
+        {activeSection === "loyalty" && (
+          <DxPanel title="Loyalty Rewards Enrollment" icon={<Award className="h-4 w-4" />}>
+            <DxForm cols={2}>
+              <DxSelect
+                label="Program"
+                placeholder="Select program…"
+                options={loyaltyPrograms.map((p) => ({ value: String(p.id), label: p.name }))}
+                {...register("loyalty_enrollment.loyalty_program_id")}
+              />
+              <DxInput
+                label="Membership no."
+                mono
+                readOnly
+                placeholder="LOY-…"
+                hint="Auto-generated when a program is selected."
+                {...register("loyalty_enrollment.membership_no")}
+              />
+            </DxForm>
+            <div className="mt-3">
+              <DxTextarea label="Enrollment note" rows={4} placeholder="Additional details…" {...register("loyalty_enrollment.note")} />
             </div>
-          )}
+          </DxPanel>
+        )}
 
-          {/* Loyalty Section */}
-          {activeSection === "loyalty" && (
-            <div className="animate-slide-up">
-              <div className="glass-card rounded-[2.5rem] p-10 md:p-12 space-y-10">
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-xl bg-amber-500 flex items-center justify-center text-white">
-                    <Award className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-xl font-bold font-display">Loyalty Rewards Enrollment</h3>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Program ID</label>
-                    <Controller
-                      name="loyalty_enrollment.loyalty_program_id"
-                      control={control}
-                      render={({ field }) => (
-                        <Select
-                          {...field}
-                          options={loyaltyPrograms.map(p => ({ value: p.id, label: p.name }))}
-                          styles={selectStyles}
-                          menuPortalTarget={document.body}
-                          value={loyaltyPrograms.map(p => ({ value: p.id, label: p.name })).find(opt => opt.value === field.value)}
-                          onChange={(val: any) => field.onChange(val?.value)}
-                          placeholder="Select Program..."
-                        />
-                      )}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Membership No.</label>
-                    <input {...register("loyalty_enrollment.membership_no")} className="input-field bg-secondary-50/50 font-mono" placeholder="LOY-555" readOnly />
-                    <p className="text-[10px] font-bold text-primary-500 mt-1 uppercase">Auto-Generated Sequence</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Enrollment Note</label>
-                  <textarea {...register("loyalty_enrollment.note")} className="input-field h-32 pt-3 resize-none" placeholder="Additional details..." />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Global Footer Controls */}
-        <div className="flex items-center justify-between p-8 glass-card rounded-[2.5rem] bg-slate-900 text-white shadow-2xl">
-          <div className="hidden md:block">
-            <p className="font-bold">Summary Review</p>
-            <p className="text-xs text-white/50 tracking-wide">Please ensure all mandatory clinical fields are populated before saving.</p>
-          </div>
-          <div className="flex gap-4 w-full md:w-auto">
-            <button
-              type="button"
-              onClick={() => navigate(routes.patients)}
-              className="flex-1 md:flex-none px-8 py-4 rounded-2xl border border-white/20 font-bold text-sm hover:bg-white/10 transition-all"
-            >
+        {/* ---- Action bar ---- */}
+        <DxPanel bodyClassName="flex flex-wrap items-center justify-between gap-3">
+          <p className="dx-muted text-xs">Ensure all mandatory fields (marked *) are completed before saving.</p>
+          <div className="flex gap-2">
+            <DxButton variant="default" leftIcon={<X className="h-4 w-4" />} onClick={() => navigate(routes.patients)}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex-1 md:flex-none bg-primary-500 hover:bg-primary-600 px-12 py-4 rounded-2xl font-bold text-sm shadow-xl shadow-primary-500/20 transition-all flex items-center justify-center gap-3"
-            >
-              {isSubmitting ? "Syncing..." : (
-                <>
-                  <Save className="h-5 w-5" />
-                  <span>Finalize Onboarding</span>
-                </>
-              )}
-            </button>
+            </DxButton>
+            <DxButton type="submit" variant="primary" isLoading={isSubmitting} leftIcon={<Save className="h-4 w-4" />}>
+              Register patient
+            </DxButton>
           </div>
-        </div>
+        </DxPanel>
       </form>
-    </div>
+    </DxPage>
   );
 }

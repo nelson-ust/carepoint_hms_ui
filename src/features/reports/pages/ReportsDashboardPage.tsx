@@ -11,7 +11,6 @@ import {
   FileText,
   Package,
   PieChart,
-  RefreshCw,
   RotateCcw,
   ShieldCheck,
   Users,
@@ -29,16 +28,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Badge, type BadgeProps } from "@/components/ui/Badge";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { MetricCard } from "@/components/charts/MetricCard";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxKpi,
+  DxButton,
+  DxBadge,
+  DxMessage,
+  type DxBadgeTone,
+} from "@/components/dx";
 import { useChartTheme } from "@/components/charts/chart-theme";
 import { useToast } from "@/components/feedback/ToastProvider";
-import { cn } from "@/lib/utils/cn";
 import {
   REPORT_DEFINITIONS,
   saveReportFile,
@@ -70,10 +71,10 @@ type ReportRun = {
   filename?: string;
 };
 
-const runStatusVariants: Record<RunStatus, BadgeProps["variant"]> = {
-  RUNNING: "soft-warning",
-  COMPLETED: "soft-success",
-  FAILED: "soft-danger",
+const runStatusTones: Record<RunStatus, DxBadgeTone> = {
+  RUNNING: "warning",
+  COMPLETED: "success",
+  FAILED: "danger",
 };
 
 const reportIcons: Record<ReportType, LucideIcon> = {
@@ -84,12 +85,13 @@ const reportIcons: Record<ReportType, LucideIcon> = {
   comprehensive: PieChart,
 };
 
-const reportIconChips: Record<ReportType, string> = {
-  financial: "bg-primary-500/10 text-primary-500",
-  clinical: "bg-cyan-500/10 text-cyan-500",
-  inventory: "bg-amber-500/10 text-amber-500",
-  workforce: "bg-violet-500/10 text-violet-500",
-  comprehensive: "bg-rose-500/10 text-rose-500",
+// Data-driven icon-chip tints — dx tokens, theme-aware.
+const reportIconChips: Record<ReportType, { background: string; color: string }> = {
+  financial: { background: "var(--dx-accent-soft)", color: "var(--dx-accent)" },
+  clinical: { background: "var(--dx-info-soft)", color: "var(--dx-info)" },
+  inventory: { background: "var(--dx-warning-soft)", color: "var(--dx-warning)" },
+  workforce: { background: "var(--dx-success-soft)", color: "var(--dx-success)" },
+  comprehensive: { background: "var(--dx-danger-soft)", color: "var(--dx-danger)" },
 };
 
 function formatCurrency(value: number, currency: string): string {
@@ -126,25 +128,25 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardHeader title={title} description={description} />
+    <DxPanel title={title} description={description}>
       <div className="h-72 w-full">
         {isLoading ? (
           <div className="flex h-full flex-col justify-end gap-3">
-            <Skeleton className="h-2/3 w-full" />
-            <Skeleton className="h-4 w-1/3" />
+            <div className="dx-skeleton h-2/3 w-full" />
+            <div className="dx-skeleton h-4 w-1/3" />
           </div>
         ) : isEmpty ? (
-          <EmptyState
-            title={emptyLabel}
-            description="Data will appear here as records are captured."
-            className="py-10"
-          />
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <h4 className="text-[14px] font-semibold text-[var(--dx-text)]">{emptyLabel}</h4>
+            <p className="mt-1 text-[12px] text-[var(--dx-text-muted)]">
+              Data will appear here as records are captured.
+            </p>
+          </div>
         ) : (
           children
         )}
       </div>
-    </Card>
+    </DxPanel>
   );
 }
 
@@ -214,118 +216,100 @@ export function ReportsDashboardPage() {
   const summaryLoading = aggregation.isLoading;
 
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Analytics" }, { label: "Reports" }]}
         title="Reports & Analytics"
-        description="Clinical registries, financial audits and operational performance across your hospital."
+        subtitle="Clinical registries, financial audits and operational performance across your hospital."
         actions={
-          <Button
-            variant="secondary"
-            leftIcon={<RefreshCw className="h-4 w-4" />}
+          <DxButton
+            leftIcon={<RotateCcw className="h-4 w-4" />}
             onClick={refreshReports}
             isLoading={aggregation.isFetching || operational.isFetching}
           >
-            Refresh Data
-          </Button>
+            Refresh data
+          </DxButton>
         }
       />
 
       {/* KPI row — /reports/aggregation-summary + /reports/operational-summary */}
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DxKpi
           label="Total Revenue"
-          value={
-            financial
-              ? formatCurrency(financial.total_revenue, financial.currency)
-              : "—"
-          }
+          value={financial ? formatCurrency(financial.total_revenue, financial.currency) : "—"}
           icon={Banknote}
-          tone="primary"
+          tone="accent"
           isLoading={summaryLoading}
         />
-        <MetricCard
+        <DxKpi
           label="Registered Patients"
           value={operational.data ? operational.data.total_patients.toLocaleString() : "—"}
           icon={Users}
-          tone="cyan"
+          tone="info"
           isLoading={operational.isLoading}
         />
-        <MetricCard
+        <DxKpi
           label="Active Visits"
-          value={
-            operational.data ? operational.data.total_active_visits.toLocaleString() : "—"
-          }
+          value={operational.data ? operational.data.total_active_visits.toLocaleString() : "—"}
           icon={Activity}
-          tone="violet"
+          tone="success"
           isLoading={operational.isLoading}
         />
-        <MetricCard
+        <DxKpi
           label="Low Stock Items"
           value={inventory ? inventory.low_stock_items.toLocaleString() : "—"}
           icon={Package}
-          tone="amber"
+          tone="warning"
           isLoading={summaryLoading}
         />
       </div>
 
       {/* Summary load failure */}
       {aggregation.isError ? (
-        <Card className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500">
-              <AlertCircle className="h-6 w-6" aria-hidden />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-secondary-900">
-                Could not load analytics summary.
-              </p>
-              <p className="text-xs font-medium text-secondary-500">
-                The charts below need the aggregation summary to render.
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => aggregation.refetch()}
-            leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
-          >
-            Retry
-          </Button>
-        </Card>
+        <DxMessage
+          tone="danger"
+          title="Could not load analytics summary."
+          action={
+            <DxButton size="sm" onClick={() => aggregation.refetch()} leftIcon={<RotateCcw className="h-3.5 w-3.5" />}>
+              Retry
+            </DxButton>
+          }
+        >
+          The charts below need the aggregation summary to render.
+        </DxMessage>
       ) : null}
 
       {/* Charts — theme tokens only, no hardcoded hex */}
-      <div className="grid gap-6 lg:grid-cols-5">
+      <div className="grid gap-4 lg:grid-cols-5">
         <div className="lg:col-span-3">
           <ChartCard
             title="Visit Trends"
-          description="Patient visits over the last 7 days."
-          isLoading={summaryLoading}
-          isEmpty={aggregation.isError || visitTrends.length === 0}
-          emptyLabel="No visit activity yet"
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={visitTrends} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-              <defs>
-                <linearGradient id="reports-visits-gradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={chart.areaGradient.from} />
-                  <stop offset="100%" stopColor={chart.areaGradient.to} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tick={chart.tick} axisLine={false} tickLine={false} dy={8} />
-              <YAxis tick={chart.tick} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip cursor={chart.cursor} contentStyle={chart.tooltip} />
-              <Area
-                type="monotone"
-                dataKey="count"
-                name="Visits"
-                stroke={chart.series[0]}
-                strokeWidth={2.5}
-                fill="url(#reports-visits-gradient)"
-              />
-            </AreaChart>
+            description="Patient visits over the last 7 days."
+            isLoading={summaryLoading}
+            isEmpty={aggregation.isError || visitTrends.length === 0}
+            emptyLabel="No visit activity yet"
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={visitTrends} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="reports-visits-gradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={chart.areaGradient.from} />
+                    <stop offset="100%" stopColor={chart.areaGradient.to} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tick={chart.tick} axisLine={false} tickLine={false} dy={8} />
+                <YAxis tick={chart.tick} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip cursor={chart.cursor} contentStyle={chart.tooltip} />
+                <Area
+                  type="monotone"
+                  dataKey="count"
+                  name="Visits"
+                  stroke={chart.series[0]}
+                  strokeWidth={2.5}
+                  fill="url(#reports-visits-gradient)"
+                />
+              </AreaChart>
             </ResponsiveContainer>
           </ChartCard>
         </div>
@@ -396,110 +380,105 @@ export function ReportsDashboardPage() {
       </div>
 
       {/* Report catalog + recent runs */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Card>
-            <CardHeader
-              title="Report Catalog"
-              description="Generate a report on demand — files download instantly as PDF or Excel."
-            />
+          <DxPanel
+            title="Report Catalog"
+            description="Generate a report on demand — files download instantly as PDF or Excel."
+          >
             <div className="grid gap-4 sm:grid-cols-2">
               {REPORT_DEFINITIONS.map((definition) => {
                 const Icon = reportIcons[definition.type];
                 return (
                   <div
                     key={definition.type}
-                    className="rounded-3xl border border-secondary-100 p-5 transition-colors hover:border-primary-500/30 dark:border-white/10"
+                    className="rounded-lg border border-[var(--dx-border)] p-5 transition-colors hover:border-[var(--dx-border-strong)]"
                   >
                     <div className="flex items-start gap-4">
                       <div
-                        className={cn(
-                          "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
-                          reportIconChips[definition.type]
-                        )}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg"
+                        style={reportIconChips[definition.type]}
                       >
                         <Icon className="h-5 w-5" aria-hidden />
                       </div>
                       <div className="min-w-0">
-                        <h4 className="text-sm font-black text-secondary-900">
+                        <h4 className="text-[14px] font-bold text-[var(--dx-text)]">
                           {definition.label}
                         </h4>
-                        <p className="mt-1 text-xs font-medium text-secondary-500">
+                        <p className="mt-1 text-[12px] font-medium text-[var(--dx-text-muted)]">
                           {definition.description}
                         </p>
                       </div>
                     </div>
                     <div className="mt-4 flex items-center gap-2">
-                      <Button
-                        variant="secondary"
+                      <DxButton
                         size="sm"
                         leftIcon={<FileText className="h-3.5 w-3.5" />}
                         isLoading={isRunning(definition.type, "pdf")}
                         onClick={() => runReport(definition, "pdf")}
                       >
                         Run PDF
-                      </Button>
-                      <Button
-                        variant="ghost"
+                      </DxButton>
+                      <DxButton
+                        variant="text"
                         size="sm"
                         leftIcon={<FileSpreadsheet className="h-3.5 w-3.5" />}
                         isLoading={isRunning(definition.type, "excel")}
                         onClick={() => runReport(definition, "excel")}
                       >
                         Excel
-                      </Button>
+                      </DxButton>
                     </div>
                   </div>
                 );
               })}
             </div>
-          </Card>
+          </DxPanel>
         </div>
 
-        <Card>
-          <CardHeader
-            title="Recent Runs"
-            description={
-              summary
-                ? `Data as of ${format(new Date(summary.generated_at), "MMM d, HH:mm")}.`
-                : "Reports generated this session."
-            }
-          />
+        <DxPanel
+          title="Recent Runs"
+          description={
+            summary
+              ? `Data as of ${format(new Date(summary.generated_at), "MMM d, HH:mm")}.`
+              : "Reports generated this session."
+          }
+        >
           {runs.length === 0 ? (
-            <EmptyState
-              icon={Download}
-              title="No runs yet"
-              description="Trigger a report from the catalog and its status will show here."
-              className="py-10"
-            />
+            <div className="py-10 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]">
+                <Download className="h-6 w-6 text-[var(--dx-text-faint)]" />
+              </div>
+              <h4 className="text-[14px] font-semibold text-[var(--dx-text)]">No runs yet</h4>
+              <p className="mx-auto mt-1 max-w-[16rem] text-[12px] text-[var(--dx-text-muted)]">
+                Trigger a report from the catalog and its status will show here.
+              </p>
+            </div>
           ) : (
             <ul className="space-y-3">
               {runs.map((run) => (
                 <li
                   key={run.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-secondary-100 px-4 py-3 dark:border-white/10"
+                  className="flex items-center justify-between gap-3 rounded-md border border-[var(--dx-border)] px-4 py-3"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-secondary-900">
+                    <p className="truncate text-[13px] font-semibold text-[var(--dx-text)]">
                       {run.label}
                     </p>
-                    <p className="data-mono mt-0.5 text-[11px] text-secondary-400">
+                    <p className="dx-mono mt-0.5 text-[11px] text-[var(--dx-text-muted)]">
                       {run.fileType.toUpperCase()} ·{" "}
                       {formatDistanceToNow(new Date(run.startedAt), { addSuffix: true })}
                     </p>
                   </div>
-                  <Badge
-                    variant={runStatusVariants[run.status]}
-                    className={cn(run.status === "RUNNING" && "animate-pulse")}
-                  >
+                  <DxBadge tone={runStatusTones[run.status]} dot className={run.status === "RUNNING" ? "animate-pulse" : undefined}>
                     {run.status}
-                  </Badge>
+                  </DxBadge>
                 </li>
               ))}
             </ul>
           )}
-        </Card>
+        </DxPanel>
       </div>
-    </div>
+    </DxPage>
   );
 }

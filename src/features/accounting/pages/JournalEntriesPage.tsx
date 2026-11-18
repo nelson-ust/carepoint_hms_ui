@@ -1,22 +1,15 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { BookOpenCheck, Plus, RotateCcw, Trash2, Undo2, UploadCloud, Eye, Scale } from "lucide-react";
 import {
-  BookOpenCheck, Plus, RefreshCw, Trash2, Undo2, UploadCloud, Eye, Scale,
-} from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Skeleton } from "@/components/ui/Skeleton";
+  DxPage, DxPageHeader, DxPanel, DxBadge, DxButton, DxPopup, DxInput, DxSelect, DxCheckbox,
+  DxGrid, type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { accountsApi, type Account } from "@/features/billing/api/accounts.api";
 import { accountingApi } from "../api/accounting.api";
 
-const NGN = (v: string | number) =>
-  `₦${Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+const NGN = (v: string | number) => `₦${Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
 function fmtDate(v?: string | null) {
   if (!v) return "—";
@@ -24,10 +17,14 @@ function fmtDate(v?: string | null) {
   return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function statusVariant(s: string): any {
-  return s === "POSTED" ? "soft-success" : s === "DRAFT" ? "soft-warning" : "soft-danger";
+function statusTone(s: string): DxBadgeTone {
+  return s === "POSTED" ? "success" : s === "DRAFT" ? "warning" : "danger";
 }
 
+type JEntry = {
+  id: number; entry_no: string; entry_date: string; memo?: string | null;
+  source_type: string; total_debit: string | number; status: string;
+};
 type DraftLine = { account_id: string; debit: string; credit: string; description: string };
 const emptyLine = (): DraftLine => ({ account_id: "", debit: "", credit: "", description: "" });
 
@@ -43,173 +40,120 @@ export function JournalEntriesPage() {
     queryKey: ["je", statusFilter, page],
     queryFn: () => accountingApi.listEntries({ status: statusFilter || undefined, page, page_size: 25 }),
   });
-  const detail = useQuery({
-    queryKey: ["je-detail", detailId],
-    queryFn: () => accountingApi.getEntry(detailId!),
-    enabled: !!detailId,
-  });
+  const detail = useQuery({ queryKey: ["je-detail", detailId], queryFn: () => accountingApi.getEntry(detailId!), enabled: !!detailId });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["je"] });
 
-  const post = useMutation({
-    mutationFn: (id: number) => accountingApi.postEntry(id),
-    onSuccess: () => { invalidate(); toast.success("Entry posted"); },
-    onError: (e: any) => toast.error("Couldn't post", accountingApi.errMsg(e, "")),
-  });
-  const reverse = useMutation({
-    mutationFn: (id: number) => accountingApi.reverseEntry(id),
-    onSuccess: () => { invalidate(); toast.success("Entry reversed"); },
-    onError: (e: any) => toast.error("Couldn't reverse", accountingApi.errMsg(e, "")),
-  });
-  const del = useMutation({
-    mutationFn: (id: number) => accountingApi.deleteDraft(id),
-    onSuccess: () => { invalidate(); toast.success("Draft deleted"); },
-    onError: (e: any) => toast.error("Couldn't delete", accountingApi.errMsg(e, "")),
-  });
+  const post = useMutation({ mutationFn: (id: number) => accountingApi.postEntry(id), onSuccess: () => { invalidate(); toast.success("Entry posted"); }, onError: (e: any) => toast.error("Couldn't post", accountingApi.errMsg(e, "")) });
+  const reverse = useMutation({ mutationFn: (id: number) => accountingApi.reverseEntry(id), onSuccess: () => { invalidate(); toast.success("Entry reversed"); }, onError: (e: any) => toast.error("Couldn't reverse", accountingApi.errMsg(e, "")) });
+  const del = useMutation({ mutationFn: (id: number) => accountingApi.deleteDraft(id), onSuccess: () => { invalidate(); toast.success("Draft deleted"); }, onError: (e: any) => toast.error("Couldn't delete", accountingApi.errMsg(e, "")) });
   const autoPost = useMutation({
     mutationFn: () => accountingApi.autoPost(),
-    onSuccess: (r) => {
-      invalidate();
-      toast.success("Auto-posting complete",
-        `${r.created} new entr${r.created === 1 ? "y" : "ies"} posted · ${r.skipped_existing} already booked.`);
-    },
+    onSuccess: (r) => { invalidate(); toast.success("Auto-posting complete", `${r.created} new entr${r.created === 1 ? "y" : "ies"} posted · ${r.skipped_existing} already booked.`); },
     onError: (e: any) => toast.error("Auto-posting failed", accountingApi.errMsg(e, "")),
   });
 
-  const items = list.data?.items ?? [];
+  const items = (list.data?.items ?? []) as JEntry[];
   const total = list.data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / 25));
 
+  const columns: DxGridColumn<JEntry>[] = [
+    { key: "entry_no", header: "Entry", render: (e) => <span className="dx-mono text-[12px] font-semibold">{e.entry_no}</span> },
+    { key: "entry_date", header: "Date", render: (e) => <span className="whitespace-nowrap">{fmtDate(e.entry_date)}</span> },
+    { key: "memo", header: "Memo", render: (e) => <span className="block max-w-[16rem] truncate">{e.memo || "—"}</span> },
+    { key: "source_type", header: "Source", render: (e) => <DxBadge tone="neutral">{e.source_type.replace(/_/g, " ")}</DxBadge> },
+    { key: "total_debit", header: "Amount", align: "right", render: (e) => <span className="dx-mono font-semibold">{NGN(e.total_debit)}</span> },
+    { key: "status", header: "Status", render: (e) => <DxBadge tone={statusTone(e.status)}>{e.status}</DxBadge> },
+    { key: "actions", header: "", align: "right", render: (e) => (
+        <div className="flex justify-end gap-1">
+          <DxButton icon size="sm" variant="text" title="View lines" onClick={() => setDetailId(e.id)}><Eye className="h-3.5 w-3.5" /></DxButton>
+          {e.status === "DRAFT" && (
+            <>
+              <DxButton size="sm" variant="default" isLoading={post.isPending} onClick={() => post.mutate(e.id)}>Post</DxButton>
+              <DxButton icon size="sm" variant="text" title="Delete draft" onClick={() => del.mutate(e.id)}><Trash2 className="h-3.5 w-3.5" /></DxButton>
+            </>
+          )}
+          {e.status === "POSTED" && <DxButton icon size="sm" variant="text" title="Reverse entry" onClick={() => reverse.mutate(e.id)}><Undo2 className="h-3.5 w-3.5" /></DxButton>}
+        </div>) },
+  ];
+
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader title="Journal Entries" description="Double-entry journal — every entry balances, posted entries feed the ledgers and financial statements." />
-        <div className="flex flex-wrap gap-3">
-          <button onClick={() => list.refetch()} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400" title="Refresh">
-            <RefreshCw className={`h-4 w-4 ${list.isFetching ? "animate-spin" : ""}`} />
-          </button>
-          <Button variant="secondary" leftIcon={<UploadCloud className="h-4 w-4" />} isLoading={autoPost.isPending}
-            onClick={() => autoPost.mutate()}
-            title="Sweep patient payments, expense claims and salary advances into the ledger (never double-books)">
-            Auto-post operations
-          </Button>
-          <Button leftIcon={<Plus className="h-5 w-5" />} onClick={() => setCreateOpen(true)}>New entry</Button>
-        </div>
-      </div>
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Accounting" }, { label: "Journal Entries" }]}
+        title="Journal Entries"
+        subtitle="Double-entry journal — every entry balances, posted entries feed the ledgers and financial statements."
+        actions={
+          <>
+            <DxButton icon title="Refresh" onClick={() => list.refetch()} isLoading={list.isFetching}><RotateCcw /></DxButton>
+            <DxButton variant="default" leftIcon={<UploadCloud className="h-4 w-4" />} isLoading={autoPost.isPending} onClick={() => autoPost.mutate()} title="Sweep patient payments, expense claims and salary advances into the ledger (never double-books)">Auto-post operations</DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setCreateOpen(true)}>New entry</DxButton>
+          </>
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-3">
-        <Select label="" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
-          <option value="">All statuses</option>
-          <option value="DRAFT">Draft</option>
-          <option value="POSTED">Posted</option>
-          <option value="REVERSED">Reversed</option>
-        </Select>
-        <span className="text-xs text-secondary-400 font-bold ml-auto">{total} entries</span>
+        <div className="w-48">
+          <DxSelect aria-label="Status" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            options={[{ value: "", label: "All statuses" }, { value: "DRAFT", label: "Draft" }, { value: "POSTED", label: "Posted" }, { value: "REVERSED", label: "Reversed" }]} />
+        </div>
+        <span className="ml-auto text-[12px] font-semibold text-[var(--dx-text-muted)]">{total} entries</span>
       </div>
 
-      {list.isLoading ? <Skeleton className="h-40 w-full" /> : items.length === 0 ? (
-        <Card className="p-10 text-center text-secondary-500">
-          <BookOpenCheck className="h-8 w-8 mx-auto mb-3 opacity-40" />
-          No journal entries yet. Create one manually or run “Auto-post operations”.
-        </Card>
-      ) : (
-        <Card className="overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead className="bg-secondary-50 text-secondary-500 text-[10px] uppercase tracking-widest dark:bg-white/5">
-              <tr>
-                <th className="text-left px-5 py-3">Entry</th>
-                <th className="text-left px-5 py-3">Date</th>
-                <th className="text-left px-5 py-3">Memo</th>
-                <th className="text-left px-5 py-3">Source</th>
-                <th className="text-right px-5 py-3">Amount</th>
-                <th className="text-left px-5 py-3">Status</th>
-                <th className="text-right px-5 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-secondary-100 dark:divide-white/5">
-              {items.map((e) => (
-                <tr key={e.id} className="hover:bg-secondary-50/60 dark:hover:bg-white/5">
-                  <td className="px-5 py-3 data-mono text-xs font-bold">{e.entry_no}</td>
-                  <td className="px-5 py-3 whitespace-nowrap">{fmtDate(e.entry_date)}</td>
-                  <td className="px-5 py-3 max-w-[16rem] truncate">{e.memo || "—"}</td>
-                  <td className="px-5 py-3"><Badge variant="secondary">{e.source_type.replace(/_/g, " ")}</Badge></td>
-                  <td className="px-5 py-3 text-right data-mono font-bold">{NGN(e.total_debit)}</td>
-                  <td className="px-5 py-3"><Badge variant={statusVariant(e.status)}>{e.status}</Badge></td>
-                  <td className="px-5 py-3">
-                    <div className="flex justify-end gap-1.5">
-                      <Button size="sm" variant="ghost" onClick={() => setDetailId(e.id)} title="View lines"><Eye className="h-3.5 w-3.5" /></Button>
-                      {e.status === "DRAFT" && (
-                        <>
-                          <Button size="sm" variant="secondary" isLoading={post.isPending} onClick={() => post.mutate(e.id)}>Post</Button>
-                          <Button size="sm" variant="ghost" onClick={() => del.mutate(e.id)} title="Delete draft"><Trash2 className="h-3.5 w-3.5 text-rose-500" /></Button>
-                        </>
-                      )}
-                      {e.status === "POSTED" && (
-                        <Button size="sm" variant="ghost" onClick={() => reverse.mutate(e.id)} title="Reverse entry"><Undo2 className="h-3.5 w-3.5" /></Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
+      <DxPanel flush>
+        <DxGrid<JEntry>
+          borderless columns={columns} data={items} rowKey={(e) => e.id} isLoading={list.isLoading}
+          empty={{ icon: BookOpenCheck, title: "No journal entries", description: "No journal entries yet. Create one manually or run “Auto-post operations”." }}
+        />
+      </DxPanel>
 
       {pages > 1 && (
         <div className="flex items-center justify-center gap-3">
-          <Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
-          <span className="text-xs font-bold text-secondary-500">Page {page} / {pages}</span>
-          <Button size="sm" variant="secondary" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Next</Button>
+          <DxButton size="sm" variant="default" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</DxButton>
+          <span className="text-[12px] font-semibold text-[var(--dx-text-muted)]">Page {page} / {pages}</span>
+          <DxButton size="sm" variant="default" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Next</DxButton>
         </div>
       )}
 
-      <CreateEntryModal open={createOpen} onClose={() => setCreateOpen(false)}
-        onDone={() => { setCreateOpen(false); invalidate(); }} />
+      <CreateEntryModal open={createOpen} onClose={() => setCreateOpen(false)} onDone={() => { setCreateOpen(false); invalidate(); }} />
 
-      {/* Detail modal */}
-      <Modal isOpen={!!detailId} onClose={() => setDetailId(null)} title={detail.data?.entry_no ?? "Journal entry"} size="lg">
-        {detail.isLoading ? <Skeleton className="h-40 w-full" /> : detail.data ? (
+      <DxPopup isOpen={!!detailId} onClose={() => setDetailId(null)} title={detail.data?.entry_no ?? "Journal entry"} size="lg">
+        {detail.isLoading ? <div className="dx-skeleton h-40 w-full" /> : detail.data ? (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Badge variant={statusVariant(detail.data.status)}>{detail.data.status}</Badge>
-              <Badge variant="secondary">{detail.data.source_type.replace(/_/g, " ")}</Badge>
-              <span className="text-secondary-500">{fmtDate(detail.data.entry_date)} · {detail.data.period_code}</span>
+            <div className="flex flex-wrap items-center gap-2 text-[13px]">
+              <DxBadge tone={statusTone(detail.data.status)}>{detail.data.status}</DxBadge>
+              <DxBadge tone="neutral">{detail.data.source_type.replace(/_/g, " ")}</DxBadge>
+              <span className="text-[var(--dx-text-muted)]">{fmtDate(detail.data.entry_date)} · {detail.data.period_code}</span>
             </div>
-            {detail.data.memo && <p className="text-sm text-secondary-600 italic">“{detail.data.memo}”</p>}
-            <div className="overflow-x-auto rounded-xl border border-secondary-200 dark:border-white/10">
-              <table className="w-full text-xs">
-                <thead className="bg-secondary-50 text-secondary-500 dark:bg-white/5">
-                  <tr>
-                    <th className="text-left px-4 py-2">Account</th>
-                    <th className="text-left px-4 py-2">Description</th>
-                    <th className="text-right px-4 py-2">Debit</th>
-                    <th className="text-right px-4 py-2">Credit</th>
-                  </tr>
+            {detail.data.memo && <p className="text-[13px] italic text-[var(--dx-text-muted)]">“{detail.data.memo}”</p>}
+            <div className="overflow-hidden rounded-lg border border-[var(--dx-border)]">
+              <table className="w-full text-[12.5px]">
+                <thead className="bg-[var(--dx-surface-sunken)] text-left text-[11px] uppercase tracking-wide text-[var(--dx-text-muted)]">
+                  <tr><th className="px-4 py-2">Account</th><th className="px-4 py-2">Description</th><th className="px-4 py-2 text-right">Debit</th><th className="px-4 py-2 text-right">Credit</th></tr>
                 </thead>
-                <tbody className="divide-y divide-secondary-100 dark:divide-white/5">
+                <tbody className="divide-y divide-[var(--dx-border)]">
                   {(detail.data.lines ?? []).map((l) => (
                     <tr key={l.id}>
-                      <td className="px-4 py-2"><span className="data-mono font-bold">{l.account_code}</span> {l.account_name}</td>
+                      <td className="px-4 py-2"><span className="dx-mono font-semibold">{l.account_code}</span> {l.account_name}</td>
                       <td className="px-4 py-2">{l.description || "—"}</td>
-                      <td className="px-4 py-2 text-right data-mono">{Number(l.debit) ? NGN(l.debit) : ""}</td>
-                      <td className="px-4 py-2 text-right data-mono">{Number(l.credit) ? NGN(l.credit) : ""}</td>
+                      <td className="px-4 py-2 text-right dx-mono">{Number(l.debit) ? NGN(l.debit) : ""}</td>
+                      <td className="px-4 py-2 text-right dx-mono">{Number(l.credit) ? NGN(l.credit) : ""}</td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-secondary-50 font-bold dark:bg-white/5">
+                <tfoot className="bg-[var(--dx-surface-sunken)] font-semibold">
                   <tr>
                     <td className="px-4 py-2" colSpan={2}>Totals</td>
-                    <td className="px-4 py-2 text-right data-mono">{NGN(detail.data.total_debit)}</td>
-                    <td className="px-4 py-2 text-right data-mono">{NGN(detail.data.total_credit)}</td>
+                    <td className="px-4 py-2 text-right dx-mono">{NGN(detail.data.total_debit)}</td>
+                    <td className="px-4 py-2 text-right dx-mono">{NGN(detail.data.total_credit)}</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
           </div>
         ) : null}
-      </Modal>
-    </div>
+      </DxPopup>
+    </DxPage>
   );
 }
 
@@ -231,84 +175,51 @@ function CreateEntryModal({ open, onClose, onDone }: { open: boolean; onClose: (
   const create = useMutation({
     mutationFn: () => accountingApi.createEntry({
       entry_date: entryDate, memo: memo || undefined, auto_post: autoPostFlag,
-      lines: lines.filter((l) => l.account_id).map((l) => ({
-        account_id: Number(l.account_id), debit: Number(l.debit) || 0,
-        credit: Number(l.credit) || 0, description: l.description || undefined,
-      })),
+      lines: lines.filter((l) => l.account_id).map((l) => ({ account_id: Number(l.account_id), debit: Number(l.debit) || 0, credit: Number(l.credit) || 0, description: l.description || undefined })),
     }),
-    onSuccess: () => {
-      toast.success(autoPostFlag ? "Entry created & posted" : "Draft entry created");
-      setLines([emptyLine(), emptyLine()]); setMemo("");
-      onDone();
-    },
+    onSuccess: () => { toast.success(autoPostFlag ? "Entry created & posted" : "Draft entry created"); setLines([emptyLine(), emptyLine()]); setMemo(""); onDone(); },
     onError: (e: any) => toast.error("Couldn't create entry", accountingApi.errMsg(e, "")),
   });
 
-  const setLine = (i: number, patch: Partial<DraftLine>) =>
-    setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  const setLine = (i: number, patch: Partial<DraftLine>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  const accountOptions = [{ value: "", label: "Select account…" }, ...(accounts.data ?? []).map((a: Account) => ({ value: String(a.id), label: `${a.code} · ${a.name}` }))];
 
   return (
-    <Modal isOpen={open} onClose={onClose} title="New journal entry" size="2xl">
+    <DxPopup isOpen={open} onClose={onClose} title="New journal entry" size="lg">
       <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
-        <div className="grid sm:grid-cols-3 gap-4">
-          <Input label="Entry date" type="date" required value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
-          <div className="sm:col-span-2">
-            <Input label="Memo" value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="What is this entry for?" />
-          </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <DxInput label="Entry date" type="date" required value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
+          <div className="sm:col-span-2"><DxInput label="Memo" value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="What is this entry for?" /></div>
         </div>
 
         <div className="space-y-2">
           {lines.map((l, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2 items-end">
-              <div className="col-span-4">
-                <Select label={i === 0 ? "Account" : ""} value={l.account_id} onChange={(e) => setLine(i, { account_id: e.target.value })}>
-                  <option value="">Select account…</option>
-                  {(accounts.data ?? []).map((a: Account) => (
-                    <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
-                  ))}
-                </Select>
-              </div>
-              <div className="col-span-3">
-                <Input label={i === 0 ? "Description" : ""} value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} />
-              </div>
-              <div className="col-span-2">
-                <Input label={i === 0 ? "Debit" : ""} type="number" min={0} step="0.01" value={l.debit}
-                  onChange={(e) => setLine(i, { debit: e.target.value, credit: e.target.value ? "" : l.credit })} />
-              </div>
-              <div className="col-span-2">
-                <Input label={i === 0 ? "Credit" : ""} type="number" min={0} step="0.01" value={l.credit}
-                  onChange={(e) => setLine(i, { credit: e.target.value, debit: e.target.value ? "" : l.debit })} />
-              </div>
+            <div key={i} className="grid grid-cols-12 items-end gap-2">
+              <div className="col-span-4"><DxSelect label={i === 0 ? "Account" : undefined} value={l.account_id} onChange={(e) => setLine(i, { account_id: e.target.value })} options={accountOptions} /></div>
+              <div className="col-span-3"><DxInput label={i === 0 ? "Description" : undefined} value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} /></div>
+              <div className="col-span-2"><DxInput label={i === 0 ? "Debit" : undefined} type="number" mono min={0} step="0.01" value={l.debit} onChange={(e) => setLine(i, { debit: e.target.value, credit: e.target.value ? "" : l.credit })} /></div>
+              <div className="col-span-2"><DxInput label={i === 0 ? "Credit" : undefined} type="number" mono min={0} step="0.01" value={l.credit} onChange={(e) => setLine(i, { credit: e.target.value, debit: e.target.value ? "" : l.debit })} /></div>
               <div className="col-span-1 pb-1">
                 {lines.length > 2 && (
-                  <button type="button" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}
-                    className="p-2 rounded-lg text-rose-500 hover:bg-rose-500/10" title="Remove line">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <DxButton icon size="sm" variant="text" title="Remove line" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></DxButton>
                 )}
               </div>
             </div>
           ))}
-          <Button type="button" size="sm" variant="secondary" leftIcon={<Plus className="h-3.5 w-3.5" />}
-            onClick={() => setLines((ls) => [...ls, emptyLine()])}>Add line</Button>
+          <DxButton type="button" size="sm" variant="default" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setLines((ls) => [...ls, emptyLine()])}>Add line</DxButton>
         </div>
 
-        <div className={`flex items-center justify-between rounded-xl px-4 py-3 text-sm font-bold ${totals.balanced ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-          <span className="flex items-center gap-2"><Scale className="h-4 w-4" />
-            {totals.balanced ? "Balanced" : "Out of balance"}
-          </span>
-          <span className="data-mono">Dr {NGN(totals.d)} · Cr {NGN(totals.c)}</span>
+        <div className={`flex items-center justify-between rounded-lg px-4 py-3 text-[13px] font-semibold ${totals.balanced ? "bg-[var(--dx-success-soft,#ecfdf5)] text-[var(--dx-success,#10b981)]" : "bg-[var(--dx-warning-soft,#fffbeb)] text-[var(--dx-warning,#d97706)]"}`}>
+          <span className="flex items-center gap-2"><Scale className="h-4 w-4" />{totals.balanced ? "Balanced" : "Out of balance"}</span>
+          <span className="dx-mono">Dr {NGN(totals.d)} · Cr {NGN(totals.c)}</span>
         </div>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={autoPostFlag} onChange={(e) => setAutoPostFlag(e.target.checked)} />
-          Post immediately (otherwise saved as draft)
-        </label>
+        <DxCheckbox label="Post immediately (otherwise saved as draft)" checked={autoPostFlag} onChange={(e) => setAutoPostFlag(e.target.checked)} />
 
-        <Button type="submit" isLoading={create.isPending} disabled={!totals.balanced}>
-          {autoPostFlag ? "Create & post" : "Save draft"}
-        </Button>
+        <div className="flex justify-end">
+          <DxButton type="submit" variant="primary" isLoading={create.isPending} disabled={!totals.balanced}>{autoPostFlag ? "Create & post" : "Save draft"}</DxButton>
+        </div>
       </form>
-    </Modal>
+    </DxPopup>
   );
 }

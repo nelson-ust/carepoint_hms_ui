@@ -1,15 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Pencil, Plus, Users } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { SuiteEyebrow } from "@/components/layout/SuiteEyebrow";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Modal } from "@/components/ui/Modal";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
+import {
+  DxPage, DxPageHeader, DxPanel, DxBadge, DxButton, DxInput, DxCheckbox, DxPopup,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import { PayrollTabs } from "../components/PayrollTabs";
@@ -95,45 +89,32 @@ function ProviderModal({ provider, isOpen, onClose }: {
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md"
+    <DxPopup
+      isOpen={isOpen} onClose={onClose} size="md"
       title={provider ? `Edit — ${provider.name}` : "New Pension Provider (PFA)"}
+      locked={save.isPending}
       footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" size="sm" onClick={onClose} disabled={save.isPending}>Cancel</Button>
-          <Button size="sm" onClick={submit} isLoading={save.isPending}>
-            {provider ? "Save changes" : "Create provider"}
-          </Button>
-        </div>
-      }>
+        <>
+          <DxButton onClick={onClose} disabled={save.isPending}>Cancel</DxButton>
+          <DxButton variant="primary" onClick={submit} isLoading={save.isPending}>{provider ? "Save changes" : "Create provider"}</DxButton>
+        </>
+      }
+    >
       <div className="space-y-4">
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Input label="Code" value={form.code} onChange={set("code")}
-            hint="Short unique code, e.g. STANBIC-PFA." />
-          <Input label="Name" value={form.name} onChange={set("name")}
-            hint="Registered PFA name." />
-          <Input label="PFA licence number" value={form.pfa_license_no}
-            onChange={set("pfa_license_no")} hint="PenCom licence, e.g. PFA/2005/001." />
-          <Input label="Contact email" type="email" value={form.contact_email}
-            onChange={set("contact_email")} />
-          <Input label="Contact phone" value={form.contact_phone}
-            onChange={set("contact_phone")} />
-          <Input label="Address" value={form.address} onChange={set("address")} />
-          <Input label="Remittance bank" value={form.bank_name} onChange={set("bank_name")}
-            hint="Bank contributions are remitted into." />
-          <Input label="Remittance account no." value={form.bank_account_no}
-            onChange={set("bank_account_no")} />
-          <Input label="Note" value={form.note} onChange={set("note")} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <DxInput label="Code" value={form.code} onChange={set("code")} hint="Short unique code, e.g. STANBIC-PFA." />
+          <DxInput label="Name" value={form.name} onChange={set("name")} hint="Registered PFA name." />
+          <DxInput label="PFA licence number" value={form.pfa_license_no} onChange={set("pfa_license_no")} hint="PenCom licence, e.g. PFA/2005/001." />
+          <DxInput label="Contact email" type="email" value={form.contact_email} onChange={set("contact_email")} />
+          <DxInput label="Contact phone" value={form.contact_phone} onChange={set("contact_phone")} />
+          <DxInput label="Address" value={form.address} onChange={set("address")} />
+          <DxInput label="Remittance bank" value={form.bank_name} onChange={set("bank_name")} hint="Bank contributions are remitted into." />
+          <DxInput label="Remittance account no." value={form.bank_account_no} onChange={set("bank_account_no")} />
+          <DxInput label="Note" value={form.note} onChange={set("note")} />
         </div>
-        <label className="flex items-center gap-2.5 cursor-pointer select-none">
-          <input type="checkbox" checked={form.is_active}
-            onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
-            className="h-4 w-4 rounded accent-primary-600" />
-          <span className="text-sm font-semibold text-secondary-800 dark:text-secondary-100">
-            Active
-          </span>
-        </label>
+        <DxCheckbox label="Active" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} />
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -148,80 +129,56 @@ export function PensionProvidersPage() {
   const providers = providersQuery.data ?? [];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "HR & Payroll" }, { label: "Pension Providers" }]}
         title="Pension Providers"
-        eyebrow={<SuiteEyebrow label="HR & Payroll Suite" />}
-        description="Pension Fund Administrators (PFAs) staff contributions are remitted to. The pension remittance schedule groups amounts per provider."
+        subtitle="Pension Fund Administrators (PFAs) staff contributions are remitted to. The pension remittance schedule groups amounts per provider."
         actions={
-          <Button size="sm" leftIcon={<Plus className="h-3.5 w-3.5" />}
-            onClick={() => { setEditProvider(null); setModalOpen(true); }}>
-            New Provider
-          </Button>
+          <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setEditProvider(null); setModalOpen(true); }}>New provider</DxButton>
         }
       />
       <PayrollTabs />
 
-      <Card className="p-6">
+      <DxPanel title="Providers" icon={<Building2 className="h-4 w-4" />}>
         {providersQuery.isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" />
-          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="dx-skeleton h-36 w-full" />)}</div>
         ) : providers.length === 0 ? (
-          <EmptyState
-            icon={Building2}
-            title="No pension providers yet"
-            description="Add the PFAs your staff use, then link each staff member to theirs in HR Staff Records — the pension schedule will group remittances per provider."
-            action={
-              <Button size="sm" leftIcon={<Plus className="h-3.5 w-3.5" />}
-                onClick={() => { setEditProvider(null); setModalOpen(true); }}>
-                New Provider
-              </Button>
-            }
-          />
+          <div className="py-14 text-center">
+            <Building2 className="mx-auto mb-3 h-10 w-10 text-[var(--dx-text-faint)]" />
+            <h4 className="text-[15px] font-bold text-[var(--dx-text)]">No pension providers yet</h4>
+            <p className="mx-auto mt-1 max-w-md text-[13px] text-[var(--dx-text-muted)]">Add the PFAs your staff use, then link each staff member to theirs in HR Staff Records — the pension schedule will group remittances per provider.</p>
+            <DxButton className="mx-auto mt-4" variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setEditProvider(null); setModalOpen(true); }}>New provider</DxButton>
+          </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {providers.map((p) => (
-              <div key={p.id}
-                className="rounded-2xl border border-secondary-100 p-4 space-y-2.5 dark:border-white/5">
+              <div key={p.id} className="space-y-2.5 rounded-lg border border-[var(--dx-border)] bg-[var(--dx-surface)] p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-bold text-secondary-900 dark:text-white">{p.name}</p>
-                    <p className="data-mono text-[10px] text-secondary-400">
-                      {p.code}{p.pfa_license_no ? ` · ${p.pfa_license_no}` : ""}
-                    </p>
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-bold text-[var(--dx-text)]">{p.name}</p>
+                    <p className="dx-mono text-[10px] text-[var(--dx-text-muted)]">{p.code}{p.pfa_license_no ? ` · ${p.pfa_license_no}` : ""}</p>
                   </div>
-                  <Badge variant={p.is_active ? "soft-success" : "secondary"}>
-                    {p.is_active ? "ACTIVE" : "INACTIVE"}
-                  </Badge>
+                  <DxBadge tone={p.is_active ? "success" : "neutral"}>{p.is_active ? "ACTIVE" : "INACTIVE"}</DxBadge>
                 </div>
-                <div className="space-y-1 text-xs text-secondary-500">
-                  {p.contact_email && <p>{p.contact_email}</p>}
-                  {p.contact_phone && <p>{p.contact_phone}</p>}
-                  {p.bank_name && (
-                    <p>
-                      Remit to: {p.bank_name}
-                      {p.bank_account_no ? ` · ${p.bank_account_no}` : ""}
-                    </p>
-                  )}
+                <div className="space-y-1 text-[12px] text-[var(--dx-text-muted)]">
+                  {p.contact_email ? <p>{p.contact_email}</p> : null}
+                  {p.contact_phone ? <p>{p.contact_phone}</p> : null}
+                  {p.bank_name ? <p>Remit to: {p.bank_name}{p.bank_account_no ? ` · ${p.bank_account_no}` : ""}</p> : null}
                 </div>
-                <div className="flex items-center justify-between pt-1">
-                  <span className="flex items-center gap-1.5 text-xs font-semibold text-secondary-500">
+                <div className="flex items-center justify-between border-t border-[var(--dx-border)] pt-2">
+                  <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--dx-text-muted)]">
                     <Users className="h-3.5 w-3.5" /> {p.staff_count ?? 0} staff
                   </span>
-                  <Button size="sm" variant="secondary" leftIcon={<Pencil className="h-3.5 w-3.5" />}
-                    onClick={() => { setEditProvider(p); setModalOpen(true); }}>
-                    Edit
-                  </Button>
+                  <DxButton size="sm" leftIcon={<Pencil className="h-3.5 w-3.5" />} onClick={() => { setEditProvider(p); setModalOpen(true); }}>Edit</DxButton>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </Card>
+      </DxPanel>
 
-      <ProviderModal provider={editProvider} isOpen={modalOpen}
-        onClose={() => setModalOpen(false)} />
-    </div>
+      <ProviderModal provider={editProvider} isOpen={modalOpen} onClose={() => setModalOpen(false)} />
+    </DxPage>
   );
 }

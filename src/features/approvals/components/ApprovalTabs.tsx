@@ -10,12 +10,21 @@ const tabs = [
 
 export function ApprovalTabs() {
   return (
-    <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-white/40 border border-secondary-400/40 w-fit dark:bg-secondary-950/40 dark:border-white/10">
+    <div className="dx flex w-fit flex-wrap items-center gap-1 rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface)] p-1">
       {tabs.map(({ to, label, icon: Icon, end }) => (
-        <NavLink key={to} to={to} end={end}
-          className={({ isActive }) => cn(
-            "flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all",
-            isActive ? "bg-secondary-900 text-white shadow-lg" : "text-secondary-500 hover:text-secondary-900 dark:hover:text-secondary-100")}>
+        <NavLink
+          key={to}
+          to={to}
+          end={end}
+          className={({ isActive }) =>
+            cn(
+              "flex items-center gap-2 rounded px-4 py-2 text-[12px] font-semibold transition-colors",
+              isActive
+                ? "bg-[var(--dx-accent)] text-white"
+                : "text-[var(--dx-text-muted)] hover:bg-[var(--dx-surface-alt)] hover:text-[var(--dx-text)]",
+            )
+          }
+        >
           <Icon className="h-4 w-4" /> {label}
         </NavLink>
       ))}

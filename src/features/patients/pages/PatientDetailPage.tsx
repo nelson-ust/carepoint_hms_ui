@@ -6,7 +6,6 @@ import {
   ArrowRight,
   ChevronRight,
   ShieldCheck,
-  AlertCircle,
   Phone,
   Mail,
   MapPin,
@@ -17,8 +16,11 @@ import {
   TrendingUp,
   HeartPulse,
   Stethoscope,
-  FlaskConical
+  FlaskConical,
 } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxPanel, DxKpi, DxBadge, DxButton, DxMessage, DxPageLoading,
+} from "@/components/dx";
 import { getPatientById } from "../api/patients.api";
 import type { Patient } from "../api/patients.api";
 import { getVisits } from "@/features/visits/api/visits.api";
@@ -50,15 +52,15 @@ export function PatientDetailPage() {
         const id = Number(patientId);
         const [patientData, visitsResponse] = await Promise.all([
           getPatientById(id),
-          getVisits({ patient_id: id, limit: 10 })
+          getVisits({ patient_id: id, limit: 10 }),
         ]);
 
         setPatient(patientData);
 
         const allVisits = visitsResponse.items || [];
-        const active = allVisits.find(v => v.status === 'ACTIVE' || v.status === 'IN_PROGRESS' || v.status === 'WAITING');
+        const active = allVisits.find((v) => v.status === "ACTIVE" || v.status === "IN_PROGRESS" || v.status === "WAITING");
         setActiveVisit(active || null);
-        setRecentVisits(allVisits.filter(v => v.id !== active?.id));
+        setRecentVisits(allVisits.filter((v) => v.id !== active?.id));
         setTotalEncounters(visitsResponse.meta?.total ?? visitsResponse.count ?? allVisits.length);
 
         // Adherence is non-critical — fetch it separately so a failure
@@ -70,7 +72,6 @@ export function PatientDetailPage() {
         } catch {
           setAdherencePct(null);
         }
-
       } catch (err: any) {
         console.error("Failed to load patient dashboard", err);
         setError("Unable to retrieve patient clinical records.");
@@ -82,263 +83,187 @@ export function PatientDetailPage() {
     loadData();
   }, [patientId]);
 
-  if (isLoading) {
-    return (
-      <div className="h-[80vh] w-full flex flex-col items-center justify-center space-y-6">
-        <div className="relative">
-          <div className="h-20 w-20 border-4 border-secondary-400 rounded-full" />
-          <div className="absolute inset-0 h-20 w-20 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-        <p className="text-xs font-black uppercase tracking-[0.3em] text-secondary-400 animate-pulse">Synchronizing Clinical Data</p>
-      </div>
-    );
-  }
+  if (isLoading) return <DxPageLoading label="Loading clinical data…" />;
 
   if (error || !patient) {
     return (
-      <div className="h-[80vh] w-full flex items-center justify-center">
-        <div className="glass-card rounded p-12 text-center max-w-md border border-rose-100 bg-white/50 backdrop-blur-xl">
-          <AlertCircle className="h-16 w-16 text-rose-500 mx-auto mb-6" />
-          <h2 className="text-2xl font-black text-secondary-900 mb-2">Record Access Failed</h2>
-          <p className="text-secondary-500 mb-8 font-medium">{error || "Patient not found."}</p>
-          <button onClick={() => navigate(routes.patients)} className="btn-primary w-full py-4">Return to Registry</button>
-        </div>
-      </div>
+      <DxPage>
+        <DxPanel title="Patient record">
+          <div className="py-12 text-center">
+            <DxMessage tone="danger" className="mx-auto max-w-md text-left">{error || "Patient not found."}</DxMessage>
+            <DxButton className="mx-auto mt-4" variant="primary" onClick={() => navigate(routes.patients)}>Return to registry</DxButton>
+          </div>
+        </DxPanel>
+      </DxPage>
     );
   }
 
-  return (
-    <div className="max-w-7xl mx-auto space-y-10 animate-fade-in pb-20">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div className="flex items-center gap-6">
-          <div className="h-20 w-20 rounded-[2.5rem] bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-3xl font-black shadow-2xl shadow-primary-500/30 ring-8 ring-primary-500/10">
-            {patient.first_name?.[0]}{patient.last_name?.[0]}
-          </div>
-          <div>
-            <h1 className="text-4xl font-black font-display tracking-tight text-secondary-900 leading-none">
-              {patient.first_name} {patient.last_name}
-            </h1>
-            <div className="flex items-center gap-3 mt-3">
-              <span className="px-3 py-1 bg-secondary-900 text-white rounded-lg text-[10px] font-mono font-bold tracking-widest uppercase">
-                {patient.hospital_number}
-              </span>
-              <span className="h-1 w-1 bg-secondary-300 rounded-full" />
-              <p className="text-xs font-bold text-secondary-400 uppercase tracking-widest">
-                {patient.gender} • {patient.date_of_birth ? `${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} Years` : 'Age N/A'}
-              </p>
-            </div>
-          </div>
-        </div>
+  const age = patient.date_of_birth ? `${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} years` : "Age N/A";
+  const patientClass =
+    patient.patient_class === "HMO" ? "HMO / Insurance" : patient.patient_class === "RETAINERSHIP" ? "Retainership" : "Normal (self-pay)";
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(routes.visitInitiate, { state: { patient } })}
-            disabled={!!activeVisit}
-            className={`btn-primary px-8 py-4 rounded flex items-center gap-3 shadow-xl ${activeVisit ? 'opacity-30 grayscale cursor-not-allowed' : 'shadow-primary-500/20'}`}
-          >
-            <Plus className="h-5 w-5" />
-            <span className="font-bold">Initiate Visit</span>
-          </button>
-        </div>
-      </div>
+  const modules: { label: string; icon: typeof HeartPulse; color: string }[] = [
+    { label: "Triage", icon: HeartPulse, color: "var(--dx-danger)" },
+    { label: "Notes", icon: FileText, color: "var(--dx-accent)" },
+    { label: "Laboratory", icon: FlaskConical, color: "var(--dx-warning)" },
+    { label: "Prescriptions", icon: Stethoscope, color: "var(--dx-success)" },
+  ];
+
+  return (
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Patients", to: routes.patients }, { label: `${patient.first_name} ${patient.last_name}` }]}
+        title={
+          <span className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--dx-accent)] text-[15px] font-bold text-white">
+              {patient.first_name?.[0]}{patient.last_name?.[0]}
+            </span>
+            <span>{patient.first_name} {patient.last_name}</span>
+          </span>
+        }
+        subtitle={
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="dx-mono rounded bg-[var(--dx-surface-sunken)] px-2 py-0.5 text-[11px] font-semibold text-[var(--dx-text)]">{patient.hospital_number}</span>
+            <span>{patient.gender} · {age}</span>
+          </span>
+        }
+        actions={
+          <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} disabled={!!activeVisit}
+            onClick={() => navigate(routes.visitInitiate, { state: { patient } })}>
+            Initiate visit
+          </DxButton>
+        }
+      />
 
       {/* Clinical overview: chronic problems, progress analytics, baseline & history */}
       <Patient360Panel patientId={patient.id} />
 
-      {/* Status Banner for Active Visit */}
-      {activeVisit && (
-        <div className="relative overflow-hidden group">
-          <div className="absolute inset-0 bg-emerald-500/10 backdrop-blur-md" />
-          <div className="relative border-2 border-emerald-500/20 rounded p-8 lg:p-10 flex flex-col lg:flex-row items-center justify-between gap-8 shadow-2xl shadow-emerald-500/10">
-            <div className="flex items-center gap-8">
-              <div className="h-20 w-20 rounded bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 animate-pulse-slow">
-                <Activity className="h-10 w-10" />
+      {/* Active visit banner */}
+      {activeVisit ? (
+        <div className="flex flex-col items-start justify-between gap-4 rounded-lg border border-[var(--dx-success)] bg-[var(--dx-success-soft)] p-5 lg:flex-row lg:items-center">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--dx-success)] text-white"><Activity className="h-6 w-6" /></div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="dx-live-dot" aria-hidden />
+                <h3 className="text-[16px] font-bold text-[var(--dx-text)]">Active encounter</h3>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-                  <h3 className="text-2xl font-black text-secondary-900">Active Encounter Detected</h3>
-                </div>
-                <p className="text-secondary-500 font-medium max-w-md">
-                  This patient is currently undergoing a clinical lifecycle at <span className="font-bold text-secondary-900">{activeVisit.current_service_delivery_point?.name || 'Reception'}</span>.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 w-full lg:w-auto">
-              <div className="flex-1 lg:flex-none px-8 py-4 bg-white/50 border border-emerald-100 rounded text-center">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 mb-1">Visit Code</p>
-                <p className="text-sm font-mono font-black text-secondary-900">{activeVisit.visit_code}</p>
-              </div>
-              <Link
-                to={routes.visitDetail.replace(':visitId', String(activeVisit.id))}
-                className="flex-1 lg:flex-none btn-primary bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-4 rounded flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/20"
-              >
-                <span className="font-black uppercase tracking-widest text-xs">Access Lifecycle</span>
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+              <p className="mt-0.5 text-[13px] text-[var(--dx-text-muted)]">Currently at <span className="font-semibold text-[var(--dx-text)]">{activeVisit.current_service_delivery_point?.name || "Reception"}</span>.</p>
             </div>
           </div>
+          <div className="flex w-full items-center gap-3 lg:w-auto">
+            <div className="rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface)] px-4 py-2 text-center">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Visit code</p>
+              <p className="dx-mono text-[13px] font-bold text-[var(--dx-text)]">{activeVisit.visit_code}</p>
+            </div>
+            <Link to={routes.visitDetail.replace(":visitId", String(activeVisit.id))} className="dx-btn dx-btn-primary">
+              Access lifecycle <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
-      )}
+      ) : null}
 
-      <div className="grid lg:grid-cols-12 gap-10">
-        {/* Left: Vital Info & Identity */}
-        <div className="lg:col-span-4 space-y-10">
+      <div className="grid gap-4 lg:grid-cols-12">
+        {/* Left: identity & baseline */}
+        <div className="space-y-4 lg:col-span-4">
           <BaselineProfileCard patientId={patient.id} />
           <DiagnosticResultsPanel patientId={patient.id} />
-          <div className="glass-card rounded p-10 border border-secondary-400/50 shadow-premium bg-white/40 backdrop-blur-xl">
-            <h3 className="text-xl font-black font-display mb-10 flex items-center gap-3">
-              <ShieldCheck className="h-6 w-6 text-primary-500" />
-              Identity Context
-            </h3>
 
-            <div className="space-y-8">
-              <div className="space-y-4">
-                <div className="flex items-center gap-4 group">
-                  <div className="h-10 w-10 rounded bg-secondary-50 flex items-center justify-center group-hover:bg-primary-50 transition-colors">
-                    <Phone className="h-5 w-5 text-secondary-400 group-hover:text-primary-500 transition-colors" />
+          <DxPanel title="Identity context" icon={<ShieldCheck className="h-4 w-4" />}>
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {[
+                  { icon: Phone, label: "Mobile", value: patient.phone_number },
+                  { icon: Mail, label: "Email", value: patient.email || "None provided" },
+                  { icon: MapPin, label: "Residence", value: `${patient.address ?? ""}${patient.city ? `, ${patient.city}` : ""}` || "—" },
+                ].map(({ icon: Icon, label, value }) => (
+                  <div key={label} className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--dx-surface-sunken)] text-[var(--dx-text-muted)]"><Icon className="h-4 w-4" /></div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">{label}</p>
+                      <p className="truncate text-[13px] font-medium text-[var(--dx-text)]">{value}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">Mobile Terminal</p>
-                    <p className="text-sm font-bold text-secondary-900">{patient.phone_number}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 group">
-                  <div className="h-10 w-10 rounded bg-secondary-50 flex items-center justify-center group-hover:bg-primary-50 transition-colors">
-                    <Mail className="h-5 w-5 text-secondary-400 group-hover:text-primary-500 transition-colors" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">Secure Email</p>
-                    <p className="text-sm font-bold text-secondary-900">{patient.email || 'None Provided'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 group">
-                  <div className="h-10 w-10 rounded bg-secondary-50 flex items-center justify-center group-hover:bg-primary-50 transition-colors">
-                    <MapPin className="h-5 w-5 text-secondary-400 group-hover:text-primary-500 transition-colors" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">Primary Residence</p>
-                    <p className="text-sm font-bold text-secondary-900 leading-tight">{patient.address}, {patient.city}</p>
-                  </div>
-                </div>
+                ))}
               </div>
 
-              <div className="pt-8 border-t border-secondary-400">
-                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-secondary-400 mb-6">Financial Classification</p>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-5 rounded bg-indigo-50 border border-indigo-100">
-                    <p className="text-[9px] font-black uppercase text-indigo-600 mb-1">Patient Class</p>
-                    <p className="text-xs font-black text-indigo-900 uppercase">
-                      {patient.patient_class === "HMO"
-                        ? "HMO / Insurance"
-                        : patient.patient_class === "RETAINERSHIP"
-                          ? "Retainership"
-                          : "Normal (Self-pay)"}
-                    </p>
-                  </div>
-                  <div className="p-5 rounded bg-emerald-50 border border-emerald-100">
-                    <p className="text-[9px] font-black uppercase text-emerald-600 mb-1">Payer Group</p>
-                    <p className="text-xs font-black text-emerald-900 uppercase">{patient.payer_type}</p>
-                  </div>
-                  <div className="p-5 rounded bg-primary-50 border border-primary-100">
-                    <p className="text-[9px] font-black uppercase text-primary-600 mb-1">Account Type</p>
-                    <p className="text-xs font-black text-primary-900 uppercase">{patient.patient_type}</p>
-                  </div>
+              <div className="border-t border-[var(--dx-border)] pt-4">
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Financial classification</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: "Patient class", value: patientClass },
+                    { label: "Payer group", value: patient.payer_type },
+                    { label: "Account type", value: patient.patient_type },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] p-2.5">
+                      <p className="text-[9px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">{label}</p>
+                      <p className="mt-0.5 text-[11px] font-semibold uppercase text-[var(--dx-text)]">{value || "—"}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
-          </div>
+          </DxPanel>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-6">
-            <div className="glass-card rounded-[2.5rem] p-6 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-xl shadow-indigo-500/20">
-              <TrendingUp className="h-6 w-6 mb-4 opacity-50" />
-              <p className="text-2xl font-black leading-none">{totalEncounters ?? "—"}</p>
-              <p className="text-[9px] font-black uppercase tracking-widest mt-2 opacity-70">Total Encounters</p>
-            </div>
-            <div className="glass-card rounded-[2.5rem] p-6 bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-xl shadow-emerald-500/20">
-              <HeartPulse className="h-6 w-6 mb-4 opacity-50" />
-              <p className="text-2xl font-black leading-none">{adherencePct === null ? "—" : `${adherencePct}%`}</p>
-              <p className="text-[9px] font-black uppercase tracking-widest mt-2 opacity-70">Adherence Score</p>
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <DxKpi label="Total encounters" value={totalEncounters ?? "—"} icon={TrendingUp} tone="accent" />
+            <DxKpi label="Adherence score" value={adherencePct === null ? "—" : `${adherencePct}%`} icon={HeartPulse} tone="success" />
           </div>
         </div>
 
-        {/* Right: Clinical Timeline & Modules */}
-        <div className="lg:col-span-8 space-y-10">
-          {/* Quick Actions / Modules */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: 'Triage', icon: HeartPulse, color: 'text-rose-500', bg: 'bg-rose-50', border: 'border-rose-100' },
-              { label: 'Notes', icon: FileText, color: 'text-primary-500', bg: 'bg-primary-50', border: 'border-primary-100' },
-              { label: 'Laboratory', icon: FlaskConical, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100' },
-              { label: 'Prescriptions', icon: Stethoscope, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-            ].map(mod => (
-              <button key={mod.label} className={`p-6 rounded border ${mod.border} ${mod.bg} flex flex-col items-center gap-3 hover:scale-105 transition-all group`}>
-                <mod.icon className={`h-6 w-6 ${mod.color}`} />
-                <span className="text-[10px] font-black uppercase tracking-widest text-secondary-900">{mod.label}</span>
+        {/* Right: actions & history */}
+        <div className="space-y-4 lg:col-span-8">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {modules.map((mod) => (
+              <button key={mod.label} className="flex flex-col items-center gap-2 rounded-lg border border-[var(--dx-border)] bg-[var(--dx-surface)] p-5 transition-colors hover:border-[var(--dx-border-strong)]">
+                <mod.icon className="h-6 w-6" style={{ color: mod.color }} />
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text)]">{mod.label}</span>
               </button>
             ))}
           </div>
 
-          {/* Historical Encounters */}
-          <div className="glass-card rounded p-10 border border-secondary-400/50 shadow-premium bg-white/40">
-            <div className="flex items-center justify-between mb-10">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded bg-secondary-900 text-white flex items-center justify-center">
-                  <History className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black font-display tracking-tight text-secondary-900">Encounter History</h3>
-                  <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-widest mt-0.5">Clinical Timeline</p>
-                </div>
-              </div>
-              <Link
-                to={`${routes.visits}?patient_id=${patient.id}`}
-                className="text-[10px] font-black uppercase tracking-widest text-primary-600 hover:text-primary-700 flex items-center gap-2"
-              >
-                View All <ChevronRight className="h-3 w-3" />
+          <DxPanel
+            title="Encounter history"
+            icon={<History className="h-4 w-4" />}
+            description="Clinical timeline"
+            actions={
+              <Link to={`${routes.visits}?patient_id=${patient.id}`} className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--dx-accent)] hover:underline">
+                View all <ChevronRight className="h-3 w-3" />
               </Link>
-            </div>
-
-            <div className="space-y-4">
-              {recentVisits.length > 0 ? recentVisits.map(visit => (
-                <div key={visit.id} className="p-6 rounded bg-white/60 border border-secondary-400 flex items-center justify-between group hover:border-primary-200 hover:bg-white transition-all">
-                  <div className="flex items-center gap-6">
-                    <div className="h-14 w-14 rounded bg-secondary-50 flex flex-col items-center justify-center text-secondary-500 group-hover:bg-primary-50 group-hover:text-primary-600 transition-colors">
-                      <span className="text-xs font-black leading-none">{new Date(visit.visit_date).getDate()}</span>
-                      <span className="text-[8px] font-bold uppercase mt-1">{new Date(visit.visit_date).toLocaleString('default', { month: 'short' })}</span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-black text-secondary-900">#{visit.visit_code}</p>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">{visit.status}</span>
-                        <span className="h-1 w-1 bg-secondary-200 rounded-full" />
-                        <span className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">{visit.priority}</span>
+            }
+          >
+            <div className="space-y-2.5">
+              {recentVisits.length > 0 ? (
+                recentVisits.map((visit) => (
+                  <div key={visit.id} className="flex items-center justify-between rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface)] p-3 transition-colors hover:border-[var(--dx-border-strong)]">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 flex-col items-center justify-center rounded-md bg-[var(--dx-surface-sunken)] text-[var(--dx-text-muted)]">
+                        <span className="text-[13px] font-bold leading-none text-[var(--dx-text)]">{new Date(visit.visit_date).getDate()}</span>
+                        <span className="mt-0.5 text-[8px] font-semibold uppercase">{new Date(visit.visit_date).toLocaleString("default", { month: "short" })}</span>
+                      </div>
+                      <div>
+                        <p className="dx-mono text-[13px] font-semibold text-[var(--dx-text)]">#{visit.visit_code}</p>
+                        <div className="mt-1 flex items-center gap-2">
+                          <DxBadge tone="neutral">{visit.status}</DxBadge>
+                          <DxBadge tone="info">{visit.priority}</DxBadge>
+                        </div>
                       </div>
                     </div>
+                    <Link to={routes.visitDetail.replace(":visitId", String(visit.id))} className="dx-btn dx-btn-icon dx-btn-sm" title="Open visit">
+                      <ArrowRight />
+                    </Link>
                   </div>
-                  <Link
-                    to={routes.visitDetail.replace(':visitId', String(visit.id))}
-                    className="p-3 bg-secondary-50 group-hover:bg-primary-500 group-hover:text-white rounded transition-all"
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-              )) : (
-                <div className="py-20 text-center space-y-4">
-                  <div className="h-20 w-20 bg-secondary-50 rounded-3xl flex items-center justify-center mx-auto">
-                    <ClipboardList className="h-10 w-10 text-secondary-200" />
-                  </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-secondary-300">No Historical Records</p>
+                ))
+              ) : (
+                <div className="py-16 text-center">
+                  <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]"><ClipboardList className="h-8 w-8 text-[var(--dx-text-faint)]" /></div>
+                  <p className="text-[12px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">No historical records</p>
                 </div>
               )}
             </div>
-          </div>
+          </DxPanel>
         </div>
       </div>
-    </div>
+    </DxPage>
   );
 }

@@ -15,17 +15,18 @@ import {
   Users,
 } from "lucide-react";
 
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
-import { Modal } from "@/components/ui/Modal";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { MetricCard } from "@/components/charts/MetricCard";
-import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxKpi,
+  DxButton,
+  DxInput,
+  DxSelect,
+  DxTextarea,
+  DxPopup,
+  DxMessage,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { useDisclosure } from "@/hooks/useDisclosure";
 import { cn } from "@/lib/utils/cn";
@@ -114,37 +115,56 @@ function errorMessage(error: unknown): string | null {
 }
 
 // ============================================================
-// Slot tone mapping (static classes — no dynamic interpolation)
+// Slot tone mapping — dx tokens, data-driven inline styles so the
+// coloured calendar blocks stay theme-aware in light and dark.
 // ============================================================
 
-const SLOT_TONES: Record<AppointmentSlotStatus, { block: string; dot: string; label: string }> = {
+type SlotToneSpec = {
+  block: React.CSSProperties;
+  dot: string;
+  label: string;
+};
+
+const SLOT_TONES: Record<AppointmentSlotStatus, SlotToneSpec> = {
   OPEN: {
-    block:
-      "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 dark:text-emerald-300",
-    dot: "bg-emerald-500",
+    block: {
+      background: "var(--dx-success-soft)",
+      borderColor: "var(--dx-success)",
+      color: "var(--dx-success)",
+    },
+    dot: "var(--dx-success)",
     label: "Open",
   },
   BOOKED: {
-    block:
-      "border-cyan-500/40 bg-cyan-500/15 text-cyan-700 hover:bg-cyan-500/25 dark:text-cyan-300",
-    dot: "bg-cyan-500",
+    block: {
+      background: "var(--dx-info-soft)",
+      borderColor: "var(--dx-info)",
+      color: "var(--dx-info)",
+    },
+    dot: "var(--dx-info)",
     label: "Booked",
   },
   BLOCKED: {
-    block:
-      "border-rose-500/40 bg-rose-500/15 text-rose-700 hover:bg-rose-500/25 dark:text-rose-300",
-    dot: "bg-rose-500",
+    block: {
+      background: "var(--dx-danger-soft)",
+      borderColor: "var(--dx-danger)",
+      color: "var(--dx-danger)",
+    },
+    dot: "var(--dx-danger)",
     label: "Blocked",
   },
   EXPIRED: {
-    block:
-      "border-secondary-400/30 bg-secondary-500/10 text-secondary-500 dark:text-secondary-400",
-    dot: "bg-secondary-400",
+    block: {
+      background: "var(--dx-surface-sunken)",
+      borderColor: "var(--dx-border)",
+      color: "var(--dx-text-muted)",
+    },
+    dot: "var(--dx-text-faint)",
     label: "Expired",
   },
 };
 
-function slotTone(status: string) {
+function slotTone(status: string): SlotToneSpec {
   return SLOT_TONES[status as AppointmentSlotStatus] ?? SLOT_TONES.EXPIRED;
 }
 
@@ -230,75 +250,77 @@ function AddAvailabilityModal({
   };
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={handleClose}
       title="Add Weekly Availability"
       size="lg"
+      locked={createTemplate.isPending}
       footer={
-        <div className="flex justify-end gap-3">
-          <Button variant="ghost" onClick={handleClose}>
+        <>
+          <DxButton onClick={handleClose} disabled={createTemplate.isPending}>
             Cancel
-          </Button>
-          <Button
+          </DxButton>
+          <DxButton
+            variant="primary"
             leftIcon={<CalendarPlus className="h-4 w-4" />}
             isLoading={createTemplate.isPending}
             onClick={handleSubmit(onSubmit)}
           >
             Save Availability
-          </Button>
-        </div>
+          </DxButton>
+        </>
       }
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        <Select
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <DxSelect
           label="Weekday"
           options={WEEKDAY_OPTIONS}
           error={errors.weekday?.message}
           {...register("weekday")}
         />
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Input
+        <div className="grid gap-4 sm:grid-cols-2">
+          <DxInput
             label="Start Time"
             type="time"
             error={errors.start_time?.message}
             {...register("start_time")}
           />
-          <Input
+          <DxInput
             label="End Time"
             type="time"
             error={errors.end_time?.message}
             {...register("end_time")}
           />
         </div>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Input
+        <div className="grid gap-4 sm:grid-cols-2">
+          <DxInput
             label="Slot Duration (minutes)"
             type="number"
             error={errors.slot_duration_minutes?.message}
             {...register("slot_duration_minutes")}
           />
-          <Input
+          <DxInput
             label="Max Patients per Slot"
             type="number"
             error={errors.max_patients_per_slot?.message}
             {...register("max_patients_per_slot")}
           />
         </div>
-        <Input
+        <DxInput
           label="Appointment Type (optional)"
           placeholder="e.g. CONSULTATION"
           error={errors.appointment_type?.message}
           {...register("appointment_type")}
         />
-        <Textarea
+        <DxTextarea
           label="Notes (optional)"
           rows={2}
           error={errors.notes?.message}
           {...register("notes")}
         />
       </form>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -367,41 +389,42 @@ function BlockTimeModal({
   };
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={handleClose}
       title="Block Calendar Time"
       size="md"
+      locked={addTimeOff.isPending}
       footer={
-        <div className="flex justify-end gap-3">
-          <Button variant="ghost" onClick={handleClose}>
+        <>
+          <DxButton onClick={handleClose} disabled={addTimeOff.isPending}>
             Cancel
-          </Button>
-          <Button
+          </DxButton>
+          <DxButton
             variant="danger"
             leftIcon={<ShieldBan className="h-4 w-4" />}
             isLoading={addTimeOff.isPending}
             onClick={handleSubmit(onSubmit)}
           >
             Block Time
-          </Button>
-        </div>
+          </DxButton>
+        </>
       }
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        <Input
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <DxInput
           label="From"
           type="datetime-local"
           error={errors.starts_at?.message}
           {...register("starts_at")}
         />
-        <Input
+        <DxInput
           label="Until"
           type="datetime-local"
           error={errors.ends_at?.message}
           {...register("ends_at")}
         />
-        <Textarea
+        <DxTextarea
           label="Reason (optional)"
           rows={2}
           placeholder="Leave, conference, theatre list…"
@@ -409,7 +432,7 @@ function BlockTimeModal({
           {...register("reason")}
         />
       </form>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -538,20 +561,19 @@ export function DoctorCalendarPage() {
         onClick={() => (clickable ? setSlotToRelease(slot) : undefined)}
         title={`${tone.label} · ${formatTime(start)}–${formatTime(end)}${slot.block_reason ? ` · ${slot.block_reason}` : ""}${slot.appointment_type ? ` · ${slot.appointment_type}` : ""}`}
         className={cn(
-          "absolute inset-x-1 overflow-hidden rounded-xl border px-2 py-1 text-left backdrop-blur-sm transition-all",
-          tone.block,
+          "absolute inset-x-1 overflow-hidden rounded-md border px-2 py-1 text-left transition-opacity hover:opacity-80",
           clickable ? "cursor-pointer" : "cursor-default",
         )}
-        style={{ top: `${top + 2}px`, height: `${Math.max(22, bottom - top - 4)}px` }}
+        style={{ ...tone.block, top: `${top + 2}px`, height: `${Math.max(22, bottom - top - 4)}px` }}
       >
         <span className="flex items-center gap-1.5">
-          <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", tone.dot)} />
-          <span className="truncate text-[10px] font-black uppercase tracking-wider">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: tone.dot }} />
+          <span className="truncate text-[10px] font-bold uppercase tracking-wider">
             {tone.label}
             {slot.status === "BOOKED" ? ` ${slot.booked_count}/${slot.capacity}` : ""}
           </span>
         </span>
-        <span className="data-mono block truncate text-[10px] opacity-80">
+        <span className="dx-mono block truncate text-[10px] opacity-80">
           {formatTime(start)}–{formatTime(end)}
         </span>
       </button>
@@ -559,77 +581,78 @@ export function DoctorCalendarPage() {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Scheduling" }, { label: "Doctor Calendar" }]}
         title="Doctor Calendar"
-        description="Weekly availability, bookings and blocked time per clinician."
+        subtitle="Weekly availability, bookings and blocked time per clinician."
         actions={
           <>
-            <Button
-              variant="secondary"
+            <DxButton
               leftIcon={<ShieldBan className="h-4 w-4" />}
               onClick={blockTimeModal.open}
               disabled={!staffProfileId}
             >
               Block Time
-            </Button>
-            <Button
+            </DxButton>
+            <DxButton
+              variant="primary"
               leftIcon={<Plus className="h-4 w-4" />}
               onClick={availabilityModal.open}
               disabled={!staffProfileId}
             >
               Add Availability
-            </Button>
+            </DxButton>
           </>
         }
       />
 
       {/* KPI row — derived from the visible week */}
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DxKpi
           label="Open Slots"
           value={counts.OPEN}
           icon={CheckCircle2}
-          tone="primary"
+          tone="success"
           isLoading={slotsQuery.isLoading && staffProfileId > 0}
         />
-        <MetricCard
+        <DxKpi
           label="Booked"
           value={counts.BOOKED}
           icon={Users}
-          tone="cyan"
+          tone="info"
           isLoading={slotsQuery.isLoading && staffProfileId > 0}
         />
-        <MetricCard
+        <DxKpi
           label="Blocked"
           value={counts.BLOCKED}
           icon={ShieldBan}
-          tone="rose"
+          tone="danger"
           isLoading={slotsQuery.isLoading && staffProfileId > 0}
         />
-        <MetricCard
+        <DxKpi
           label="Total This Week"
           value={slots.length}
           icon={CalendarDays}
-          tone="violet"
+          tone="accent"
           isLoading={slotsQuery.isLoading && staffProfileId > 0}
         />
       </div>
 
       {/* Toolbar: doctor picker + week navigation */}
-      <Card padding="sm">
-        <div className="flex flex-wrap items-center justify-between gap-4 px-2">
+      <DxPanel>
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Select
-              options={doctorOptions}
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-              placeholder={doctorsQuery.isLoading ? "Loading doctors…" : "Select doctor…"}
-              className="w-64 py-2.5"
-              aria-label="Select doctor"
-            />
-            <Button
-              variant="outline"
+            <div className="w-64">
+              <DxSelect
+                options={doctorOptions}
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                placeholder={doctorsQuery.isLoading ? "Loading doctors…" : "Select doctor…"}
+                aria-label="Select doctor"
+              />
+            </div>
+            <DxButton
               size="sm"
               leftIcon={<Sparkles className="h-3.5 w-3.5" />}
               isLoading={materialise.isPending}
@@ -637,49 +660,54 @@ export function DoctorCalendarPage() {
               onClick={handleGenerateSlots}
             >
               Generate Slots
-            </Button>
+            </DxButton>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
+            <DxButton
+              icon
               size="sm"
+              variant="text"
               onClick={() => setWeekStart((w) => addDays(w, -7))}
-              aria-label="Previous week"
+              title="Previous week"
             >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="data-mono min-w-[180px] text-center text-xs font-bold text-secondary-600 dark:text-secondary-300">
+              <ChevronLeft />
+            </DxButton>
+            <span className="dx-mono min-w-[180px] text-center text-[12px] font-semibold text-[var(--dx-text-muted)]">
               {weekLabel}
             </span>
-            <Button
-              variant="ghost"
+            <DxButton
+              icon
               size="sm"
+              variant="text"
               onClick={() => setWeekStart((w) => addDays(w, 7))}
-              aria-label="Next week"
+              title="Next week"
             >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setWeekStart(startOfWeek(new Date()))}>
+              <ChevronRight />
+            </DxButton>
+            <DxButton size="sm" onClick={() => setWeekStart(startOfWeek(new Date()))}>
               Today
-            </Button>
+            </DxButton>
           </div>
         </div>
-      </Card>
+      </DxPanel>
 
       {/* Week grid */}
-      <Card padding="none" className="overflow-hidden">
+      <DxPanel flush className="overflow-hidden">
         {doctors.length === 0 && !doctorsQuery.isLoading ? (
-          <EmptyState
-            icon={Users}
-            title="No doctors found"
-            description="Add staff members with clinical profiles to manage their calendars."
-            className="py-16"
-          />
+          <div className="py-16 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]">
+              <Users className="h-8 w-8 text-[var(--dx-text-faint)]" />
+            </div>
+            <h4 className="text-[16px] font-bold text-[var(--dx-text)]">No doctors found</h4>
+            <p className="mx-auto mt-1 max-w-sm text-[13px] text-[var(--dx-text-muted)]">
+              Add staff members with clinical profiles to manage their calendars.
+            </p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <div className="min-w-[860px]">
               {/* Day headers */}
-              <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-secondary-100 dark:border-white/5">
+              <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-[var(--dx-border)]">
                 <div className="px-2 py-3" />
                 {weekDays.map((day) => {
                   const isToday = isSameDay(day, today);
@@ -687,19 +715,17 @@ export function DoctorCalendarPage() {
                     <div
                       key={day.toISOString()}
                       className={cn(
-                        "border-l border-secondary-100 px-2 py-3 text-center dark:border-white/5",
-                        isToday && "bg-primary-500/10",
+                        "border-l border-[var(--dx-border)] px-2 py-3 text-center",
+                        isToday && "bg-[var(--dx-accent-soft)]",
                       )}
                     >
-                      <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
                         {day.toLocaleDateString(undefined, { weekday: "short" })}
                       </p>
                       <p
                         className={cn(
-                          "data-mono mt-0.5 text-sm font-bold",
-                          isToday
-                            ? "text-primary-600 dark:text-primary-300"
-                            : "text-secondary-700 dark:text-secondary-200",
+                          "dx-mono mt-0.5 text-[14px] font-bold",
+                          isToday ? "text-[var(--dx-accent)]" : "text-[var(--dx-text)]",
                         )}
                       >
                         {day.getDate()}
@@ -713,7 +739,7 @@ export function DoctorCalendarPage() {
               {slotsQuery.isLoading && staffProfileId > 0 ? (
                 <div className="space-y-3 p-6">
                   {HOURS.slice(0, 6).map((h) => (
-                    <Skeleton key={h} className="h-10 w-full" />
+                    <div key={h} className="dx-skeleton h-10 w-full" />
                   ))}
                 </div>
               ) : (
@@ -723,10 +749,10 @@ export function DoctorCalendarPage() {
                     {HOURS.map((hour) => (
                       <div
                         key={hour}
-                        className="flex items-start justify-end border-b border-secondary-100 pr-2 pt-1 dark:border-white/5"
+                        className="flex items-start justify-end border-b border-[var(--dx-border)] pr-2 pt-1"
                         style={{ height: `${HOUR_HEIGHT_PX}px` }}
                       >
-                        <span className="data-mono text-[10px] font-bold text-secondary-400">
+                        <span className="dx-mono text-[10px] font-semibold text-[var(--dx-text-muted)]">
                           {formatHourLabel(hour)}
                         </span>
                       </div>
@@ -740,15 +766,15 @@ export function DoctorCalendarPage() {
                       <div
                         key={day.toISOString()}
                         className={cn(
-                          "relative border-l border-secondary-100 dark:border-white/5",
-                          isToday && "bg-primary-500/5",
+                          "relative border-l border-[var(--dx-border)]",
+                          isToday && "bg-[var(--dx-accent-soft)]",
                         )}
                         style={{ height: `${gridBodyHeight}px` }}
                       >
                         {HOURS.map((hour) => (
                           <div
                             key={hour}
-                            className="border-b border-secondary-100 dark:border-white/5"
+                            className="border-b border-[var(--dx-border)]"
                             style={{ height: `${HOUR_HEIGHT_PX}px` }}
                           />
                         ))}
@@ -765,30 +791,30 @@ export function DoctorCalendarPage() {
         )}
 
         {/* Footer: legend + empty hint */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-secondary-100 px-6 py-4 dark:border-white/5">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--dx-border)] px-6 py-4">
           <div className="flex flex-wrap items-center gap-4">
             {(Object.keys(SLOT_TONES) as AppointmentSlotStatus[]).map((status) => (
               <span key={status} className="flex items-center gap-1.5">
-                <span className={cn("h-2 w-2 rounded-full", SLOT_TONES[status].dot)} />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
+                <span className="h-2 w-2 rounded-full" style={{ background: SLOT_TONES[status].dot }} />
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
                   {SLOT_TONES[status].label}
                 </span>
               </span>
             ))}
           </div>
           {staffProfileId > 0 && !slotsQuery.isLoading && slots.length === 0 ? (
-            <span className="flex items-center gap-2 text-xs font-medium text-secondary-400">
+            <span className="flex items-center gap-2 text-[12px] font-medium text-[var(--dx-text-muted)]">
               <Clock className="h-3.5 w-3.5" />
               No slots this week — add availability, then generate slots.
             </span>
           ) : null}
           {slotsQuery.isError ? (
-            <span className="text-xs font-bold text-rose-500">
+            <span className="text-[12px] font-semibold" style={{ color: "var(--dx-danger)" }}>
               {errorMessage(slotsQuery.error)}
             </span>
           ) : null}
         </div>
-      </Card>
+      </DxPanel>
 
       {/* Modals */}
       <AddAvailabilityModal
@@ -802,29 +828,44 @@ export function DoctorCalendarPage() {
         staffProfileId={staffProfileId}
       />
 
-      <ConfirmDialog
+      {/* Release confirm */}
+      <DxPopup
         isOpen={slotToRelease !== null}
         onClose={() => setSlotToRelease(null)}
         title="Release this slot?"
-        description={
-          slotToRelease
-            ? `The booking on ${new Date(slotToRelease.starts_at).toLocaleString()} for ${selectedDoctor ? `${selectedDoctor.first_name} ${selectedDoctor.last_name}` : "this doctor"} will be released and the slot reopened.`
-            : undefined
+        size="sm"
+        locked={releaseSlotMutation.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setSlotToRelease(null)} disabled={releaseSlotMutation.isPending}>
+              Cancel
+            </DxButton>
+            <DxButton
+              variant="danger"
+              isLoading={releaseSlotMutation.isPending}
+              onClick={async () => {
+                if (!slotToRelease) return;
+                try {
+                  await releaseSlotMutation.mutateAsync(slotToRelease.id);
+                  toast.success("Slot released", "The slot is open for booking again.");
+                } catch (err) {
+                  toast.error("Could not release slot", errorMessage(err) ?? undefined);
+                } finally {
+                  setSlotToRelease(null);
+                }
+              }}
+            >
+              Release Slot
+            </DxButton>
+          </>
         }
-        confirmLabel="Release Slot"
-        tone="danger"
-        onConfirm={async () => {
-          if (!slotToRelease) return;
-          try {
-            await releaseSlotMutation.mutateAsync(slotToRelease.id);
-            toast.success("Slot released", "The slot is open for booking again.");
-          } catch (err) {
-            toast.error("Could not release slot", errorMessage(err) ?? undefined);
-          } finally {
-            setSlotToRelease(null);
-          }
-        }}
-      />
-    </div>
+      >
+        <DxMessage tone="warning">
+          {slotToRelease
+            ? `The booking on ${new Date(slotToRelease.starts_at).toLocaleString()} for ${selectedDoctor ? `${selectedDoctor.first_name} ${selectedDoctor.last_name}` : "this doctor"} will be released and the slot reopened.`
+            : null}
+        </DxMessage>
+      </DxPopup>
+    </DxPage>
   );
 }

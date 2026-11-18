@@ -252,6 +252,34 @@ export async function returnToConsultation(visitId: number) {
   return response.data;
 }
 
+export type VisitDisposition = "DISCHARGED" | "FOLLOW_UP" | "REFERRED" | "ADMITTED";
+
+export type DisposeVisitPayload = {
+  disposition: VisitDisposition;
+  /** Required for REFERRED (specialist clinic); optional ward for ADMITTED. */
+  target_service_delivery_point_id?: number;
+  note?: string;
+};
+
+export type DisposeVisitResponse = {
+  success: boolean;
+  message: string;
+  disposition: VisitDisposition;
+  visit: Visit;
+  new_flow_step?: unknown;
+  new_queue_ticket?: unknown;
+};
+
+/** POST /visits/{id}/dispose — end-of-encounter disposition:
+ * discharge, follow-up, refer to a specialist clinic, or authorise admission. */
+export async function disposeVisit(visitId: number, payload: DisposeVisitPayload) {
+  const response = await apiClient.post<DisposeVisitResponse>(
+    `/visits/${visitId}/dispose`,
+    payload,
+  );
+  return response.data;
+}
+
 export async function getServiceDeliveryPoints(
   options: { skip?: number; limit?: number } = {},
 ): Promise<ServiceDeliveryPoint[]> {

@@ -10,13 +10,23 @@ import {
   Pencil,
   Phone,
   Plus,
-  RefreshCw,
+  RotateCcw,
   Search,
   Trash2,
 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Badge } from "@/components/ui/Badge";
-import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxKpi,
+  DxBadge,
+  DxButton,
+  DxInput,
+  DxSelect,
+  DxPopup,
+  DxMessage,
+  type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import {
@@ -36,19 +46,17 @@ const STATUS_FILTERS: ("" | FacilityStatus)[] = [
   "DECOMMISSIONED",
 ];
 
-function statusVariant(
-  status: FacilityStatus,
-): "soft-success" | "soft-warning" | "soft-danger" | "secondary" {
+function statusTone(status: FacilityStatus): DxBadgeTone {
   switch (status) {
     case "ACTIVE":
-      return "soft-success";
+      return "success";
     case "UNDER_CONSTRUCTION":
     case "INACTIVE":
-      return "soft-warning";
+      return "warning";
     case "DECOMMISSIONED":
-      return "soft-danger";
+      return "danger";
     default:
-      return "secondary";
+      return "neutral";
   }
 }
 
@@ -111,194 +119,198 @@ export function FacilitiesPage() {
     setShowForm(true);
   };
 
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await removeMut.mutateAsync(deleteTarget.id);
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-        <PageHeader
-          title="Facilities"
-          description="Manage your hospital branches, clinics and service sites."
-        />
-        <div className="flex gap-3">
-          <button
-            onClick={() => facilitiesQuery.refetch()}
-            className="btn-secondary rounded-2xl border-secondary-400 bg-white/80 p-4"
-            title="Refresh"
-          >
-            <RefreshCw className={`h-4 w-4 ${facilitiesQuery.isFetching ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={openCreate}
-            className="btn-primary gap-3 px-8 py-3 shadow-xl shadow-primary-500/20"
-          >
-            <Plus className="h-5 w-5" />
-            <span className="font-bold">Add Facility</span>
-          </button>
-        </div>
-      </div>
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Operations" }, { label: "Facilities" }]}
+        title="Facilities"
+        subtitle="Manage your hospital branches, clinics and service sites."
+        actions={
+          <>
+            <DxButton
+              icon
+              title="Refresh"
+              onClick={() => facilitiesQuery.refetch()}
+              isLoading={facilitiesQuery.isFetching}
+            >
+              <RotateCcw />
+            </DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>
+              Add facility
+            </DxButton>
+          </>
+        }
+      />
 
       {/* Summary tiles */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-        <div className="glass-card rounded-[2rem] border border-secondary-400/50 bg-white/40 p-6">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-900 text-white">
-            <Building2 className="h-6 w-6" />
-          </div>
-          <p className="text-xs font-bold uppercase tracking-widest text-secondary-400">
-            Total Facilities
-          </p>
-          <p className="text-3xl font-black text-secondary-900">
-            {facilitiesQuery.isLoading ? "…" : facilities.length}
-          </p>
-        </div>
-        <div className="glass-card rounded-[2rem] border border-secondary-400/50 bg-white/40 p-6">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white">
-            <CheckCircle2 className="h-6 w-6" />
-          </div>
-          <p className="text-xs font-bold uppercase tracking-widest text-secondary-400">Active</p>
-          <p className="text-3xl font-black text-emerald-600">
-            {facilitiesQuery.isLoading ? "…" : activeCount}
-          </p>
-        </div>
-        <div className="glass-card rounded-[2rem] border border-secondary-400/50 bg-white/40 p-6">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500 text-white">
-            <AlertCircle className="h-6 w-6" />
-          </div>
-          <p className="text-xs font-bold uppercase tracking-widest text-secondary-400">
-            Decommissioned
-          </p>
-          <p className="text-3xl font-black text-rose-500">
-            {facilitiesQuery.isLoading ? "…" : retiredCount}
-          </p>
-        </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <DxKpi
+          label="Total Facilities"
+          value={facilitiesQuery.isLoading ? "…" : facilities.length}
+          icon={Building2}
+          tone="accent"
+          isLoading={facilitiesQuery.isLoading}
+        />
+        <DxKpi
+          label="Active"
+          value={facilitiesQuery.isLoading ? "…" : activeCount}
+          icon={CheckCircle2}
+          tone="success"
+          isLoading={facilitiesQuery.isLoading}
+        />
+        <DxKpi
+          label="Decommissioned"
+          value={facilitiesQuery.isLoading ? "…" : retiredCount}
+          icon={AlertCircle}
+          tone="danger"
+          isLoading={facilitiesQuery.isLoading}
+        />
       </div>
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="group relative w-full max-w-sm">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400 transition-colors group-focus-within:text-primary-500" />
-          <input
-            type="text"
+        <div className="w-full max-w-sm">
+          <DxInput
+            leftIcon={<Search className="h-3.5 w-3.5" />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, code or city…"
-            className="w-full rounded-2xl border border-secondary-400 bg-white/60 py-3 pl-12 pr-6 text-sm font-medium outline-none transition-all focus:border-primary-500"
           />
         </div>
-        <select
+        <DxSelect
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as "" | FacilityStatus)}
-          className="rounded-2xl border border-secondary-400 bg-white/80 px-4 py-3 text-xs font-bold uppercase tracking-widest text-secondary-700 outline-none focus:border-primary-500"
-        >
-          {STATUS_FILTERS.map((s) => (
-            <option key={s || "all"} value={s}>
-              {s ? facilityStatusLabel(s) : "All statuses"}
-            </option>
-          ))}
-        </select>
+          options={STATUS_FILTERS.map((s) => ({
+            value: s,
+            label: s ? facilityStatusLabel(s) : "All statuses",
+          }))}
+        />
       </div>
 
-      {loadError && (
-        <div className="flex items-center justify-between gap-4 rounded-[2rem] border border-rose-100 bg-rose-50 p-6 text-rose-600">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="h-6 w-6" />
-            <p className="text-sm font-bold">{loadError}</p>
-          </div>
-          <button
-            onClick={() => facilitiesQuery.refetch()}
-            className="btn-secondary px-5 py-2 text-xs"
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      {loadError ? (
+        <DxMessage
+          tone="danger"
+          action={
+            <DxButton size="sm" onClick={() => facilitiesQuery.refetch()}>
+              Retry
+            </DxButton>
+          }
+        >
+          {loadError}
+        </DxMessage>
+      ) : null}
 
       {/* Grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {facilitiesQuery.isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-52 animate-pulse rounded-[2.5rem] bg-white/40" />
-          ))
-        ) : filtered.length === 0 && !loadError ? (
-          <div className="col-span-full rounded-[3rem] border-2 border-dashed border-secondary-400 bg-white/20 py-24 text-center">
-            <Building2 className="mx-auto mb-4 h-12 w-12 text-secondary-200" />
-            <h4 className="text-lg font-bold text-secondary-900">
+      {facilitiesQuery.isLoading ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="dx-skeleton h-48 w-full" />
+          ))}
+        </div>
+      ) : filtered.length === 0 && !loadError ? (
+        <DxPanel>
+          <div className="py-16 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]">
+              <Building2 className="h-8 w-8 text-[var(--dx-text-faint)]" />
+            </div>
+            <h4 className="text-[16px] font-bold text-[var(--dx-text)]">
               {search || statusFilter ? "No matching facilities" : "No facilities yet"}
             </h4>
-            <p className="mt-2 text-sm text-secondary-400">
+            <p className="mx-auto mt-1 max-w-sm text-[13px] text-[var(--dx-text-muted)]">
               {search || statusFilter
                 ? "Try a different search or status filter."
                 : "Add your first facility to start issuing cards and running operations."}
             </p>
-            {!search && !statusFilter && (
-              <button onClick={openCreate} className="btn-primary mt-6 gap-2 px-6 py-3">
-                <Plus className="h-4 w-4" /> Add Facility
-              </button>
-            )}
+            {!search && !statusFilter ? (
+              <DxButton
+                className="mx-auto mt-4"
+                variant="primary"
+                leftIcon={<Plus className="h-4 w-4" />}
+                onClick={openCreate}
+              >
+                Add facility
+              </DxButton>
+            ) : null}
           </div>
-        ) : (
-          filtered.map((f) => (
+        </DxPanel>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {filtered.map((f) => (
             <div
               key={f.id}
-              className="glass-card group relative overflow-hidden rounded-[2.5rem] border border-secondary-400/50 bg-white/40 p-8 transition-all hover:bg-white/60"
+              className="flex flex-col rounded-lg border border-[var(--dx-border)] bg-[var(--dx-surface)] p-6 transition-colors hover:border-[var(--dx-border-strong)]"
             >
-              <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary-500/5 blur-xl" />
-              <div className="mb-6 flex items-start justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary-900 text-white shadow-lg transition-transform group-hover:scale-110">
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]">
                     <Building2 className="h-6 w-6" />
                   </div>
                   <div>
-                    <h4 className="text-base font-black text-secondary-900">{f.name}</h4>
-                    <p className="data-mono mt-1 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-400">
+                    <h4 className="text-[15px] font-bold text-[var(--dx-text)]">{f.name}</h4>
+                    <p className="dx-mono mt-0.5 text-[11px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
                       {f.code} · {facilityTypeLabel(f.facility_type)}
                     </p>
                   </div>
                 </div>
-                <Badge variant={statusVariant(f.status)}>{facilityStatusLabel(f.status)}</Badge>
+                <DxBadge tone={statusTone(f.status)} dot>
+                  {facilityStatusLabel(f.status)}
+                </DxBadge>
               </div>
 
-              <div className="space-y-2 border-t border-secondary-400/50 pt-5 text-sm text-secondary-600">
+              <div className="space-y-2 border-t border-[var(--dx-border)] pt-4 text-[13px] text-[var(--dx-text-muted)]">
                 <p className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 shrink-0 text-secondary-400" />
+                  <MapPin className="h-4 w-4 shrink-0 text-[var(--dx-text-faint)]" />
                   <span className="truncate">{addressLine(f)}</span>
                 </p>
                 {f.phone_number ? (
                   <p className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 shrink-0 text-secondary-400" />
+                    <Phone className="h-4 w-4 shrink-0 text-[var(--dx-text-faint)]" />
                     <span>{f.phone_number}</span>
                   </p>
                 ) : null}
                 {f.email ? (
                   <p className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 shrink-0 text-secondary-400" />
+                    <Mail className="h-4 w-4 shrink-0 text-[var(--dx-text-faint)]" />
                     <span className="truncate">{f.email}</span>
                   </p>
                 ) : null}
                 {f.network?.name ? (
                   <p className="flex items-center gap-2">
-                    <Globe className="h-4 w-4 shrink-0 text-secondary-400" />
+                    <Globe className="h-4 w-4 shrink-0 text-[var(--dx-text-faint)]" />
                     <span className="truncate">{f.network.name}</span>
                   </p>
                 ) : null}
               </div>
 
-              <div className="mt-6 flex justify-end gap-2">
-                <button
-                  onClick={() => openEdit(f)}
-                  className="flex h-10 items-center gap-2 rounded-xl bg-secondary-900 px-4 text-xs font-bold text-white transition-all hover:bg-primary-600"
-                >
-                  <Pencil className="h-4 w-4" /> Edit
-                </button>
-                <button
+              <div className="mt-5 flex justify-end gap-2 border-t border-[var(--dx-border)] pt-4">
+                <DxButton size="sm" leftIcon={<Pencil className="h-3.5 w-3.5" />} onClick={() => openEdit(f)}>
+                  Edit
+                </DxButton>
+                <DxButton
+                  size="sm"
+                  variant="outline-danger"
+                  leftIcon={<Trash2 className="h-3.5 w-3.5" />}
                   onClick={() => setDeleteTarget(f)}
-                  className="flex h-10 items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-xs font-bold text-rose-600 transition-all hover:bg-rose-100"
                 >
-                  <Trash2 className="h-4 w-4" /> Delete
-                </button>
+                  Delete
+                </DxButton>
               </div>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       <FacilityFormModal
         isOpen={showForm}
@@ -307,21 +319,38 @@ export function FacilitiesPage() {
         onSaved={() => facilitiesQuery.refetch()}
       />
 
-      <ConfirmDialog
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={async () => {
-          if (deleteTarget) await removeMut.mutateAsync(deleteTarget.id);
-        }}
+      {/* Delete confirm */}
+      <DxPopup
+        isOpen={deleteTarget !== null}
+        onClose={() => !deleting && setDeleteTarget(null)}
         title="Delete facility"
-        description={
-          deleteTarget
-            ? `Delete "${deleteTarget.name}"? If it is linked to existing records you'll be asked to decommission it instead. This action cannot be undone.`
-            : undefined
+        size="sm"
+        locked={deleting}
+        footer={
+          <>
+            <DxButton onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancel
+            </DxButton>
+            <DxButton
+              variant="danger"
+              onClick={handleDelete}
+              isLoading={deleting}
+              leftIcon={<Trash2 className="h-4 w-4" />}
+            >
+              Delete facility
+            </DxButton>
+          </>
         }
-        confirmLabel="Delete facility"
-        tone="danger"
-      />
-    </div>
+      >
+        <DxMessage tone="danger">
+          {deleteTarget ? (
+            <>
+              Delete <strong>{deleteTarget.name}</strong>? If it is linked to existing records
+              you'll be asked to decommission it instead. This action cannot be undone.
+            </>
+          ) : null}
+        </DxMessage>
+      </DxPopup>
+    </DxPage>
   );
 }

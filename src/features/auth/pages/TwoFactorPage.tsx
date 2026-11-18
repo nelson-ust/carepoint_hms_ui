@@ -14,7 +14,7 @@ import {
 import { routes } from "@/config/routes";
 import { resendOtp, verifyTwoFactor } from "@/features/auth/api/auth.api";
 import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
-import logo from "@/assets/logo.jpeg";
+import logo from "@/assets/logo.svg";
 
 type LocationState = {
   userId?: number;

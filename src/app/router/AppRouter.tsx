@@ -7,6 +7,7 @@ import { OnlineRequiredRoute } from "@/components/layout/OnlineRequiredRoute";
 import { routes } from "@/config/routes";
 import { RouteErrorBoundary } from "@/components/common/ErrorBoundary";
 import { PatientDetailPage } from "@/features/patients/pages/PatientDetailPage";
+import { useFacilityProfile } from "@/lib/modules/useFacilityProfile";
 
 // --- Lazy Load Pages ---
 const LandingPage = lazy(() => import("@/features/landing/pages/LandingPage").then(m => ({ default: m.LandingPage })));
@@ -37,6 +38,9 @@ const StockItemsPage = lazy(() => import("@/features/inventory/pages/StockItemsP
 const StockItemDetailPage = lazy(() => import("@/features/inventory/pages/StockItemDetailPage").then(m => ({ default: m.StockItemDetailPage })));
 const StockMovementsPage = lazy(() => import("@/features/inventory/pages/StockMovementsPage").then(m => ({ default: m.StockMovementsPage })));
 const PharmacyQueuePage = lazy(() => import("@/features/pharmacy/pages/PharmacyQueuePage").then(m => ({ default: m.PharmacyQueuePage })));
+const PharmacyPosPage = lazy(() => import("@/features/pharmacy/pages/PharmacyPosPage").then(m => ({ default: m.PharmacyPosPage })));
+const PharmacyStoreDashboardPage = lazy(() => import("@/features/pharmacy/pages/PharmacyStoreDashboardPage").then(m => ({ default: m.PharmacyStoreDashboardPage })));
+const PharmacySalesPage = lazy(() => import("@/features/pharmacy/pages/PharmacySalesPage").then(m => ({ default: m.PharmacySalesPage })));
 const AdmissionsPage = lazy(() => import("@/features/admissions/pages/AdmissionsPage").then(m => ({ default: m.AdmissionsPage })));
 const WardsBedsPage = lazy(() => import("@/features/admissions/pages/WardsBedsPage").then(m => ({ default: m.WardsBedsPage })));
 const BedsPage = lazy(() => import("@/features/admissions/pages/BedsPage").then(m => ({ default: m.BedsPage })));
@@ -48,10 +52,18 @@ const InstrumentSetsPage = lazy(() => import("@/features/surgery/pages/Instrumen
 
 const AmbulanceListingPage = lazy(() => import("@/features/ambulance/pages/AmbulanceListingPage").then(m => ({ default: m.AmbulanceListingPage })));
 const MortuaryPage = lazy(() => import("@/features/mortuary/pages/MortuaryPage").then(m => ({ default: m.MortuaryPage })));
+const MortuaryFeeSchedulePage = lazy(() => import("@/features/mortuary/pages/MortuaryFeeSchedulePage").then(m => ({ default: m.MortuaryFeeSchedulePage })));
 const DentalWorklistPage = lazy(() => import("@/features/dental/pages/DentalWorklistPage").then(m => ({ default: m.DentalWorklistPage })));
 const DentalChartPage = lazy(() => import("@/features/dental/pages/DentalChartPage").then(m => ({ default: m.DentalChartPage })));
+const DentalCatalogPage = lazy(() => import("@/features/dental/pages/DentalCatalogPage").then(m => ({ default: m.DentalCatalogPage })));
+const DentalRecallsPage = lazy(() => import("@/features/dental/pages/DentalRecallsPage").then(m => ({ default: m.DentalRecallsPage })));
 const EyeWorklistPage = lazy(() => import("@/features/eye/pages/EyeWorklistPage").then(m => ({ default: m.EyeWorklistPage })));
 const EyeExamPage = lazy(() => import("@/features/eye/pages/EyeExamPage").then(m => ({ default: m.EyeExamPage })));
+const OpticalOrdersPage = lazy(() => import("@/features/eye/pages/OpticalOrdersPage").then(m => ({ default: m.OpticalOrdersPage })));
+const EyeRecallsPage = lazy(() => import("@/features/eye/pages/EyeRecallsPage").then(m => ({ default: m.EyeRecallsPage })));
+const EyePrescriptionsPage = lazy(() => import("@/features/eye/pages/EyePrescriptionsPage").then(m => ({ default: m.EyePrescriptionsPage })));
+const OpticalInventoryPage = lazy(() => import("@/features/eye/pages/OpticalInventoryPage").then(m => ({ default: m.OpticalInventoryPage })));
+const EyeClinicFlowPage = lazy(() => import("@/features/eye/pages/EyeClinicFlowPage").then(m => ({ default: m.EyeClinicFlowPage })));
 const OrthoWorklistPage = lazy(() => import("@/features/ortho/pages/OrthoWorklistPage").then(m => ({ default: m.OrthoWorklistPage })));
 const OrthoAssessmentPage = lazy(() => import("@/features/ortho/pages/OrthoAssessmentPage").then(m => ({ default: m.OrthoAssessmentPage })));
 const DeceasedDetailPage = lazy(() => import("@/features/mortuary/pages/DeceasedDetailPage").then(m => ({ default: m.DeceasedDetailPage })));
@@ -99,6 +111,8 @@ const ConsultationPage = lazy(() => import("@/features/clinical/pages/Consultati
 const StaffManagementPage = lazy(() => import("@/features/staff/pages/StaffManagementPage").then(m => ({ default: m.StaffManagementPage })));
 const EmailSettingsPage = lazy(() => import("@/features/settings/pages/EmailSettingsPage").then(m => ({ default: m.EmailSettingsPage })));
 const TenantJobsPage = lazy(() => import("@/features/settings/pages/TenantJobsPage").then(m => ({ default: m.TenantJobsPage })));
+const AuditLogsPage = lazy(() => import("@/features/audit/pages/AuditLogsPage").then(m => ({ default: m.AuditLogsPage })));
+const SaaSAuditLogsPage = lazy(() => import("@/features/audit/pages/SaaSAuditLogsPage").then(m => ({ default: m.SaaSAuditLogsPage })));
 const BrandingPage = lazy(() => import("@/features/settings/pages/BrandingPage").then(m => ({ default: m.BrandingPage })));
 const SettingsPage = lazy(() => import("@/features/settings/pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
 const InsuranceClaimsPage = lazy(() => import("@/features/insurance/pages/InsuranceClaimsPage").then(m => ({ default: m.InsuranceClaimsPage })));
@@ -138,6 +152,7 @@ const TimesheetsPage = lazy(() => import("@/features/staff/pages/TimesheetsPage"
 const StaffFinancePage = lazy(() => import("@/features/staff/pages/StaffFinancePage").then(m => ({ default: m.StaffFinancePage })));
 const ProcurementPage = lazy(() => import("@/features/inventory/pages/ProcurementPage").then(m => ({ default: m.ProcurementPage })));
 const MembershipCardsPage = lazy(() => import("@/features/patients/pages/MembershipCardsPage").then(m => ({ default: m.MembershipCardsPage })));
+const CardUsageLogPage = lazy(() => import("@/features/patients/pages/CardUsageLogPage").then(m => ({ default: m.CardUsageLogPage })));
 const CardFundingApprovalsPage = lazy(() => import("@/features/patients/pages/CardFundingApprovalsPage").then(m => ({ default: m.CardFundingApprovalsPage })));
 const ClinicalTemplatesPage = lazy(() => import("@/features/clinical/pages/ClinicalTemplatesPage").then(m => ({ default: m.ClinicalTemplatesPage })));
 const PaymentsPage = lazy(() => import("@/features/payments/pages/PaymentsPage").then(m => ({ default: m.PaymentsPage })));
@@ -168,6 +183,7 @@ const PortalTelehealthPage = lazy(() => import("@/features/patient-portal/pages/
 const PortalNotificationsPage = lazy(() => import("@/features/patient-portal/pages/PortalNotificationsPage").then(m => ({ default: m.PortalNotificationsPage })));
 const PortalLabResultsPage = lazy(() => import("@/features/patient-portal/pages/PortalLabResultsPage").then(m => ({ default: m.PortalLabResultsPage })));
 const PortalInvoicesPage = lazy(() => import("@/features/patient-portal/pages/PortalInvoicesPage").then(m => ({ default: m.PortalInvoicesPage })));
+const PortalCardUsagePage = lazy(() => import("@/features/patient-portal/pages/PortalCardUsagePage").then(m => ({ default: m.PortalCardUsagePage })));
 const PortalBaselineDiagnosticsPage = lazy(() => import("@/features/patient-portal/pages/PortalBaselineDiagnosticsPage").then(m => ({ default: m.PortalBaselineDiagnosticsPage })));
 const MedicalExamsPage = lazy(() => import("@/features/clinical/pages/MedicalExamsPage").then(m => ({ default: m.MedicalExamsPage })));
 const PortalMessagesPage = lazy(() => import("@/features/patient-portal/pages/PortalMessagesPage").then(m => ({ default: m.PortalMessagesPage })));
@@ -186,6 +202,24 @@ function PageLoader() {
       </div>
       <p className="mt-6 text-xs font-bold text-secondary-400 uppercase tracking-[0.3em] animate-pulse">Initializing Interface</p>
     </div>
+  );
+}
+
+/**
+ * Profile-aware landing for `/dashboard`. Integrated hospitals (and anything
+ * still loading) see the full Facility Overview; a standalone vertical
+ * (Dental / Eye / Pharmacy) is redirected to its own home so the app feels
+ * purpose-built for that clinic.
+ */
+function ProfileHome() {
+  const { code, homeRoute, isLoading } = useFacilityProfile();
+  if (!isLoading && code !== "HOSPITAL" && homeRoute && homeRoute !== routes.dashboard) {
+    return <Navigate to={homeRoute} replace />;
+  }
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <TenantOverviewPage />
+    </Suspense>
   );
 }
 
@@ -258,6 +292,7 @@ const router = createBrowserRouter([
           { path: routes.portalNotifications, element: <Suspense fallback={<PageLoader />}><PortalNotificationsPage /></Suspense> },
           { path: routes.portalLabResults, element: <Suspense fallback={<PageLoader />}><PortalLabResultsPage /></Suspense> },
           { path: routes.portalInvoices, element: <Suspense fallback={<PageLoader />}><PortalInvoicesPage /></Suspense> },
+          { path: routes.portalCardLog, element: <Suspense fallback={<PageLoader />}><PortalCardUsagePage /></Suspense> },
           { path: routes.portalBaselineDiagnostics, element: <Suspense fallback={<PageLoader />}><PortalBaselineDiagnosticsPage /></Suspense> },
           { path: routes.portalMessages, element: <Suspense fallback={<PageLoader />}><PortalMessagesPage /></Suspense> },
           { path: routes.portalProfile, element: <Suspense fallback={<PageLoader />}><PortalProfilePage /></Suspense> },
@@ -302,7 +337,7 @@ const router = createBrowserRouter([
       {
         element: <DashboardLayout />,
         children: [
-          { path: routes.dashboard, element: <Suspense fallback={<PageLoader />}><TenantOverviewPage /></Suspense> },
+          { path: routes.dashboard, element: <ProfileHome /> },
           { path: routes.saasDashboard, element: <Suspense fallback={<PageLoader />}><SaasOverviewPage /></Suspense> },
 
           // Patient Flow
@@ -310,6 +345,7 @@ const router = createBrowserRouter([
           { path: routes.patientDetail, element: <Suspense fallback={<PageLoader />}><PatientDetailPage /></Suspense> },
           { path: routes.loyalty, element: <Suspense fallback={<PageLoader />}><LoyaltyPage /></Suspense> },
           { path: routes.membershipCards, element: <Suspense fallback={<PageLoader />}><MembershipCardsPage /></Suspense> },
+          { path: routes.cardUsageLog, element: <Suspense fallback={<PageLoader />}><CardUsageLogPage /></Suspense> },
           { path: routes.cardFundingApprovals, element: <Suspense fallback={<PageLoader />}><CardFundingApprovalsPage /></Suspense> },
           { path: routes.patientRegister, element: <Suspense fallback={<PageLoader />}><PatientRegistrationPage /></Suspense> },
 
@@ -391,6 +427,9 @@ const router = createBrowserRouter([
           // Pharmacy
           { path: routes.pharmacy, element: <Suspense fallback={<PageLoader />}><PharmacyQueuePage /></Suspense> },
           { path: routes.pharmacyDispense, element: <Navigate to={routes.pharmacy} replace /> },
+          { path: routes.pharmacyPos, element: <Suspense fallback={<PageLoader />}><PharmacyPosPage /></Suspense> },
+          { path: routes.pharmacyStore, element: <Suspense fallback={<PageLoader />}><PharmacyStoreDashboardPage /></Suspense> },
+          { path: routes.pharmacySales, element: <Suspense fallback={<PageLoader />}><PharmacySalesPage /></Suspense> },
           { path: routes.radiology, element: <Suspense fallback={<PageLoader />}><RadiologyOrdersPage /></Suspense> },
 
           // Admissions
@@ -414,13 +453,21 @@ const router = createBrowserRouter([
           { path: routes.mortuary, element: <Suspense fallback={<PageLoader />}><MortuaryPage /></Suspense> },
           { path: routes.dentalWorklist, element: <Suspense fallback={<PageLoader />}><DentalWorklistPage /></Suspense> },
           { path: routes.dentalChart, element: <Suspense fallback={<PageLoader />}><DentalChartPage /></Suspense> },
+          { path: routes.dentalCatalog, element: <Suspense fallback={<PageLoader />}><DentalCatalogPage /></Suspense> },
+          { path: routes.dentalRecalls, element: <Suspense fallback={<PageLoader />}><DentalRecallsPage /></Suspense> },
           { path: routes.eyeClinic, element: <Suspense fallback={<PageLoader />}><EyeWorklistPage /></Suspense> },
           { path: routes.eyeExam, element: <Suspense fallback={<PageLoader />}><EyeExamPage /></Suspense> },
+          { path: routes.opticalOrders, element: <Suspense fallback={<PageLoader />}><OpticalOrdersPage /></Suspense> },
+          { path: routes.eyePrescriptions, element: <Suspense fallback={<PageLoader />}><EyePrescriptionsPage /></Suspense> },
+          { path: routes.opticalInventory, element: <Suspense fallback={<PageLoader />}><OpticalInventoryPage /></Suspense> },
+          { path: routes.eyeFlow, element: <Suspense fallback={<PageLoader />}><EyeClinicFlowPage /></Suspense> },
+          { path: routes.eyeRecalls, element: <Suspense fallback={<PageLoader />}><EyeRecallsPage /></Suspense> },
           { path: routes.orthoWorklist, element: <Suspense fallback={<PageLoader />}><OrthoWorklistPage /></Suspense> },
           { path: routes.orthoAssessment, element: <Suspense fallback={<PageLoader />}><OrthoAssessmentPage /></Suspense> },
           { path: routes.mortuaryUnits, element: <Suspense fallback={<PageLoader />}><MortuaryPage /></Suspense> },
           { path: routes.mortuaryAutopsies, element: <Suspense fallback={<PageLoader />}><MortuaryPage /></Suspense> },
           { path: routes.mortuaryBilling, element: <Suspense fallback={<PageLoader />}><MortuaryPage /></Suspense> },
+          { path: routes.mortuaryFeeSchedule, element: <Suspense fallback={<PageLoader />}><MortuaryFeeSchedulePage /></Suspense> },
           { path: routes.mortuaryAnalytics, element: <Suspense fallback={<PageLoader />}><MortuaryAnalyticsPage /></Suspense> },
           { path: routes.mortuaryDeceasedDetail, element: <Suspense fallback={<PageLoader />}><DeceasedDetailPage /></Suspense> },
 
@@ -437,6 +484,7 @@ const router = createBrowserRouter([
 
           // Support Access
           { path: routes.supportAccess, element: <Suspense fallback={<PageLoader />}><SupportAccessPage /></Suspense> },
+          { path: routes.saasAuditLogs, element: <Suspense fallback={<PageLoader />}><SaaSAuditLogsPage /></Suspense> },
           { path: routes.saasPaymentConfirmations, element: <Suspense fallback={<PageLoader />}><PaymentConfirmationsPage /></Suspense> },
           { path: routes.saasPaymentsLookup, element: <Suspense fallback={<PageLoader />}><PaymentsLookupPage /></Suspense> },
           { path: routes.connectivity, element: <Suspense fallback={<PageLoader />}><ConnectivityPage /></Suspense> },
@@ -468,6 +516,7 @@ const router = createBrowserRouter([
           { path: routes.emailSettings, element: <Suspense fallback={<PageLoader />}><EmailSettingsPage /></Suspense> },
           { path: routes.settingsBranding, element: <Suspense fallback={<PageLoader />}><BrandingPage /></Suspense> },
           { path: routes.tenantJobs, element: <Suspense fallback={<PageLoader />}><TenantJobsPage /></Suspense> },
+          { path: routes.auditLogs, element: <Suspense fallback={<PageLoader />}><AuditLogsPage /></Suspense> },
           { path: routes.approvals, element: <Suspense fallback={<PageLoader />}><ApprovalsListPage /></Suspense> },
           { path: routes.approvalFlows, element: <Suspense fallback={<PageLoader />}><ApprovalFlowsPage /></Suspense> },
           { path: routes.approvalRequest, element: <Suspense fallback={<PageLoader />}><ApprovalRequestPage /></Suspense> },

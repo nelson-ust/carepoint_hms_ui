@@ -1,36 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, RefreshCw, AlertCircle, Pencil, Trash2, BookOpen, FileSpreadsheet } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { Plus, RotateCcw, Pencil, Trash2, BookOpen, FileSpreadsheet } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxPanel, DxBadge, DxButton, DxPopup, DxInput, DxSelect, DxTextarea,
+  DxMessage, DxGrid, type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { SearchInput } from "@/components/forms/SearchInput";
 import { Pagination } from "@/components/data-table/Pagination";
 import { useToast } from "@/components/feedback/ToastProvider";
 import {
-  accountsApi,
-  ACCOUNT_TYPE_OPTIONS,
-  downloadAccountsTemplate,
-  bulkUploadAccounts,
-  type Account,
-  type AccountType,
+  accountsApi, ACCOUNT_TYPE_OPTIONS, downloadAccountsTemplate, bulkUploadAccounts,
+  type Account, type AccountType,
 } from "../api/accounts.api";
 import { DrugBulkUploadModal } from "@/features/drugs/components/DrugBulkUploadModal";
 
 const PAGE_SIZE = 20;
 
-const typeVariant: Record<string, "soft-success" | "soft-info" | "soft-warning" | "soft-danger" | "secondary"> = {
-  REVENUE: "soft-success",
-  ASSET: "soft-info",
-  LIABILITY: "soft-warning",
-  EXPENSE: "soft-danger",
-  EQUITY: "secondary",
+const TYPE_TONES: Record<string, DxBadgeTone> = {
+  REVENUE: "success", ASSET: "info", LIABILITY: "warning", EXPENSE: "danger", EQUITY: "neutral",
 };
 
 export function ChartOfAccountsPage() {
@@ -42,19 +29,11 @@ export function ChartOfAccountsPage() {
   const [type, setType] = useState("");
 
   const params = useMemo(
-    () => ({
-      skip: (page - 1) * PAGE_SIZE,
-      limit: PAGE_SIZE,
-      search: search || undefined,
-      account_type: type || undefined,
-    }),
+    () => ({ skip: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE, search: search || undefined, account_type: type || undefined }),
     [page, search, type],
   );
 
-  const list = useQuery({
-    queryKey: ["accounts", "paged", params],
-    queryFn: () => accountsApi.listPaged(params),
-  });
+  const list = useQuery({ queryKey: ["accounts", "paged", params], queryFn: () => accountsApi.listPaged(params) });
   const accounts = list.data?.items ?? [];
   const meta = list.data?.meta;
 
@@ -70,105 +49,58 @@ export function ChartOfAccountsPage() {
 
   const isFiltering = Boolean(search || type);
 
+  const columns: DxGridColumn<Account>[] = [
+    { key: "code", header: "Code", render: (a) => <span className="dx-mono font-semibold text-[var(--dx-text)]">{a.code}</span> },
+    { key: "name", header: "Name", render: (a) => <span className="text-[var(--dx-text)]">{a.name}</span> },
+    { key: "account_type", header: "Type", render: (a) => <DxBadge tone={TYPE_TONES[a.account_type] ?? "neutral"}>{a.account_type}</DxBadge> },
+    { key: "act", header: "", align: "right", render: (a) => (
+        <div className="flex items-center justify-end gap-1">
+          <DxButton size="sm" variant="text" leftIcon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditing(a)}>Edit</DxButton>
+          <DxButton icon size="sm" variant="text" title="Remove" disabled={remove.isPending} onClick={() => remove.mutate(a.id)}><Trash2 className="h-4 w-4" /></DxButton>
+        </div>) },
+  ];
+
   return (
-    <div className="space-y-6 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader title="Chart of Accounts" description="Ledger accounts every billable service posts to." />
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => list.refetch()}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400"
-            title="Refresh"
-          >
-            <RefreshCw className={`h-4 w-4 ${list.isFetching ? "animate-spin" : ""}`} />
-          </button>
-          <Button variant="secondary" leftIcon={<FileSpreadsheet className="h-5 w-5" />} onClick={() => setBulkOpen(true)}>Bulk Upload</Button>
-          <Button leftIcon={<Plus className="h-5 w-5" />} onClick={() => setCreateOpen(true)}>New Account</Button>
-        </div>
-      </div>
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Billing" }, { label: "Chart of Accounts" }]}
+        title="Chart of Accounts"
+        subtitle="Ledger accounts every billable service posts to."
+        actions={
+          <>
+            <DxButton icon title="Refresh" onClick={() => list.refetch()} isLoading={list.isFetching}><RotateCcw /></DxButton>
+            <DxButton variant="default" leftIcon={<FileSpreadsheet className="h-4 w-4" />} onClick={() => setBulkOpen(true)}>Bulk upload</DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setCreateOpen(true)}>New account</DxButton>
+          </>
+        }
+      />
 
-      {list.isError && (
-        <div className="p-5 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center gap-3">
-          <AlertCircle className="h-5 w-5" /><p className="text-sm font-bold">Failed to load accounts.</p>
-        </div>
-      )}
+      {list.isError && <DxMessage tone="danger" title="Failed to load accounts.">Please retry.</DxMessage>}
 
-      {/* Filter toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <SearchInput
-          className="flex-1"
-          placeholder="Search by code or name…"
-          onSearch={(t) => { setSearch(t); setPage(1); }}
-        />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <SearchInput className="flex-1" placeholder="Search by code or name…" onSearch={(t) => { setSearch(t); setPage(1); }} />
         <div className="sm:w-52">
-          <Select
-            value={type}
-            onChange={(e) => { setType(e.target.value); setPage(1); }}
-            options={[{ value: "", label: "All types" }, ...ACCOUNT_TYPE_OPTIONS]}
-          />
+          <DxSelect aria-label="Type" value={type} onChange={(e) => { setType(e.target.value); setPage(1); }} options={[{ value: "", label: "All types" }, ...ACCOUNT_TYPE_OPTIONS]} />
         </div>
       </div>
 
-      <Card variant="panel" className="p-0 overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="bg-secondary-900/5 text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              <th className="px-6 py-4">Code</th>
-              <th className="px-6 py-4">Name</th>
-              <th className="px-6 py-4">Type</th>
-              <th className="px-6 py-4 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-secondary-100/60">
-            {list.isLoading ? (
-              Array.from({ length: 8 }).map((_, i) => (
-                <tr key={i}><td colSpan={4} className="px-6 py-4"><Skeleton className="h-8 w-full" /></td></tr>
-              ))
-            ) : accounts.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-6 py-24 text-center">
-                  <BookOpen className="h-12 w-12 mx-auto text-secondary-200 mb-3" />
-                  <p className="font-bold text-secondary-900">{isFiltering ? "No matching accounts" : "No accounts yet"}</p>
-                  <p className="text-sm text-secondary-400 mt-1">
-                    {isFiltering ? "Try a different search or filter." : "Add revenue accounts before pricing services."}
-                  </p>
-                </td>
-              </tr>
-            ) : (
-              accounts.map((a) => (
-                <tr key={a.id} className="hover:bg-primary-50/20">
-                  <td className="px-6 py-4 font-mono font-bold text-secondary-900">{a.code}</td>
-                  <td className="px-6 py-4 text-secondary-700">{a.name}</td>
-                  <td className="px-6 py-4"><Badge variant={typeVariant[a.account_type] ?? "secondary"}>{a.account_type}</Badge></td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button size="sm" variant="ghost" leftIcon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditing(a)}>Edit</Button>
-                      <button
-                        onClick={() => remove.mutate(a.id)}
-                        className="p-2 rounded-xl hover:bg-rose-50"
-                        title="Remove"
-                        disabled={remove.isPending}
-                      >
-                        <Trash2 className="h-4 w-4 text-rose-400" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-
-        {meta && meta.total > 0 && (
-          <Pagination
-            page={page}
-            totalPages={meta.total_pages}
-            totalItems={meta.total}
-            pageSize={PAGE_SIZE}
-            onPageChange={setPage}
-          />
-        )}
-      </Card>
+      <DxPanel flush>
+        <DxGrid<Account>
+          borderless
+          columns={columns}
+          data={accounts}
+          rowKey={(a) => a.id}
+          isLoading={list.isLoading}
+          empty={{
+            icon: BookOpen,
+            title: isFiltering ? "No matching accounts" : "No accounts yet",
+            description: isFiltering ? "Try a different search or filter." : "Add revenue accounts before pricing services.",
+          }}
+          footer={meta && meta.total > 0 ? (
+            <Pagination page={page} totalPages={meta.total_pages} totalItems={meta.total} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          ) : undefined}
+        />
+      </DxPanel>
 
       <AccountModal
         isOpen={createOpen || editing !== null}
@@ -188,7 +120,7 @@ export function ChartOfAccountsPage() {
         download={downloadAccountsTemplate}
         upload={bulkUploadAccounts}
       />
-    </div>
+    </DxPage>
   );
 }
 
@@ -223,14 +155,17 @@ function AccountModal({ isOpen, account, onClose, onSaved }: { isOpen: boolean; 
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? "Edit Account" : "New Account"} size="md"
-      footer={<div className="flex justify-end gap-3"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={submit} isLoading={save.isPending}>{isEdit ? "Save changes" : "Create account"}</Button></div>}>
+    <DxPopup isOpen={isOpen} onClose={onClose} title={isEdit ? "Edit account" : "New account"} size="md"
+      footer={<>
+        <DxButton variant="text" onClick={onClose}>Cancel</DxButton>
+        <DxButton variant="primary" onClick={submit} isLoading={save.isPending}>{isEdit ? "Save changes" : "Create account"}</DxButton>
+      </>}>
       <div className="space-y-4">
-        <Input label="Account code" value={code} onChange={(e) => setCode(e.target.value)} disabled={isEdit} hint={isEdit ? "Code can't be changed." : "e.g. REV-CONS"} />
-        <Input label="Account name" value={name} onChange={(e) => setName(e.target.value)} />
-        <Select label="Account type" value={type} onChange={(e) => setType(e.target.value as AccountType)} options={ACCOUNT_TYPE_OPTIONS} />
-        <Textarea label="Description (optional)" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <DxInput label="Account code" value={code} onChange={(e) => setCode(e.target.value)} disabled={isEdit} hint={isEdit ? "Code can't be changed." : "e.g. REV-CONS"} />
+        <DxInput label="Account name" value={name} onChange={(e) => setName(e.target.value)} />
+        <DxSelect label="Account type" value={type} onChange={(e) => setType(e.target.value as AccountType)} options={ACCOUNT_TYPE_OPTIONS} />
+        <DxTextarea label="Description (optional)" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

@@ -3,22 +3,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Copy,
   FileText,
-  Filter,
   Layers,
   Pencil,
   Plus,
-  RefreshCw,
+  RotateCcw,
   Search,
   Star,
   Trash2,
 } from "lucide-react";
 import { format, isValid } from "date-fns";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { Modal } from "@/components/ui/Modal";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
+import {
+  DxPage, DxPageHeader, DxPanel, DxBadge, DxButton, DxInput, DxSelect, DxMessage, DxPopup,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import {
   clinicalTemplatesApi,
@@ -65,8 +61,7 @@ export function ClinicalTemplatesPage() {
       toast.success("Template duplicated", `"${copy.name}" was added to the library.`);
       refresh();
     },
-    onError: (err: any) =>
-      toast.error("Couldn't duplicate", err?.response?.data?.message || "Please try again."),
+    onError: (err: any) => toast.error("Couldn't duplicate", err?.response?.data?.message || "Please try again."),
   });
 
   const deleteMut = useMutation({
@@ -75,16 +70,13 @@ export function ClinicalTemplatesPage() {
       toast.success("Template deleted", "It has been removed from the library.");
       refresh();
     },
-    onError: (err: any) =>
-      toast.error("Couldn't delete", err?.response?.data?.message || "Please try again."),
+    onError: (err: any) => toast.error("Couldn't delete", err?.response?.data?.message || "Please try again."),
   });
 
   const favoriteMut = useMutation({
-    mutationFn: (tpl: ClinicalTemplate) =>
-      clinicalTemplatesApi.update(tpl.id, { is_favorite: !tpl.is_favorite }),
+    mutationFn: (tpl: ClinicalTemplate) => clinicalTemplatesApi.update(tpl.id, { is_favorite: !tpl.is_favorite }),
     onSuccess: refresh,
-    onError: (err: any) =>
-      toast.error("Couldn't update", err?.response?.data?.message || "Please try again."),
+    onError: (err: any) => toast.error("Couldn't update", err?.response?.data?.message || "Please try again."),
   });
 
   const templates = templatesQuery.data ?? [];
@@ -108,213 +100,99 @@ export function ClinicalTemplatesPage() {
     ? !loadError?.response
       ? "Cannot reach the API server. Check that the backend is running, then retry."
       : loadError.response.status === 401 || loadError.response.status === 403
-        ? loadError.response.data?.message ||
-          "You don't have permission to view templates (TEMPLATE_READ required)."
+        ? loadError.response.data?.message || "You don't have permission to view templates (TEMPLATE_READ required)."
         : loadError.response.data?.message || "The template service returned an error. Please retry."
     : null;
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Clinical" }, { label: "Templates" }]}
         title="Clinical Templates"
-        description="Standardize consultations with reusable SOAP, history, and examination templates."
+        subtitle="Standardize consultations with reusable SOAP, history, and examination templates."
         actions={
-          <div className="flex gap-3">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                templatesQuery.refetch();
-                statsQuery.refetch();
-              }}
-              leftIcon={
-                <RefreshCw className={`h-4 w-4 ${templatesQuery.isFetching ? "animate-spin" : ""}`} />
-              }
-            >
-              Refresh
-            </Button>
-            <Button
-              onClick={() => {
-                setEditTarget(null);
-                setFormOpen(true);
-              }}
-              leftIcon={<Plus className="h-4 w-4" />}
-            >
-              Create Template
-            </Button>
-          </div>
+          <>
+            <DxButton icon title="Refresh" onClick={() => { templatesQuery.refetch(); statsQuery.refetch(); }} isLoading={templatesQuery.isFetching}><RotateCcw /></DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setEditTarget(null); setFormOpen(true); }}>Create template</DxButton>
+          </>
         }
       />
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         {/* Library stats */}
-        <div className="space-y-6 lg:col-span-1">
-          <div className="glass-card rounded-[2.5rem] border border-secondary-400/50 bg-white/40 p-8 shadow-premium">
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary-900 text-white shadow-lg">
-              <Layers className="h-8 w-8" />
-            </div>
-            <h4 className="mb-2 text-xl font-black text-secondary-900">Standardization</h4>
-            <p className="mb-8 text-xs leading-relaxed text-secondary-500">
-              Using templates reduces clinical documentation time while keeping notes consistent
-              across your care teams.
+        <div className="lg:col-span-1">
+          <DxPanel title="Standardization" icon={<Layers className="h-4 w-4" />}>
+            <p className="mb-5 text-[12px] leading-relaxed text-[var(--dx-text-muted)]">
+              Using templates reduces clinical documentation time while keeping notes consistent across your care teams.
             </p>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-secondary-700">Total Templates</span>
-                <span className="text-xl font-black text-secondary-900">
-                  {statsQuery.isLoading ? "…" : statsQuery.data?.total ?? 0}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-secondary-700">Commonly Used</span>
-                <span className="text-xl font-black text-primary-500">
-                  {statsQuery.isLoading ? "…" : statsQuery.data?.commonly_used ?? 0}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-secondary-700">Specialties</span>
-                <span className="text-xl font-black text-secondary-900">
-                  {statsQuery.isLoading ? "…" : specialties.length}
-                </span>
-              </div>
+            <div className="space-y-3">
+              {[
+                { label: "Total templates", value: statsQuery.isLoading ? "…" : statsQuery.data?.total ?? 0, accent: false },
+                { label: "Commonly used", value: statsQuery.isLoading ? "…" : statsQuery.data?.commonly_used ?? 0, accent: true },
+                { label: "Specialties", value: statsQuery.isLoading ? "…" : specialties.length, accent: false },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] px-3 py-2">
+                  <span className="text-[13px] font-medium text-[var(--dx-text-muted)]">{row.label}</span>
+                  <span className="text-[18px] font-bold" style={{ color: row.accent ? "var(--dx-accent)" : "var(--dx-text)" }}>{row.value}</span>
+                </div>
+              ))}
             </div>
-          </div>
+          </DxPanel>
         </div>
 
         {/* Template list */}
-        <div className="space-y-6 lg:col-span-3">
+        <div className="space-y-4 lg:col-span-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="group relative w-full max-w-sm">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400 transition-colors group-focus-within:text-primary-500" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search templates by name or specialty..."
-                className="w-full rounded-2xl border border-secondary-400 bg-white/60 py-3 pl-12 pr-6 text-sm font-medium outline-none transition-all focus:border-primary-500"
-              />
+            <div className="w-full max-w-sm">
+              <DxInput leftIcon={<Search className="h-3.5 w-3.5" />} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search templates by name or specialty…" />
             </div>
-            <div className="relative">
-              <Filter className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" />
-              <select
-                value={specialtyFilter}
-                onChange={(e) => setSpecialtyFilter(e.target.value)}
-                className="appearance-none rounded-2xl border border-secondary-400 bg-white/60 py-3 pl-11 pr-8 text-xs font-bold outline-none transition-all focus:border-primary-500"
-              >
-                <option value="">All Specialties</option>
-                {specialties.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+            <div className="w-full sm:w-56">
+              <DxSelect value={specialtyFilter} onChange={(e) => setSpecialtyFilter(e.target.value)} aria-label="Filter by specialty"
+                options={[{ value: "", label: "All specialties" }, ...specialties.map((s) => ({ value: s, label: s }))]} />
             </div>
           </div>
 
-          {errorMessage && (
-            <div className="flex items-center justify-between gap-4 rounded-[2rem] border border-rose-100 bg-rose-50 p-6 text-rose-600">
-              <p className="text-sm font-bold">{errorMessage}</p>
-              <Button variant="secondary" size="sm" onClick={() => templatesQuery.refetch()}>
-                Retry
-              </Button>
-            </div>
-          )}
+          {errorMessage ? (
+            <DxMessage tone="danger" action={<DxButton size="sm" onClick={() => templatesQuery.refetch()}>Retry</DxButton>}>{errorMessage}</DxMessage>
+          ) : null}
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {templatesQuery.isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-48 animate-pulse rounded-[2.5rem] bg-white/40" />
-              ))
+              Array.from({ length: 4 }).map((_, i) => <div key={i} className="dx-skeleton h-44 w-full" />)
             ) : visible.length === 0 && !errorMessage ? (
-              <div className="col-span-2 rounded-[3rem] border-2 border-dashed border-secondary-400 bg-white/20">
-                <EmptyState
-                  icon={FileText}
-                  title={templates.length === 0 ? "Library is Empty" : "No matching templates"}
-                  description={
-                    templates.length === 0
-                      ? "Create your first clinical documentation template."
-                      : "Try a different search term or specialty filter."
-                  }
-                  action={
-                    templates.length === 0 ? (
-                      <Button
-                        onClick={() => {
-                          setEditTarget(null);
-                          setFormOpen(true);
-                        }}
-                        leftIcon={<Plus className="h-4 w-4" />}
-                      >
-                        Create Template
-                      </Button>
-                    ) : undefined
-                  }
-                />
-              </div>
+              <DxPanel className="col-span-full">
+                <div className="py-14 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]"><FileText className="h-8 w-8 text-[var(--dx-text-faint)]" /></div>
+                  <h4 className="text-[16px] font-bold text-[var(--dx-text)]">{templates.length === 0 ? "Library is empty" : "No matching templates"}</h4>
+                  <p className="mx-auto mt-1 max-w-sm text-[13px] text-[var(--dx-text-muted)]">{templates.length === 0 ? "Create your first clinical documentation template." : "Try a different search term or specialty filter."}</p>
+                  {templates.length === 0 ? (
+                    <DxButton className="mx-auto mt-4" variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setEditTarget(null); setFormOpen(true); }}>Create template</DxButton>
+                  ) : null}
+                </div>
+              </DxPanel>
             ) : (
               visible.map((tpl) => (
-                <div
-                  key={tpl.id}
-                  className="glass-card group relative overflow-hidden rounded-[2.5rem] border border-secondary-400/50 bg-white/40 p-8 transition-all hover:bg-white/60"
-                >
-                  <div className="mb-6 flex items-start justify-between">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-500/10 text-primary-600 shadow-sm transition-all group-hover:bg-primary-500 group-hover:text-white">
-                      <FileText className="h-6 w-6" />
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => favoriteMut.mutate(tpl)}
-                        className={`rounded-xl p-2.5 transition-all hover:bg-secondary-100 ${
-                          tpl.is_favorite ? "text-amber-500" : "text-secondary-400"
-                        }`}
-                        title={tpl.is_favorite ? "Unmark commonly used" : "Mark commonly used"}
-                      >
-                        <Star className={`h-4 w-4 ${tpl.is_favorite ? "fill-current" : ""}`} />
-                      </button>
-                      <button
-                        onClick={() => duplicateMut.mutate(tpl.id)}
-                        className="rounded-xl p-2.5 text-secondary-400 transition-all hover:bg-secondary-100"
-                        title="Duplicate"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditTarget(tpl);
-                          setFormOpen(true);
-                        }}
-                        className="rounded-xl p-2.5 text-secondary-400 transition-all hover:bg-secondary-100"
-                        title="Edit"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(tpl)}
-                        className="rounded-xl p-2.5 text-secondary-400 transition-all hover:bg-rose-500/10 hover:text-rose-500"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                <div key={tpl.id} className="flex flex-col rounded-lg border border-[var(--dx-border)] bg-[var(--dx-surface)] p-5 transition-colors hover:border-[var(--dx-border-strong)]">
+                  <div className="mb-4 flex items-start justify-between">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]"><FileText className="h-5 w-5" /></div>
+                    <div className="flex gap-0.5">
+                      <DxButton icon size="sm" variant="text" title={tpl.is_favorite ? "Unmark commonly used" : "Mark commonly used"} onClick={() => favoriteMut.mutate(tpl)}>
+                        <Star style={{ color: tpl.is_favorite ? "var(--dx-warning)" : undefined, fill: tpl.is_favorite ? "var(--dx-warning)" : "none" }} />
+                      </DxButton>
+                      <DxButton icon size="sm" variant="text" title="Duplicate" onClick={() => duplicateMut.mutate(tpl.id)}><Copy /></DxButton>
+                      <DxButton icon size="sm" variant="text" title="Edit" onClick={() => { setEditTarget(tpl); setFormOpen(true); }}><Pencil /></DxButton>
+                      <DxButton icon size="sm" variant="text" title="Delete" onClick={() => setDeleteTarget(tpl)}><Trash2 /></DxButton>
                     </div>
                   </div>
-                  <h4 className="mb-2 text-lg font-black text-secondary-900">{tpl.name}</h4>
+                  <h4 className="mb-2 text-[15px] font-bold text-[var(--dx-text)]">{tpl.name}</h4>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-lg bg-secondary-900 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-white">
-                      {tpl.specialty || "General"}
-                    </span>
-                    <Badge variant="secondary">{typeLabel(tpl.template_type)}</Badge>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                      {tpl.sections_count ?? tpl.sections?.length ?? 0} Sections
-                    </span>
+                    <DxBadge tone="accent">{tpl.specialty || "General"}</DxBadge>
+                    <DxBadge tone="neutral">{typeLabel(tpl.template_type)}</DxBadge>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">{tpl.sections_count ?? tpl.sections?.length ?? 0} sections</span>
                   </div>
-                  <div className="mt-8 flex items-center justify-between border-t border-secondary-400/50 pt-6">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                      Updated {safeDate(tpl.updated_at || tpl.date_created)}
-                    </span>
-                    <button
-                      onClick={() => setPreviewTarget(tpl)}
-                      className="text-xs font-black uppercase tracking-widest text-primary-600 hover:underline"
-                    >
-                      Preview →
-                    </button>
+                  <div className="mt-5 flex items-center justify-between border-t border-[var(--dx-border)] pt-4">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Updated {safeDate(tpl.updated_at || tpl.date_created)}</span>
+                    <button onClick={() => setPreviewTarget(tpl)} className="text-[11px] font-semibold uppercase tracking-wide text-[var(--dx-accent)] hover:underline">Preview →</button>
                   </div>
                 </div>
               ))
@@ -324,71 +202,51 @@ export function ClinicalTemplatesPage() {
       </div>
 
       {/* Create / edit */}
-      <TemplateFormModal
-        isOpen={formOpen}
-        onClose={() => {
-          setFormOpen(false);
-          setEditTarget(null);
-        }}
-        template={editTarget}
-      />
+      <TemplateFormModal isOpen={formOpen} onClose={() => { setFormOpen(false); setEditTarget(null); }} template={editTarget} />
 
       {/* Preview */}
-      <Modal
-        isOpen={!!previewTarget}
-        onClose={() => setPreviewTarget(null)}
-        title={previewTarget?.name || "Template preview"}
-        size="lg"
-      >
+      <DxPopup isOpen={!!previewTarget} onClose={() => setPreviewTarget(null)} title={previewTarget?.name || "Template preview"} size="lg">
         {previewTarget ? (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">{typeLabel(previewTarget.template_type)}</Badge>
-              {previewTarget.specialty ? <Badge variant="secondary">{previewTarget.specialty}</Badge> : null}
-              <span className="text-xs font-medium text-secondary-400">
-                Used {previewTarget.usage_count || 0} time{(previewTarget.usage_count || 0) === 1 ? "" : "s"}
-              </span>
+              <DxBadge tone="neutral">{typeLabel(previewTarget.template_type)}</DxBadge>
+              {previewTarget.specialty ? <DxBadge tone="accent">{previewTarget.specialty}</DxBadge> : null}
+              <span className="text-[12px] text-[var(--dx-text-muted)]">Used {previewTarget.usage_count || 0} time{(previewTarget.usage_count || 0) === 1 ? "" : "s"}</span>
             </div>
-            {previewTarget.description ? (
-              <p className="text-sm font-medium text-secondary-500">{previewTarget.description}</p>
-            ) : null}
+            {previewTarget.description ? <p className="text-[13px] text-[var(--dx-text-muted)]">{previewTarget.description}</p> : null}
             <div className="space-y-3">
               {(previewTarget.sections || []).map((s, i) => (
-                <div key={i} className="rounded-2xl border border-secondary-200 p-4 dark:border-white/10">
-                  <p className="mb-1 text-xs font-bold uppercase tracking-widest text-secondary-500">
-                    {s.title}
-                  </p>
-                  <p className="whitespace-pre-wrap text-sm font-medium text-secondary-700 dark:text-secondary-200">
-                    {s.content || <span className="text-secondary-300">Free text — filled during the consultation.</span>}
-                  </p>
+                <div key={i} className="rounded-md border border-[var(--dx-border)] p-4">
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">{s.title}</p>
+                  <p className="whitespace-pre-wrap text-[13px] text-[var(--dx-text)]">{s.content || <span className="text-[var(--dx-text-faint)]">Free text — filled during the consultation.</span>}</p>
                 </div>
               ))}
-              {(previewTarget.sections || []).length === 0 ? (
-                <p className="text-sm font-medium text-secondary-400">This template has no sections yet.</p>
-              ) : null}
+              {(previewTarget.sections || []).length === 0 ? <p className="text-[13px] text-[var(--dx-text-muted)]">This template has no sections yet.</p> : null}
             </div>
           </div>
         ) : null}
-      </Modal>
+      </DxPopup>
 
       {/* Delete */}
-      <ConfirmDialog
+      <DxPopup
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         title="Delete this template?"
-        tone="danger"
-        confirmLabel="Delete template"
-        description={
-          deleteTarget
-            ? `"${deleteTarget.name}" will be removed from the library. Consultations already written with it are not affected.`
-            : undefined
+        locked={deleteMut.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setDeleteTarget(null)} disabled={deleteMut.isPending}>Cancel</DxButton>
+            <DxButton variant="danger" isLoading={deleteMut.isPending} leftIcon={<Trash2 className="h-4 w-4" />}
+              onClick={async () => { if (!deleteTarget) return; await deleteMut.mutateAsync(deleteTarget.id); setDeleteTarget(null); }}>
+              Delete template
+            </DxButton>
+          </>
         }
-        onConfirm={async () => {
-          if (!deleteTarget) return;
-          await deleteMut.mutateAsync(deleteTarget.id);
-          setDeleteTarget(null);
-        }}
-      />
-    </div>
+      >
+        <DxMessage tone="danger">
+          {deleteTarget ? `"${deleteTarget.name}" will be removed from the library. Consultations already written with it are not affected.` : ""}
+        </DxMessage>
+      </DxPopup>
+    </DxPage>
   );
 }

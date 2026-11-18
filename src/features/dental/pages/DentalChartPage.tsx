@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { RotateCcw, Save, Plus, Stethoscope, ClipboardList, CheckCircle2, Trash2 } from "lucide-react";
+import { RotateCcw, Save, Plus, Stethoscope, ClipboardList, CheckCircle2, Trash2, Banknote } from "lucide-react";
 import {
   DxBadge, DxButton, DxGrid, DxPage, DxPageHeader, DxPageLoading, DxPanel, DxPopup,
   DxInput, DxSelect, DxTextarea, apiErrorMessage, type DxGridColumn,
@@ -105,23 +105,47 @@ export function DentalChartPage() {
 
   // procedure add
   const [procOpen, setProcOpen] = useState(false);
+  const [pCatalogId, setPCatalogId] = useState("");
   const [pName, setPName] = useState("");
   const [pTooth, setPTooth] = useState("");
   const [pCost, setPCost] = useState("");
   const [pNote, setPNote] = useState("");
+
+  const catalogQ = useQuery({
+    queryKey: ["dental", "catalog", "active"],
+    queryFn: () => dentalApi.listCatalog({ active_only: true, limit: 500 }),
+  });
+  const catalogItems = catalogQ.data?.items ?? [];
+
+  const resetProcForm = () => { setPCatalogId(""); setPName(""); setPTooth(""); setPCost(""); setPNote(""); };
+  const pickCatalog = (cid: string) => {
+    setPCatalogId(cid);
+    const c = catalogItems.find((x) => String(x.id) === cid);
+    if (c) {
+      setPName(c.name);
+      if (c.default_cost != null) setPCost(String(c.default_cost));
+    }
+  };
+
   const addProc = useMutation({
     mutationFn: () => dentalApi.createProcedure({
       patient_id: chart!.patient_id, chart_id: id, visit_id: chart!.visit_id ?? null,
+      catalog_id: pCatalogId ? Number(pCatalogId) : null,
       procedure_name: pName, tooth_number: pTooth ? Number(pTooth) : null,
       cost: pCost ? Number(pCost) : null, note: pNote || null,
     }),
     onSuccess: () => { toast.success("Procedure added."); qc.invalidateQueries({ queryKey: ["dental", "chart", id] });
-      setProcOpen(false); setPName(""); setPTooth(""); setPCost(""); setPNote(""); },
+      setProcOpen(false); resetProcForm(); },
     onError: (e) => toast.error(apiErrorMessage(e)),
   });
   const setProcStatus = useMutation({
     mutationFn: ({ pid, status }: { pid: number; status: string }) => dentalApi.updateProcedure(pid, { status }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["dental", "chart", id] }); },
+    onError: (e) => toast.error(apiErrorMessage(e)),
+  });
+  const billChart = useMutation({
+    mutationFn: () => dentalApi.billChart(id),
+    onSuccess: (res) => { toast.success(res.message || "Procedures billed."); qc.invalidateQueries({ queryKey: ["dental", "chart", id] }); },
     onError: (e) => toast.error(apiErrorMessage(e)),
   });
 
@@ -132,7 +156,10 @@ export function DentalChartPage() {
     { key: "procedure_name", header: "Procedure", render: (r) => <span className="font-semibold">{r.procedure_name}</span> },
     { key: "cost", header: "Cost", align: "right", render: (r) => (r.cost ? naira(r.cost) : "--") },
     { key: "status", header: "Status", render: (r) => (
-      <DxBadge tone={r.status === "COMPLETED" ? "success" : r.status === "CANCELLED" ? "neutral" : "warning"}>{r.status}</DxBadge>
+      <span className="inline-flex items-center gap-1.5">
+        <DxBadge tone={r.status === "COMPLETED" ? "success" : r.status === "CANCELLED" ? "neutral" : "warning"}>{r.status}</DxBadge>
+        {r.is_billed ? <DxBadge tone="info" dot>Billed</DxBadge> : null}
+      </span>
     ) },
     { key: "actions", header: "", align: "right", render: (r) => (
       r.status !== "COMPLETED" && r.status !== "CANCELLED" ? (
@@ -142,6 +169,8 @@ export function DentalChartPage() {
   ];
 
   const chartedCount = (chart.teeth ?? []).filter((t) => t.condition !== "HEALTHY").length;
+  const unbilled = (chart.procedures ?? []).filter(
+    (p) => !p.is_billed && p.cost != null && Number(p.cost) > 0 && p.status !== "CANCELLED");
 
   return (
     <DxPage>
@@ -206,7 +235,17 @@ export function DentalChartPage() {
         </DxPanel>
 
         <DxPanel title="Treatment plan" icon={<ClipboardList />}
-          actions={<DxButton size="sm" variant="primary" onClick={() => setProcOpen(true)}><Plus /> Add procedure</DxButton>} flush>
+          actions={
+            <>
+              {unbilled.length > 0 ? (
+                <DxButton size="sm" onClick={() => billChart.mutate()} isLoading={billChart.isPending}
+                  title={chart.visit_id ? `Bill ${unbilled.length} procedure(s) to the visit charge sheet` : "Link this chart to a visit to enable billing"}>
+                  <Banknote /> Bill {unbilled.length}
+                </DxButton>
+              ) : null}
+              <DxButton size="sm" variant="primary" onClick={() => setProcOpen(true)}><Plus /> Add procedure</DxButton>
+            </>
+          } flush>
           <DxGrid<DentalProcedure>
             borderless
             columns={procColumns}
@@ -242,14 +281,23 @@ export function DentalChartPage() {
       </DxPopup>
 
       {/* Add procedure */}
-      <DxPopup isOpen={procOpen} onClose={() => setProcOpen(false)} title="Add procedure" size="md"
+      <DxPopup isOpen={procOpen} onClose={() => { setProcOpen(false); resetProcForm(); }} title="Add procedure" size="md"
         footer={
           <>
-            <DxButton variant="text" onClick={() => setProcOpen(false)}>Cancel</DxButton>
+            <DxButton variant="text" onClick={() => { setProcOpen(false); resetProcForm(); }}>Cancel</DxButton>
             <DxButton variant="primary" disabled={!pName} isLoading={addProc.isPending} onClick={() => addProc.mutate()}>Add</DxButton>
           </>
         }>
         <div className="space-y-3">
+          {catalogItems.length > 0 ? (
+            <DxSelect label="From price list" value={pCatalogId} onChange={(e) => pickCatalog(e.target.value)}
+              placeholder="Pick a catalogue procedure (optional)"
+              hint="Selecting one fills the name and cost; you can still edit them."
+              options={catalogItems.map((c) => ({
+                value: String(c.id),
+                label: `${c.name}${c.default_cost != null ? ` — ${naira(c.default_cost)}` : ""}`,
+              }))} />
+          ) : null}
           <DxInput label="Procedure" required value={pName} onChange={(e) => setPName(e.target.value)} placeholder="e.g. Composite restoration" />
           <div className="grid grid-cols-2 gap-3">
             <DxInput label="Tooth number" value={pTooth} onChange={(e) => setPTooth(e.target.value)} placeholder="e.g. 36" inputMode="numeric" />

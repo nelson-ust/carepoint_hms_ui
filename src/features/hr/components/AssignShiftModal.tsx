@@ -1,6 +1,4 @@
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
+import { DxPopup, DxButton, DxBadge } from "@/components/dx";
 import { Check, Trash2, Clock } from "lucide-react";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
@@ -18,11 +16,7 @@ function hhmm(t?: string | null): string {
 function prettyDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
 }
 
 export function AssignShiftModal({
@@ -57,17 +51,10 @@ export function AssignShiftModal({
           onClose();
           return;
         }
-        await updateMut.mutateAsync({
-          id: existing.id,
-          payload: { shift_definition_id: def.id },
-        });
+        await updateMut.mutateAsync({ id: existing.id, payload: { shift_definition_id: def.id } });
         toast.success("Shift changed", `${staffName} → ${def.name}.`);
       } else {
-        await createMut.mutateAsync({
-          staff_profile_id: staffId,
-          shift_definition_id: def.id,
-          shift_date: date,
-        });
+        await createMut.mutateAsync({ staff_profile_id: staffId, shift_definition_id: def.id, shift_date: date });
         toast.success("Shift assigned", `${staffName} → ${def.name}.`);
       }
       onClose();
@@ -88,52 +75,36 @@ export function AssignShiftModal({
   };
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={onClose}
       title="Assign Shift"
       size="md"
+      locked={busy}
       footer={
         existing ? (
-          <div className="flex items-center justify-between gap-3">
-            <Button
-              variant="danger"
-              onClick={remove}
-              isLoading={deleteMut.isPending}
-              leftIcon={<Trash2 className="h-4 w-4" />}
-            >
-              Remove
-            </Button>
-            <Button variant="secondary" onClick={onClose} disabled={busy}>
-              Done
-            </Button>
+          <div className="flex w-full items-center justify-between gap-3">
+            <DxButton variant="danger" onClick={remove} isLoading={deleteMut.isPending} leftIcon={<Trash2 className="h-4 w-4" />}>Remove</DxButton>
+            <DxButton onClick={onClose} disabled={busy}>Done</DxButton>
           </div>
         ) : (
-          <div className="flex justify-end">
-            <Button variant="secondary" onClick={onClose} disabled={busy}>
-              Cancel
-            </Button>
-          </div>
+          <DxButton onClick={onClose} disabled={busy}>Cancel</DxButton>
         )
       }
     >
       <div className="space-y-5">
-        <div className="rounded-2xl bg-secondary-50 px-4 py-3 dark:bg-white/5">
-          <p className="text-sm font-black text-secondary-900 dark:text-secondary-100">
-            {staffName}
-          </p>
-          <p className="text-xs font-semibold text-secondary-500">{prettyDate(date)}</p>
+        <div className="rounded-md bg-[var(--dx-surface-sunken)] px-4 py-3">
+          <p className="text-[14px] font-semibold text-[var(--dx-text)]">{staffName}</p>
+          <p className="text-[12px] font-semibold text-[var(--dx-text-muted)]">{prettyDate(date)}</p>
         </div>
 
         {definitions.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-secondary-200 px-4 py-6 text-center text-sm text-secondary-400 dark:border-white/10">
+          <p className="rounded-md border border-dashed border-[var(--dx-border)] px-4 py-6 text-center text-[13px] text-[var(--dx-text-muted)]">
             No shifts configured for this scope yet. Add shifts first.
           </p>
         ) : (
           <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
-              {existing ? "Change to" : "Pick a shift"}
-            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">{existing ? "Change to" : "Pick a shift"}</p>
             {definitions.map((def) => {
               const selected = existing?.shift_definition_id === def.id;
               return (
@@ -142,30 +113,22 @@ export function AssignShiftModal({
                   type="button"
                   disabled={busy}
                   onClick={() => pick(def)}
-                  className={`flex w-full items-center justify-between rounded-2xl border-2 px-4 py-3 text-left transition-all disabled:opacity-50 ${
-                    selected
-                      ? "border-primary-500 bg-primary-50 dark:bg-primary-500/10"
-                      : "border-secondary-200 hover:border-primary-300 dark:border-white/10"
-                  }`}
+                  className="flex w-full items-center justify-between rounded-md border-2 px-4 py-3 text-left transition-colors disabled:opacity-50"
+                  style={selected ? { borderColor: "var(--dx-accent)", background: "var(--dx-accent-soft)" } : { borderColor: "var(--dx-border)" }}
                 >
                   <span className="flex items-center gap-3">
-                    <span
-                      className="h-8 w-1.5 rounded-full"
-                      style={{ backgroundColor: def.color_hex || "#94a3b8" }}
-                    />
+                    <span className="h-8 w-1.5 rounded-full" style={{ backgroundColor: def.color_hex || "#94a3b8" }} />
                     <span>
-                      <span className="block text-sm font-black text-secondary-900 dark:text-secondary-100">
-                        {def.name}
-                      </span>
-                      <span className="flex items-center gap-1 text-[11px] font-bold text-secondary-400">
+                      <span className="block text-[14px] font-semibold text-[var(--dx-text)]">{def.name}</span>
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--dx-text-muted)]">
                         <Clock className="h-3 w-3" />
                         {hhmm(def.start_time)}–{hhmm(def.end_time)}
                       </span>
                     </span>
                   </span>
                   <span className="flex items-center gap-2">
-                    <Badge variant="secondary">{def.code}</Badge>
-                    {selected ? <Check className="h-4 w-4 text-primary-500" /> : null}
+                    <DxBadge tone="neutral">{def.code}</DxBadge>
+                    {selected ? <Check className="h-4 w-4" style={{ color: "var(--dx-accent)" }} /> : null}
                   </span>
                 </button>
               );
@@ -173,6 +136,6 @@ export function AssignShiftModal({
           </div>
         )}
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

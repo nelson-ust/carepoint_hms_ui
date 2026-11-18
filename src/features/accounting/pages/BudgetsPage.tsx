@@ -1,14 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PiggyBank, Plus } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Skeleton } from "@/components/ui/Skeleton";
+import {
+  DxPage, DxPageHeader, DxPanel, DxBadge, DxButton, DxPopup, DxInput, DxSelect,
+  DxGrid, type DxGridColumn,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { accountsApi, type Account } from "@/features/billing/api/accounts.api";
 import { accountingApi, financeApi } from "../api/accounting.api";
@@ -20,6 +16,8 @@ function firstOfMonth(): string {
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
 }
 const today = () => new Date().toISOString().slice(0, 10);
+
+type BvaRow = { account_id: number; code: string; name: string; type: string; budget: string | number; actual: string | number; variance: string | number };
 
 export function BudgetsPage() {
   const [dateFrom, setDateFrom] = useState(firstOfMonth());
@@ -33,96 +31,75 @@ export function BudgetsPage() {
     enabled: !!dateFrom && !!dateTo,
   });
 
-  const items = report.data?.items ?? [];
+  const items = (report.data?.items ?? []) as BvaRow[];
+
+  const columns: DxGridColumn<BvaRow>[] = [
+    { key: "account", header: "Account", render: (r) => <span><span className="dx-mono font-semibold">{r.code}</span> {r.name}</span> },
+    { key: "type", header: "Type", render: (r) => <DxBadge tone="neutral">{r.type}</DxBadge> },
+    { key: "budget", header: "Budget", align: "right", render: (r) => <span className="dx-mono">{NGN(r.budget)}</span> },
+    { key: "actual", header: "Actual", align: "right", render: (r) => <span className="dx-mono">{NGN(r.actual)}</span> },
+    { key: "variance", header: "Variance", align: "right", render: (r) => {
+        const variance = Number(r.variance);
+        const good = r.type === "EXPENSE" ? variance >= 0 : variance <= 0;
+        return <span className={`dx-mono font-semibold ${good ? "text-[var(--dx-success,#10b981)]" : "text-[var(--dx-danger,#e11d48)]"}`}>{NGN(r.variance)}</span>;
+      } },
+  ];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader title="Budgets" description="Monthly budgets per account, compared against actual posted activity." />
-        <Button leftIcon={<Plus className="h-5 w-5" />} onClick={() => setSetOpen(true)}>Set budget</Button>
-      </div>
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Accounting" }, { label: "Budgets" }]}
+        title="Budgets"
+        subtitle="Monthly budgets per account, compared against actual posted activity."
+        actions={<DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setSetOpen(true)}>Set budget</DxButton>}
+      />
 
-      <Card className="p-5">
-        <div className="grid sm:grid-cols-3 gap-4 max-w-xl">
-          <Input label="From" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-          <Input label="To" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+      <DxPanel>
+        <div className="grid max-w-xl gap-4 sm:grid-cols-3">
+          <DxInput label="From" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          <DxInput label="To" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </div>
-      </Card>
+      </DxPanel>
 
-      {report.isLoading ? <Skeleton className="h-40 w-full" /> : items.length === 0 ? (
-        <Card className="p-10 text-center text-secondary-500">
-          <PiggyBank className="h-8 w-8 mx-auto mb-3 opacity-40" />
-          No budgets or activity in this range yet. Set a budget to begin.
-        </Card>
-      ) : (
-        <Card className="overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead className="bg-secondary-50 text-secondary-500 text-[10px] uppercase tracking-widest dark:bg-white/5">
-              <tr>
-                <th className="text-left px-5 py-3">Account</th>
-                <th className="text-left px-5 py-3">Type</th>
-                <th className="text-right px-5 py-3">Budget</th>
-                <th className="text-right px-5 py-3">Actual</th>
-                <th className="text-right px-5 py-3">Variance</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-secondary-100 dark:divide-white/5">
-              {items.map((r) => {
-                const variance = Number(r.variance);
-                const good = r.type === "EXPENSE" ? variance >= 0 : variance <= 0;
-                return (
-                  <tr key={r.account_id}>
-                    <td className="px-5 py-2.5"><span className="data-mono font-bold">{r.code}</span> {r.name}</td>
-                    <td className="px-5 py-2.5"><Badge variant="secondary">{r.type}</Badge></td>
-                    <td className="px-5 py-2.5 text-right data-mono">{NGN(r.budget)}</td>
-                    <td className="px-5 py-2.5 text-right data-mono">{NGN(r.actual)}</td>
-                    <td className={`px-5 py-2.5 text-right data-mono font-bold ${good ? "text-emerald-600" : "text-rose-600"}`}>
-                      {NGN(r.variance)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
-      )}
+      <DxPanel flush>
+        <DxGrid<BvaRow>
+          borderless columns={columns} data={items} rowKey={(r) => r.account_id} isLoading={report.isLoading}
+          empty={{ icon: PiggyBank, title: "No budgets or activity", description: "No budgets or activity in this range yet. Set a budget to begin." }}
+        />
+      </DxPanel>
 
-      <SetBudgetModal open={setOpen} onClose={() => setSetOpen(false)}
-        onDone={() => { setSetOpen(false); qc.invalidateQueries({ queryKey: ["bva"] }); }} />
-    </div>
+      <SetBudgetModal open={setOpen} onClose={() => setSetOpen(false)} onDone={() => { setSetOpen(false); qc.invalidateQueries({ queryKey: ["bva"] }); }} />
+    </DxPage>
   );
 }
 
 function SetBudgetModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const toast = useToast();
   const now = new Date();
-  const [f, setF] = useState({
-    account_id: "", period_code: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`, amount: "",
-  });
+  const [f, setF] = useState({ account_id: "", period_code: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`, amount: "" });
   const accounts = useQuery({ queryKey: ["accounts-all"], queryFn: () => accountsApi.list(), enabled: open });
   const save = useMutation({
-    mutationFn: () => financeApi.upsertBudget({
-      account_id: Number(f.account_id), period_code: f.period_code, amount: Number(f.amount),
-    }),
+    mutationFn: () => financeApi.upsertBudget({ account_id: Number(f.account_id), period_code: f.period_code, amount: Number(f.amount) }),
     onSuccess: () => { toast.success("Budget saved"); onDone(); },
     onError: (e: any) => toast.error("Couldn't save budget", accountingApi.errMsg(e, "")),
   });
+  const accountOptions = [
+    { value: "", label: "Select account…" },
+    ...(accounts.data ?? []).filter((a: Account) => a.account_type === "REVENUE" || a.account_type === "EXPENSE")
+      .map((a: Account) => ({ value: String(a.id), label: `${a.code} · ${a.name} (${a.account_type})` })),
+  ];
   return (
-    <Modal isOpen={open} onClose={onClose} title="Set budget">
+    <DxPopup isOpen={open} onClose={onClose} title="Set budget" size="md">
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
-        <Select label="Account" required value={f.account_id} onChange={(e) => setF({ ...f, account_id: e.target.value })}>
-          <option value="">Select account…</option>
-          {(accounts.data ?? []).filter((a: Account) => a.account_type === "REVENUE" || a.account_type === "EXPENSE")
-            .map((a: Account) => <option key={a.id} value={a.id}>{a.code} · {a.name} ({a.account_type})</option>)}
-        </Select>
+        <DxSelect label="Account" required value={f.account_id} onChange={(e) => setF({ ...f, account_id: e.target.value })} options={accountOptions} />
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Period (YYYY-MM)" required pattern="\d{4}-\d{2}" value={f.period_code}
-            onChange={(e) => setF({ ...f, period_code: e.target.value })} />
-          <Input label="Budget amount" type="number" min={0} step="0.01" required value={f.amount}
-            onChange={(e) => setF({ ...f, amount: e.target.value })} />
+          <DxInput label="Period (YYYY-MM)" required pattern="\d{4}-\d{2}" value={f.period_code} onChange={(e) => setF({ ...f, period_code: e.target.value })} />
+          <DxInput label="Budget amount" type="number" mono min={0} step="0.01" required value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
         </div>
-        <Button type="submit" isLoading={save.isPending}>Save budget</Button>
+        <div className="flex justify-end">
+          <DxButton type="submit" variant="primary" isLoading={save.isPending}>Save budget</DxButton>
+        </div>
       </form>
-    </Modal>
+    </DxPopup>
   );
 }

@@ -5,15 +5,11 @@ import {
   RefreshCw, Send, Download, ArrowLeftRight, Search,
   ShieldCheck, X, Eye, FileText, Building2, Hospital, UserRound, UserPlus, CheckCircle2, AlertTriangle,
 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge, type BadgeProps } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
-import { Skeleton } from "@/components/ui/Skeleton";
+import {
+  DxPage, DxPageHeader, DxSegmented, DxTabs, DxGrid, DxBadge, DxButton, DxPopup,
+  DxInput, DxSelect, DxTextarea, DxCheckbox, DxMessage,
+  type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import { routes } from "@/config/routes";
@@ -22,19 +18,19 @@ import type { ReferralImportPreview, ReferralImportResult } from "../api/interop
 import { searchPatients } from "@/features/patients/api/patients.api";
 import {
   interopApi, interopReferralApi, facilityReferralApi,
-  type DataRequest, type DataRequestStatus, type InterFacilityReferral, type PartnerTenant,
+  type DataRequest, type DataRequestStatus, type InterFacilityReferral, type FacilityReferral, type PartnerTenant,
 } from "../api/interoperability.api";
 
 type Mode = "INTERNAL" | "CROSS";
 type Tab = "REFER_OUT" | "REFER_IN" | "DATA_OUT" | "DATA_IN";
 
-const reqVariant: Record<DataRequestStatus, BadgeProps["variant"]> = {
-  PENDING: "soft-warning", APPROVED: "soft-success", DENIED: "soft-danger",
-  FULFILLED: "soft-success", EXPIRED: "secondary", CANCELLED: "secondary",
+const reqTone: Record<DataRequestStatus, DxBadgeTone> = {
+  PENDING: "warning", APPROVED: "success", DENIED: "danger",
+  FULFILLED: "success", EXPIRED: "neutral", CANCELLED: "neutral",
 };
-const refVariant: Record<string, BadgeProps["variant"]> = {
-  PENDING: "soft-warning", ACCEPTED: "soft-success", DECLINED: "soft-danger",
-  COMPLETED: "soft-success", CANCELLED: "secondary",
+const refTone: Record<string, DxBadgeTone> = {
+  PENDING: "warning", ACCEPTED: "success", DECLINED: "danger",
+  COMPLETED: "success", CANCELLED: "neutral",
 };
 
 function fmt(v?: string | null) {
@@ -43,24 +39,29 @@ function fmt(v?: string | null) {
   return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 }
 
+const mono = "dx-mono font-semibold text-[var(--dx-text)]";
+const muted = "text-[var(--dx-text-muted)]";
+
 export function InteroperabilityPage() {
   const [mode, setMode] = useState<Mode>("INTERNAL");
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Interoperability" }]}
         title="Interoperability"
-        description="Move patients and records between your own facilities seamlessly, and exchange records with other hospitals on the platform under consent and approval."
+        subtitle="Move patients and records between your own facilities, and exchange records with other hospitals on the platform under consent and approval."
       />
-      <div className="flex items-center gap-1 bg-secondary-100/50 p-1 rounded-2xl w-fit">
-        {([["INTERNAL", "Within My Hospital", Hospital], ["CROSS", "Across Hospitals", ArrowLeftRight]] as const).map(([key, label, Icon]) => (
-          <button key={key} onClick={() => setMode(key)}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all ${mode === key ? "bg-white text-primary-600 shadow-sm" : "text-secondary-400 hover:text-secondary-600"}`}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-      </div>
+      <DxSegmented<Mode>
+        ariaLabel="Interoperability scope"
+        value={mode}
+        onChange={setMode}
+        items={[
+          { key: "INTERNAL", label: "Within my hospital", icon: <Hospital className="h-4 w-4" /> },
+          { key: "CROSS", label: "Across hospitals", icon: <ArrowLeftRight className="h-4 w-4" /> },
+        ]}
+      />
       {mode === "INTERNAL" ? <WithinHospital /> : <AcrossHospitals />}
-    </div>
+    </DxPage>
   );
 }
 
@@ -92,62 +93,68 @@ function WithinHospital() {
 
   const list = tab === "IN" ? incoming : outgoing;
 
+  const columns: DxGridColumn<FacilityReferral>[] = [
+    { key: "referral_no", header: "Referral", render: (r) => <span className={mono}>{r.referral_no}</span> },
+    { key: "patient_id", header: "Patient", render: (r) => <span className="text-[13px] text-[var(--dx-text)]">Patient #{r.patient_id}</span> },
+    {
+      key: "facility",
+      header: tab === "IN" ? "From facility" : "To facility",
+      render: (r) => (
+        <span className="text-[13px] text-[var(--dx-text)]">
+          {tab === "IN"
+            ? (r.source_facility_id ? facName.get(r.source_facility_id) ?? `#${r.source_facility_id}` : "—")
+            : (r.destination_facility_id ? facName.get(r.destination_facility_id) ?? r.destination_facility : r.destination_facility)}
+        </span>
+      ),
+    },
+    { key: "reason_for_referral", header: "Reason", render: (r) => <span className={`block max-w-[16rem] truncate text-[13px] ${muted}`}>{r.reason_for_referral}</span> },
+    { key: "status", header: "Status", align: "center", render: (r) => <DxBadge tone={refTone[r.status] ?? "neutral"}>{r.status}</DxBadge> },
+    {
+      key: "actions", header: "", align: "right",
+      render: (r) => (
+        <div className="flex items-center justify-end gap-1.5">
+          <DxButton size="sm" leftIcon={<Eye className="h-3.5 w-3.5" />} onClick={() => navigate(routes.patientDetail.replace(":patientId", String(r.patient_id)))}>Open record</DxButton>
+          {tab === "IN" && r.status === "PENDING" ? (
+            <DxButton size="sm" variant="text" onClick={() => complete.mutate(r.id)}>Mark seen</DxButton>
+          ) : null}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl bg-primary-500/5 border border-primary-100 px-5 py-4 text-sm text-secondary-600">
+    <div className="space-y-4">
+      <DxMessage tone="info" title="Internal referrals are instant">
         Your facilities share one patient record. Referring a patient to another of your facilities is instant — the receiving
         facility can open the full record right away. No consent or export step is required within your hospital.
-      </div>
+      </DxMessage>
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-1 bg-secondary-100/50 p-1 rounded-2xl w-fit">
-          {([["IN", `Received (${incoming.data?.length ?? 0})`], ["OUT", `Sent (${outgoing.data?.length ?? 0})`]] as const).map(([k, label]) => (
-            <button key={k} onClick={() => setTab(k)}
-              className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${tab === k ? "bg-white text-primary-600 shadow-sm" : "text-secondary-400"}`}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-3">
-          <button onClick={() => { incoming.refetch(); outgoing.refetch(); }} className="btn-secondary p-3 rounded-2xl bg-white/80 border-secondary-400" title="Refresh">
-            <RefreshCw className="h-4 w-4" />
-          </button>
-          <Button leftIcon={<Send className="h-4 w-4" />} onClick={() => setReferOpen(true)}>Refer to a facility</Button>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <DxTabs<"IN" | "OUT">
+          value={tab}
+          onChange={setTab}
+          items={[
+            { key: "IN", label: "Received", count: incoming.data?.length ?? 0 },
+            { key: "OUT", label: "Sent", count: outgoing.data?.length ?? 0 },
+          ]}
+        />
+        <div className="flex gap-2">
+          <DxButton icon title="Refresh" onClick={() => { incoming.refetch(); outgoing.refetch(); }} isLoading={list.isFetching}><RefreshCw /></DxButton>
+          <DxButton variant="primary" leftIcon={<Send className="h-4 w-4" />} onClick={() => setReferOpen(true)}>Refer to a facility</DxButton>
         </div>
       </div>
 
-      <TableCard
-        loading={list.isLoading}
-        empty={(list.data?.length ?? 0) === 0}
-        emptyIcon={Building2}
-        emptyTitle={tab === "IN" ? "No referrals to your facility" : "No referrals sent"}
-        emptyText={tab === "IN" ? "Referrals from your other facilities appear here." : "Refer a patient to one of your other facilities."}
-        head={["Referral", "Patient", tab === "IN" ? "From Facility" : "To Facility", "Reason", "Status", "Action"]}
-      >
-        {(list.data ?? []).map((r) => (
-          <tr key={r.id} className="hover:bg-primary-50/20">
-            <td className="px-6 py-4 font-mono font-bold text-secondary-900">{r.referral_no}</td>
-            <td className="px-6 py-4 text-secondary-700">Patient #{r.patient_id}</td>
-            <td className="px-6 py-4 text-secondary-700">
-              {tab === "IN"
-                ? (r.source_facility_id ? facName.get(r.source_facility_id) ?? `#${r.source_facility_id}` : "—")
-                : (r.destination_facility_id ? facName.get(r.destination_facility_id) ?? r.destination_facility : r.destination_facility)}
-            </td>
-            <td className="px-6 py-4 text-secondary-500 max-w-[16rem] truncate">{r.reason_for_referral}</td>
-            <td className="px-6 py-4"><Badge variant={refVariant[r.status] ?? "secondary"}>{r.status}</Badge></td>
-            <td className="px-6 py-4">
-              <div className="flex items-center justify-end gap-2">
-                <Button size="sm" leftIcon={<Eye className="h-3.5 w-3.5" />} onClick={() => navigate(routes.patientDetail.replace(":patientId", String(r.patient_id)))}>
-                  Open record
-                </Button>
-                {tab === "IN" && r.status === "PENDING" && (
-                  <Button size="sm" variant="ghost" onClick={() => complete.mutate(r.id)}>Mark seen</Button>
-                )}
-              </div>
-            </td>
-          </tr>
-        ))}
-      </TableCard>
+      <DxGrid
+        columns={columns}
+        data={list.data ?? []}
+        rowKey={(r) => r.id}
+        isLoading={list.isLoading}
+        empty={{
+          icon: Building2,
+          title: tab === "IN" ? "No referrals to your facility" : "No referrals sent",
+          description: tab === "IN" ? "Referrals from your other facilities appear here." : "Refer a patient to one of your other facilities.",
+        }}
+      />
 
       <ReferWithinModal isOpen={referOpen} onClose={() => setReferOpen(false)} facilities={facilities.data ?? []} onSaved={invalidate} />
     </div>
@@ -184,47 +191,48 @@ function ReferWithinModal({ isOpen, onClose, facilities, onSaved }: { isOpen: bo
     create.mutate();
   }
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Refer to a Facility" size="md"
-      footer={<div className="flex justify-end gap-3"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={submit} isLoading={create.isPending}>Send referral</Button></div>}>
+    <DxPopup isOpen={isOpen} onClose={onClose} title="Refer to a facility" size="md" locked={create.isPending}
+      footer={<><DxButton onClick={onClose} disabled={create.isPending}>Cancel</DxButton><DxButton variant="primary" leftIcon={<Send className="h-4 w-4" />} onClick={submit} isLoading={create.isPending}>Send referral</DxButton></>}>
       <div className="space-y-4">
         {patient ? (
-          <div className="flex items-center justify-between rounded-2xl border border-secondary-200 bg-secondary-50 px-4 py-3">
-            <span className="flex items-center gap-2 text-sm font-bold text-secondary-800"><UserRound className="h-4 w-4 text-primary-500" /> {patient.label}</span>
-            <button onClick={() => setPatient(null)} className="rounded-lg p-1.5 hover:bg-rose-50"><X className="h-4 w-4 text-rose-400" /></button>
+          <div className="flex items-center justify-between rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] px-3 py-2.5">
+            <span className="flex items-center gap-2 text-[13px] font-semibold text-[var(--dx-text)]"><UserRound className="h-4 w-4 text-[var(--dx-accent)]" /> {patient.label}</span>
+            <button onClick={() => setPatient(null)} className="rounded p-1 text-[var(--dx-danger)] hover:bg-[var(--dx-danger-soft)]"><X className="h-4 w-4" /></button>
           </div>
         ) : (
           <div>
-            <Input label="Find patient" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search name, hospital no. or phone…" />
-            {term.trim().length >= 2 && (
-              <div className="mt-2 max-h-52 overflow-y-auto rounded-2xl border border-secondary-100 divide-y divide-secondary-100">
+            <DxInput label="Find patient" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search name, hospital no. or phone…" leftIcon={<Search className="h-3.5 w-3.5" />} />
+            {term.trim().length >= 2 ? (
+              <div className="mt-2 max-h-52 divide-y divide-[var(--dx-border)] overflow-y-auto rounded-md border border-[var(--dx-border)]">
                 {results.isLoading ? (
-                  <div className="p-3"><Skeleton className="h-6 w-full" /></div>
+                  <div className="dx-skeleton m-3 h-6" />
                 ) : (results.data?.items ?? []).length === 0 ? (
-                  <p className="p-3 text-xs text-secondary-400">No matches.</p>
+                  <p className={`p-3 text-[12px] ${muted}`}>No matches.</p>
                 ) : (
                   (results.data?.items ?? []).map((p: any) => {
                     const label = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || `Patient #${p.id}`;
                     const sub = p.patient_number || p.hospital_number || p.global_patient_id || "";
                     return (
-                      <button key={p.id} onClick={() => { setPatient({ id: p.id, label: sub ? `${label} · ${sub}` : label }); }}
-                        className="flex w-full items-center justify-between px-4 py-2.5 text-left hover:bg-primary-50/40">
-                        <span className="text-sm font-semibold text-secondary-800">{label}</span>
-                        {sub ? <span className="font-mono text-[11px] text-secondary-400">{sub}</span> : null}
+                      <button key={p.id} onClick={() => setPatient({ id: p.id, label: sub ? `${label} · ${sub}` : label })}
+                        className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-[var(--dx-surface-alt)]">
+                        <span className="text-[13px] font-medium text-[var(--dx-text)]">{label}</span>
+                        {sub ? <span className={`dx-mono text-[11px] ${muted}`}>{sub}</span> : null}
                       </button>
                     );
                   })
                 )}
               </div>
-            )}
+            ) : null}
           </div>
         )}
-        <Select label="Receiving facility" value={facility} onChange={(e) => setFacility(e.target.value)}
-          options={[{ value: "", label: "— Select facility —" }, ...facilities.map((f) => ({ value: String(f.id), label: `${f.name} (${f.code})` }))]} />
-        <Textarea label="Reason for referral" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
-        <Textarea label="Clinical note (optional)" rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} />
-        <p className="text-[11px] text-secondary-400">The receiving facility shares this patient record — they can open it immediately on acceptance.</p>
+        <DxSelect label="Receiving facility" value={facility} onChange={(e) => setFacility(e.target.value)}
+          placeholder="— Select facility —"
+          options={facilities.map((f) => ({ value: String(f.id), label: `${f.name} (${f.code})` }))} />
+        <DxTextarea label="Reason for referral" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
+        <DxTextarea label="Clinical note (optional)" rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} />
+        <p className={`text-[11px] ${muted}`}>The receiving facility shares this patient record — they can open it immediately on acceptance.</p>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -261,122 +269,109 @@ function AcrossHospitals() {
     onError: () => toast.error("Couldn't cancel", "Please try again."),
   });
 
-  const tabs: [Tab, string, number][] = [
-    ["REFER_OUT", "Referrals Sent", referOut.data?.length ?? 0],
-    ["REFER_IN", "Referrals Received", referIn.data?.length ?? 0],
-    ["DATA_OUT", "Records Requested", dataOut.data?.length ?? 0],
-    ["DATA_IN", "Incoming Data Requests", dataIn.data?.length ?? 0],
+  const referOutCols: DxGridColumn<InterFacilityReferral>[] = [
+    { key: "referral_no", header: "Referral", render: (r) => <span className={mono}>{r.referral_no}</span> },
+    { key: "patient_global_id", header: "Patient (global ID)", render: (r) => <span className="dx-mono text-[12px] text-[var(--dx-text-muted)]">{r.patient_global_id}</span> },
+    { key: "target", header: "To hospital", render: (r) => <span className="text-[13px] text-[var(--dx-text)]">{partnerName.get(r.target_tenant_id) ?? `#${r.target_tenant_id}`}</span> },
+    { key: "reason_for_referral", header: "Reason", render: (r) => <span className={`block max-w-[16rem] truncate text-[13px] ${muted}`}>{r.reason_for_referral}</span> },
+    { key: "status", header: "Status", align: "center", render: (r) => <DxBadge tone={refTone[r.status] ?? "neutral"}>{r.status}</DxBadge> },
+    { key: "referral_date", header: "Date", align: "right", render: (r) => <span className={`text-[13px] ${muted}`}>{fmt(r.referral_date)}</span> },
+  ];
+
+  const referInCols: DxGridColumn<InterFacilityReferral>[] = [
+    { key: "referral_no", header: "Referral", render: (r) => <span className={mono}>{r.referral_no}</span> },
+    { key: "patient_global_id", header: "Patient (global ID)", render: (r) => <span className="dx-mono text-[12px] text-[var(--dx-text-muted)]">{r.patient_global_id}</span> },
+    { key: "source", header: "From hospital", render: (r) => <span className="text-[13px] text-[var(--dx-text)]">{partnerName.get(r.source_tenant_id) ?? `#${r.source_tenant_id}`}</span> },
+    { key: "reason_for_referral", header: "Reason", render: (r) => <span className={`block max-w-[16rem] truncate text-[13px] ${muted}`}>{r.reason_for_referral}</span> },
+    { key: "status", header: "Status", align: "center", render: (r) => <DxBadge tone={refTone[r.status] ?? "neutral"}>{r.status}</DxBadge> },
+    {
+      key: "actions", header: "", align: "right",
+      render: (r) => r.status === "PENDING" ? (
+        <DxButton size="sm" variant="primary" onClick={() => setRespondTo(r)}>Respond</DxButton>
+      ) : r.status === "ACCEPTED" && r.is_history_access_granted ? (
+        <DxButton size="sm" leftIcon={<Eye className="h-3.5 w-3.5" />} onClick={() => setViewReferralRecord(r)}>Open record</DxButton>
+      ) : <span className={`text-[12px] ${muted}`}>—</span>,
+    },
+  ];
+
+  const dataOutCols: DxGridColumn<DataRequest>[] = [
+    { key: "request_no", header: "Request", render: (r) => <span className={mono}>{r.request_no}</span> },
+    {
+      key: "patient", header: "Patient",
+      render: (r) => (
+        <div className="min-w-0">
+          <div className="dx-mono text-[12px] text-[var(--dx-text-muted)]">{r.patient_global_id}</div>
+          {r.patient_display_name ? <div className={`truncate text-[11px] ${muted}`}>{r.patient_display_name}</div> : null}
+        </div>
+      ),
+    },
+    { key: "holding", header: "Holding hospital", render: (r) => <span className="text-[13px] text-[var(--dx-text)]">{r.holding_tenant_name ?? partnerName.get(r.holding_tenant_id) ?? `#${r.holding_tenant_id}`}</span> },
+    { key: "purpose", header: "Purpose", render: (r) => <span className={`block max-w-[14rem] truncate text-[13px] ${muted}`}>{r.purpose}</span> },
+    { key: "status", header: "Status", align: "center", render: (r) => <DxBadge tone={reqTone[r.status]}>{r.status}</DxBadge> },
+    {
+      key: "actions", header: "", align: "right",
+      render: (r) => (
+        <div className="flex items-center justify-end gap-1.5">
+          {(r.status === "APPROVED" || r.status === "FULFILLED") ? (
+            <DxButton size="sm" leftIcon={<Eye className="h-3.5 w-3.5" />} onClick={() => setViewRecord(r)}>View record</DxButton>
+          ) : null}
+          {(r.status === "PENDING" || r.status === "APPROVED") ? (
+            <DxButton icon size="sm" variant="outline-danger" title="Cancel" onClick={() => cancelReq.mutate(r.id)}><X /></DxButton>
+          ) : null}
+        </div>
+      ),
+    },
+  ];
+
+  const dataInCols: DxGridColumn<DataRequest>[] = [
+    { key: "request_no", header: "Request", render: (r) => <span className={mono}>{r.request_no}</span> },
+    { key: "patient_global_id", header: "Patient (global ID)", render: (r) => <span className="dx-mono text-[12px] text-[var(--dx-text-muted)]">{r.patient_global_id}</span> },
+    { key: "requesting", header: "Requesting hospital", render: (r) => <span className="text-[13px] text-[var(--dx-text)]">{r.requesting_tenant_name ?? partnerName.get(r.requesting_tenant_id) ?? `#${r.requesting_tenant_id}`}</span> },
+    { key: "purpose", header: "Purpose", render: (r) => <span className={`block max-w-[14rem] truncate text-[13px] ${muted}`}>{r.purpose}</span> },
+    { key: "status", header: "Status", align: "center", render: (r) => <DxBadge tone={reqTone[r.status]}>{r.status}</DxBadge> },
+    {
+      key: "actions", header: "", align: "right",
+      render: (r) => r.status === "PENDING" ? (
+        <DxButton size="sm" variant="primary" leftIcon={<ShieldCheck className="h-3.5 w-3.5" />} onClick={() => setApprove(r)}>Review</DxButton>
+      ) : <span className={`text-[12px] ${muted}`}>—</span>,
+    },
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-1 bg-secondary-100/50 p-1 rounded-2xl w-fit">
-          {tabs.map(([key, label, count]) => (
-            <button key={key} onClick={() => setTab(key)}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${tab === key ? "bg-white text-primary-600 shadow-sm" : "text-secondary-400 hover:text-secondary-600"}`}>
-              {label} ({count})
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Button variant="secondary" leftIcon={<Search className="h-4 w-4" />} onClick={() => setNewRequest(true)}>Request Records</Button>
-          <Button leftIcon={<Send className="h-5 w-5" />} onClick={() => setNewReferral(true)}>Refer a Patient</Button>
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <DxTabs<Tab>
+          value={tab}
+          onChange={setTab}
+          items={[
+            { key: "REFER_OUT", label: "Referrals sent", count: referOut.data?.length ?? 0 },
+            { key: "REFER_IN", label: "Referrals received", count: referIn.data?.length ?? 0 },
+            { key: "DATA_OUT", label: "Records requested", count: dataOut.data?.length ?? 0 },
+            { key: "DATA_IN", label: "Incoming data requests", count: dataIn.data?.length ?? 0 },
+          ]}
+        />
+        <div className="flex flex-wrap gap-2">
+          <DxButton leftIcon={<Search className="h-4 w-4" />} onClick={() => setNewRequest(true)}>Request records</DxButton>
+          <DxButton variant="primary" leftIcon={<Send className="h-4 w-4" />} onClick={() => setNewReferral(true)}>Refer a patient</DxButton>
         </div>
       </div>
 
-      {tab === "REFER_OUT" && (
-        <TableCard loading={referOut.isLoading} empty={(referOut.data?.length ?? 0) === 0} emptyIcon={Send}
-          emptyTitle="No referrals sent" emptyText="Refer a patient to another hospital to share their care."
-          head={["Referral", "Patient (Global ID)", "To Hospital", "Reason", "Status", "Date"]}>
-          {(referOut.data ?? []).map((r) => (
-            <tr key={r.id} className="hover:bg-primary-50/20">
-              <td className="px-6 py-4 font-mono font-bold text-secondary-900">{r.referral_no}</td>
-              <td className="px-6 py-4 font-mono text-secondary-600">{r.patient_global_id}</td>
-              <td className="px-6 py-4 text-secondary-700">{partnerName.get(r.target_tenant_id) ?? `#${r.target_tenant_id}`}</td>
-              <td className="px-6 py-4 text-secondary-500 max-w-[16rem] truncate">{r.reason_for_referral}</td>
-              <td className="px-6 py-4"><Badge variant={refVariant[r.status] ?? "secondary"}>{r.status}</Badge></td>
-              <td className="px-6 py-4 text-secondary-500">{fmt(r.referral_date)}</td>
-            </tr>
-          ))}
-        </TableCard>
-      )}
-
-      {tab === "REFER_IN" && (
-        <TableCard loading={referIn.isLoading} empty={(referIn.data?.length ?? 0) === 0} emptyIcon={ArrowLeftRight}
-          emptyTitle="No incoming referrals" emptyText="Referrals from other hospitals will appear here."
-          head={["Referral", "Patient (Global ID)", "From Hospital", "Reason", "Status", "Action"]}>
-          {(referIn.data ?? []).map((r) => (
-            <tr key={r.id} className="hover:bg-primary-50/20">
-              <td className="px-6 py-4 font-mono font-bold text-secondary-900">{r.referral_no}</td>
-              <td className="px-6 py-4 font-mono text-secondary-600">{r.patient_global_id}</td>
-              <td className="px-6 py-4 text-secondary-700">{partnerName.get(r.source_tenant_id) ?? `#${r.source_tenant_id}`}</td>
-              <td className="px-6 py-4 text-secondary-500 max-w-[16rem] truncate">{r.reason_for_referral}</td>
-              <td className="px-6 py-4"><Badge variant={refVariant[r.status] ?? "secondary"}>{r.status}</Badge></td>
-              <td className="px-6 py-4 text-right">
-                {r.status === "PENDING" ? (
-                  <Button size="sm" onClick={() => setRespondTo(r)}>Respond</Button>
-                ) : r.status === "ACCEPTED" && r.is_history_access_granted ? (
-                  <Button size="sm" leftIcon={<Eye className="h-3.5 w-3.5" />}
-                    onClick={() => setViewReferralRecord(r)}>
-                    Open record
-                  </Button>
-                ) : (
-                  <span className="text-xs text-secondary-400">—</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </TableCard>
-      )}
-
-      {tab === "DATA_OUT" && (
-        <TableCard loading={dataOut.isLoading} empty={(dataOut.data?.length ?? 0) === 0} emptyIcon={FileText}
-          emptyTitle="No records requested" emptyText="Request a patient's records from the hospital that holds them."
-          head={["Request", "Patient", "Holding Hospital", "Purpose", "Status", "Action"]}>
-          {(dataOut.data ?? []).map((r) => (
-            <tr key={r.id} className="hover:bg-primary-50/20">
-              <td className="px-6 py-4 font-mono font-bold text-secondary-900">{r.request_no}</td>
-              <td className="px-6 py-4">
-                <span className="font-mono text-secondary-600">{r.patient_global_id}</span>
-                {r.patient_display_name ? <p className="text-xs text-secondary-400">{r.patient_display_name}</p> : null}
-              </td>
-              <td className="px-6 py-4 text-secondary-700">{r.holding_tenant_name ?? partnerName.get(r.holding_tenant_id) ?? `#${r.holding_tenant_id}`}</td>
-              <td className="px-6 py-4 text-secondary-500 max-w-[14rem] truncate">{r.purpose}</td>
-              <td className="px-6 py-4"><Badge variant={reqVariant[r.status]}>{r.status}</Badge></td>
-              <td className="px-6 py-4">
-                <div className="flex items-center justify-end gap-2">
-                  {(r.status === "APPROVED" || r.status === "FULFILLED") && (
-                    <Button size="sm" leftIcon={<Eye className="h-3.5 w-3.5" />} onClick={() => setViewRecord(r)}>View record</Button>
-                  )}
-                  {(r.status === "PENDING" || r.status === "APPROVED") && (
-                    <button onClick={() => cancelReq.mutate(r.id)} className="p-2 rounded-xl hover:bg-rose-50" title="Cancel"><X className="h-4 w-4 text-rose-400" /></button>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </TableCard>
-      )}
-
-      {tab === "DATA_IN" && (
-        <TableCard loading={dataIn.isLoading} empty={(dataIn.data?.length ?? 0) === 0} emptyIcon={ShieldCheck}
-          emptyTitle="No incoming data requests" emptyText="When another hospital requests a patient's records, approve or deny it here."
-          head={["Request", "Patient (Global ID)", "Requesting Hospital", "Purpose", "Status", "Action"]}>
-          {(dataIn.data ?? []).map((r) => (
-            <tr key={r.id} className="hover:bg-primary-50/20">
-              <td className="px-6 py-4 font-mono font-bold text-secondary-900">{r.request_no}</td>
-              <td className="px-6 py-4 font-mono text-secondary-600">{r.patient_global_id}</td>
-              <td className="px-6 py-4 text-secondary-700">{r.requesting_tenant_name ?? partnerName.get(r.requesting_tenant_id) ?? `#${r.requesting_tenant_id}`}</td>
-              <td className="px-6 py-4 text-secondary-500 max-w-[14rem] truncate">{r.purpose}</td>
-              <td className="px-6 py-4"><Badge variant={reqVariant[r.status]}>{r.status}</Badge></td>
-              <td className="px-6 py-4 text-right">
-                {r.status === "PENDING" ? <Button size="sm" leftIcon={<ShieldCheck className="h-3.5 w-3.5" />} onClick={() => setApprove(r)}>Review</Button> : <span className="text-xs text-secondary-400">—</span>}
-              </td>
-            </tr>
-          ))}
-        </TableCard>
-      )}
+      {tab === "REFER_OUT" ? (
+        <DxGrid columns={referOutCols} data={referOut.data ?? []} rowKey={(r) => r.id} isLoading={referOut.isLoading}
+          empty={{ icon: Send, title: "No referrals sent", description: "Refer a patient to another hospital to share their care." }} />
+      ) : null}
+      {tab === "REFER_IN" ? (
+        <DxGrid columns={referInCols} data={referIn.data ?? []} rowKey={(r) => r.id} isLoading={referIn.isLoading}
+          empty={{ icon: ArrowLeftRight, title: "No incoming referrals", description: "Referrals from other hospitals will appear here." }} />
+      ) : null}
+      {tab === "DATA_OUT" ? (
+        <DxGrid columns={dataOutCols} data={dataOut.data ?? []} rowKey={(r) => r.id} isLoading={dataOut.isLoading}
+          empty={{ icon: FileText, title: "No records requested", description: "Request a patient's records from the hospital that holds them." }} />
+      ) : null}
+      {tab === "DATA_IN" ? (
+        <DxGrid columns={dataInCols} data={dataIn.data ?? []} rowKey={(r) => r.id} isLoading={dataIn.isLoading}
+          empty={{ icon: ShieldCheck, title: "No incoming data requests", description: "When another hospital requests a patient's records, approve or deny it here." }} />
+      ) : null}
 
       <NewReferralModal isOpen={newReferral} onClose={() => setNewReferral(false)} partners={partners.data ?? []} onSaved={invalidate} />
       <RequestRecordsModal isOpen={newRequest} onClose={() => setNewRequest(false)} partners={partners.data ?? []} onSaved={invalidate} />
@@ -386,33 +381,6 @@ function AcrossHospitals() {
       <ReferralRecordModal referral={viewReferralRecord} onClose={() => setViewReferralRecord(null)} onCreatePatient={(r) => { setViewReferralRecord(null); setImportReferral(r); }} />
       <CreatePatientFromReferralModal referral={importReferral} onClose={() => setImportReferral(null)} onCreated={invalidate} />
     </div>
-  );
-}
-
-function TableCard({ loading, empty, emptyIcon: Icon, emptyTitle, emptyText, head, children }: {
-  loading: boolean; empty: boolean; emptyIcon: any; emptyTitle: string; emptyText: string; head: string[]; children: React.ReactNode;
-}) {
-  return (
-    <Card variant="panel" className="p-0 overflow-hidden">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="bg-secondary-900/5 text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-            {head.map((h, i) => <th key={i} className={`px-6 py-4 ${i === head.length - 1 ? "text-right" : ""}`}>{h}</th>)}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-secondary-100/60">
-          {loading ? (
-            Array.from({ length: 4 }).map((_, i) => <tr key={i}><td colSpan={head.length} className="px-6 py-4"><Skeleton className="h-8 w-full" /></td></tr>)
-          ) : empty ? (
-            <tr><td colSpan={head.length} className="px-6 py-24 text-center">
-              <Icon className="h-12 w-12 mx-auto text-secondary-200 mb-3" />
-              <p className="font-bold text-secondary-900">{emptyTitle}</p>
-              <p className="text-sm text-secondary-400 mt-1">{emptyText}</p>
-            </td></tr>
-          ) : children}
-        </tbody>
-      </table>
-    </Card>
   );
 }
 
@@ -438,17 +406,17 @@ function NewReferralModal({ isOpen, onClose, partners, onSaved }: { isOpen: bool
     create.mutate();
   }
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Refer a Patient to Another Hospital" size="md"
-      footer={<div className="flex justify-end gap-3"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={submit} isLoading={create.isPending}>Send referral</Button></div>}>
+    <DxPopup isOpen={isOpen} onClose={onClose} title="Refer a patient to another hospital" size="md" locked={create.isPending}
+      footer={<><DxButton onClick={onClose} disabled={create.isPending}>Cancel</DxButton><DxButton variant="primary" leftIcon={<Send className="h-4 w-4" />} onClick={submit} isLoading={create.isPending}>Send referral</DxButton></>}>
       <div className="space-y-4">
-        <Select label="Refer to hospital" value={target} onChange={(e) => setTarget(e.target.value)}
-          options={[{ value: "", label: "— Select hospital —" }, ...partners.map((p) => ({ value: String(p.id), label: `${p.name} (${p.code})` }))]} />
-        <Input label="Patient global ID" value={gid} onChange={(e) => setGid(e.target.value)} placeholder="e.g. GPID-XXXX" hint="The patient's platform-wide global ID." />
-        <Textarea label="Reason for referral" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
-        <Textarea label="Clinical summary (optional)" rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />
-        <p className="text-[11px] text-secondary-400">On acceptance, the receiving hospital is granted time-limited access to this patient's history.</p>
+        <DxSelect label="Refer to hospital" value={target} onChange={(e) => setTarget(e.target.value)}
+          placeholder="— Select hospital —" options={partners.map((p) => ({ value: String(p.id), label: `${p.name} (${p.code})` }))} />
+        <DxInput label="Patient global ID" mono value={gid} onChange={(e) => setGid(e.target.value)} placeholder="e.g. GPID-XXXX" hint="The patient's platform-wide global ID." />
+        <DxTextarea label="Reason for referral" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
+        <DxTextarea label="Clinical summary (optional)" rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />
+        <p className={`text-[11px] ${muted}`}>On acceptance, the receiving hospital is granted time-limited access to this patient's history.</p>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -487,26 +455,24 @@ function RequestRecordsModal({ isOpen, onClose, partners, onSaved }: { isOpen: b
     create.mutate();
   }
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Request Patient Records" size="md"
-      footer={<div className="flex justify-end gap-3"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={submit} isLoading={create.isPending}>Send request</Button></div>}>
+    <DxPopup isOpen={isOpen} onClose={onClose} title="Request patient records" size="md" locked={create.isPending}
+      footer={<><DxButton onClick={onClose} disabled={create.isPending}>Cancel</DxButton><DxButton variant="primary" onClick={submit} isLoading={create.isPending}>Send request</DxButton></>}>
       <div className="space-y-4">
-        <Select label="Holding hospital" value={holding} onChange={(e) => { setHolding(e.target.value); setLookup(null); }}
-          options={[{ value: "", label: "— Select hospital —" }, ...partners.map((p) => ({ value: String(p.id), label: `${p.name} (${p.code})` }))]} />
-        <div className="flex items-end gap-3">
-          <div className="flex-1"><Input label="Patient global ID" value={gid} onChange={(e) => { setGid(e.target.value); setLookup(null); }} placeholder="e.g. GPID-XXXX" /></div>
-          <Button variant="secondary" onClick={doLookup} isLoading={checking} leftIcon={<Search className="h-4 w-4" />}>Verify</Button>
+        <DxSelect label="Holding hospital" value={holding} onChange={(e) => { setHolding(e.target.value); setLookup(null); }}
+          placeholder="— Select hospital —" options={partners.map((p) => ({ value: String(p.id), label: `${p.name} (${p.code})` }))} />
+        <div className="flex items-end gap-2">
+          <div className="flex-1"><DxInput label="Patient global ID" mono value={gid} onChange={(e) => { setGid(e.target.value); setLookup(null); }} placeholder="e.g. GPID-XXXX" /></div>
+          <DxButton onClick={doLookup} isLoading={checking} leftIcon={<Search className="h-4 w-4" />}>Verify</DxButton>
         </div>
         {lookup ? (
-          lookup.found ? (
-            <div className="rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-sm font-bold text-emerald-700">✓ Found{lookup.display_name ? `: ${lookup.display_name}` : ""}</div>
-          ) : (
-            <div className="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 text-sm font-bold text-amber-700">Not found at this hospital.</div>
-          )
+          <DxMessage tone={lookup.found ? "success" : "warning"}>
+            {lookup.found ? `Found${lookup.display_name ? `: ${lookup.display_name}` : ""}` : "Not found at this hospital."}
+          </DxMessage>
         ) : null}
-        <Textarea label="Clinical purpose" rows={2} value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Why the records are needed." />
-        <p className="text-[11px] text-secondary-400">The holding hospital must confirm the patient's consent and approve before any records are released.</p>
+        <DxTextarea label="Clinical purpose" rows={2} value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Why the records are needed." />
+        <p className={`text-[11px] ${muted}`}>The holding hospital must confirm the patient's consent and approve before any records are released.</p>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -521,26 +487,26 @@ function RespondReferralModal({ referral, onClose, onSaved }: { referral: InterF
     onError: (e: any) => toast.error("Couldn't respond", apiErrorMessage(e, "Please try again.")),
   });
   return (
-    <Modal isOpen={referral !== null} onClose={onClose} title="Respond to Referral" size="md"
+    <DxPopup isOpen={referral !== null} onClose={onClose} title="Respond to referral" size="md" locked={respond.isPending}
       footer={
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={() => respond.mutate("DECLINED")} isLoading={respond.isPending && respond.variables === "DECLINED"}>Decline</Button>
-          <Button onClick={() => respond.mutate("ACCEPTED")} isLoading={respond.isPending && respond.variables === "ACCEPTED"}>Accept</Button>
-        </div>
+        <>
+          <DxButton variant="outline-danger" onClick={() => respond.mutate("DECLINED")} isLoading={respond.isPending && respond.variables === "DECLINED"}>Decline</DxButton>
+          <DxButton variant="primary" onClick={() => respond.mutate("ACCEPTED")} isLoading={respond.isPending && respond.variables === "ACCEPTED"}>Accept</DxButton>
+        </>
       }>
       {referral ? (
         <div className="space-y-4">
-          <div className="rounded-2xl bg-secondary-50 p-4 text-sm">
-            <p className="font-bold text-secondary-900">{referral.referral_no}</p>
-            <p className="text-secondary-500 mt-1">Patient <span className="font-mono">{referral.patient_global_id}</span></p>
-            <p className="text-secondary-600 mt-2">{referral.reason_for_referral}</p>
-            {referral.clinical_summary ? <p className="text-secondary-500 mt-2 text-xs">{referral.clinical_summary}</p> : null}
+          <div className="rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] p-3 text-[13px]">
+            <p className={mono}>{referral.referral_no}</p>
+            <p className={`mt-1 ${muted}`}>Patient <span className="dx-mono">{referral.patient_global_id}</span></p>
+            <p className="mt-2 text-[var(--dx-text)]">{referral.reason_for_referral}</p>
+            {referral.clinical_summary ? <p className={`mt-2 text-[12px] ${muted}`}>{referral.clinical_summary}</p> : null}
           </div>
-          <Input label="Record access window (days)" type="number" min="1" max="365" value={days} onChange={(e) => setDays(e.target.value)} hint="On accept, you get read access to this patient's history for this many days." />
-          <Textarea label="Note (optional)" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+          <DxInput label="Record access window (days)" type="number" min="1" max="365" value={days} onChange={(e) => setDays(e.target.value)} hint="On accept, you get read access to this patient's history for this many days." />
+          <DxTextarea label="Note (optional)" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
       ) : null}
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -566,32 +532,34 @@ function ApproveRequestModal({ request, onClose, onSaved }: { request: DataReque
     approve.mutate();
   }
   return (
-    <Modal isOpen={request !== null} onClose={onClose} title="Review Data Request" size="md"
+    <DxPopup isOpen={request !== null} onClose={onClose} title="Review data request" size="md" locked={approve.isPending || deny.isPending}
       footer={
-        <div className="flex justify-between gap-3 w-full">
-          <Button variant="secondary" onClick={() => deny.mutate()} isLoading={deny.isPending}>Deny</Button>
-          <Button onClick={doApprove} isLoading={approve.isPending} leftIcon={<ShieldCheck className="h-4 w-4" />}>Confirm consent &amp; share</Button>
+        <div className="flex w-full justify-between gap-2">
+          <DxButton variant="outline-danger" onClick={() => deny.mutate()} isLoading={deny.isPending}>Deny</DxButton>
+          <DxButton variant="primary" onClick={doApprove} isLoading={approve.isPending} leftIcon={<ShieldCheck className="h-4 w-4" />}>Confirm consent &amp; share</DxButton>
         </div>
       }>
       {request ? (
         <div className="space-y-4">
-          <div className="rounded-2xl bg-secondary-50 p-4 text-sm">
-            <p className="font-bold text-secondary-900">{request.request_no}</p>
-            <p className="text-secondary-500 mt-1">Patient <span className="font-mono">{request.patient_global_id}</span></p>
-            <p className="text-secondary-600 mt-2">From <b>{request.requesting_tenant_name ?? `#${request.requesting_tenant_id}`}</b> — {request.purpose}</p>
+          <div className="rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] p-3 text-[13px]">
+            <p className={mono}>{request.request_no}</p>
+            <p className={`mt-1 ${muted}`}>Patient <span className="dx-mono">{request.patient_global_id}</span></p>
+            <p className="mt-2 text-[var(--dx-text)]">From <b>{request.requesting_tenant_name ?? `#${request.requesting_tenant_id}`}</b> — {request.purpose}</p>
           </div>
-          <label className="flex items-start gap-3 rounded-2xl border border-secondary-200 px-4 py-3 cursor-pointer">
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1" />
-            <span className="text-sm text-secondary-700">I confirm this patient has <b>consented</b> to sharing their full record with the requesting hospital.</span>
-          </label>
-          <Input label="Consent reference" value={ref} onChange={(e) => setRef(e.target.value)} placeholder="e.g. CONSENT-2026-0012" hint="Reference to the recorded patient consent." />
-          <Input label="Access window (days)" type="number" min="1" max="365" value={days} onChange={(e) => setDays(e.target.value)} />
-          <div className="border-t border-secondary-100 pt-3">
-            <Textarea label="Or deny with a reason" rows={2} value={denyReason} onChange={(e) => setDenyReason(e.target.value)} placeholder="Reason for denial (used only if you Deny)." />
+          <DxCheckbox
+            className="rounded-md border border-[var(--dx-border)] px-3 py-2.5"
+            checked={consent}
+            onChange={(e) => setConsent(e.target.checked)}
+            label={<span className="text-[13px] text-[var(--dx-text)]">I confirm this patient has <b>consented</b> to sharing their full record with the requesting hospital.</span>}
+          />
+          <DxInput label="Consent reference" value={ref} onChange={(e) => setRef(e.target.value)} placeholder="e.g. CONSENT-2026-0012" hint="Reference to the recorded patient consent." />
+          <DxInput label="Access window (days)" type="number" min="1" max="365" value={days} onChange={(e) => setDays(e.target.value)} />
+          <div className="border-t border-[var(--dx-border)] pt-3">
+            <DxTextarea label="Or deny with a reason" rows={2} value={denyReason} onChange={(e) => setDenyReason(e.target.value)} placeholder="Reason for denial (used only if you Deny)." />
           </div>
         </div>
       ) : null}
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -609,12 +577,39 @@ function BaselineChips({ patient }: { patient: any }) {
   return (
     <div className="mt-3 flex flex-wrap gap-2">
       {present.map(([label, value]) => (
-        <span key={label}
-          className="rounded-xl border border-primary-500/20 bg-white px-3 py-1.5 text-xs dark:bg-white/5">
-          <span className="mr-1.5 font-black uppercase tracking-widest text-[9px] text-secondary-400">{label}</span>
-          <span className="font-bold text-secondary-900 dark:text-secondary-100">{String(value)}</span>
+        <span key={label} className="rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface)] px-2.5 py-1 text-[12px]">
+          <span className="mr-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">{label}</span>
+          <span className="font-semibold text-[var(--dx-text)]">{String(value)}</span>
         </span>
       ))}
+    </div>
+  );
+}
+
+function RecordSummary({ payload, counts, sections }: { payload: any; counts: Record<string, number>; sections: Record<string, any[]> }) {
+  return (
+    <div className="space-y-5">
+      <div className="rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] p-4">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Patient</p>
+        <p className="text-[17px] font-bold text-[var(--dx-text)]">{(payload.patient?.first_name ?? "") + " " + (payload.patient?.last_name ?? "")}</p>
+        <p className="dx-mono text-[12px] text-[var(--dx-text-muted)]">{payload.global_patient_id}</p>
+        <BaselineChips patient={payload.patient} />
+      </div>
+      <div>
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Clinical history sections</p>
+        {Object.keys(sections).length === 0 ? (
+          <p className={`text-[13px] ${muted}`}>Demographics only — no additional clinical records on file.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {Object.entries(counts).map(([name, n]) => (
+              <div key={name} className="rounded-md border border-[var(--dx-border)] p-3">
+                <p className="text-[18px] font-bold text-[var(--dx-text)]">{n}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">{name}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -641,50 +636,27 @@ function ReferralRecordModal({ referral, onClose, onCreatePatient }: { referral:
     toast.success("Downloaded", "The referred patient's record was saved as JSON.");
   }
   return (
-    <Modal isOpen={referral !== null} onClose={onClose} title="Referred Patient Record" size="lg"
-      footer={<div className="flex flex-wrap justify-end gap-3"><Button variant="secondary" onClick={onClose}>Close</Button><Button variant="secondary" onClick={download} disabled={!payload} leftIcon={<Download className="h-4 w-4" />}>Download JSON</Button>{referral && onCreatePatient ? (<Button onClick={() => onCreatePatient(referral)} leftIcon={<UserPlus className="h-4 w-4" />}>Create patient record</Button>) : null}</div>}>
+    <DxPopup isOpen={referral !== null} onClose={onClose} title="Referred patient record" size="lg"
+      footer={<><DxButton onClick={onClose}>Close</DxButton><DxButton onClick={download} disabled={!payload} leftIcon={<Download className="h-4 w-4" />}>Download JSON</DxButton>{referral && onCreatePatient ? (<DxButton variant="primary" onClick={() => onCreatePatient(referral)} leftIcon={<UserPlus className="h-4 w-4" />}>Create patient record</DxButton>) : null}</>}>
       {recordQuery.isLoading ? (
-        <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+        <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="dx-skeleton h-10 w-full" />)}</div>
       ) : recordQuery.isError ? (
-        <p className="py-10 text-center text-sm text-rose-500 font-semibold">
-          {apiErrorMessage(recordQuery.error, "Couldn't open the record — try again.")}
-        </p>
+        <p className="py-10 text-center text-[13px] font-semibold text-[var(--dx-danger)]">{apiErrorMessage(recordQuery.error, "Couldn't open the record — try again.")}</p>
       ) : !payload ? (
-        <p className="py-10 text-center text-secondary-400">No record available.</p>
+        <p className={`py-10 text-center ${muted}`}>No record available.</p>
       ) : (
-        <div className="space-y-5">
-          <div className="rounded-2xl bg-primary-500/5 p-5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">Patient</p>
-            <p className="text-lg font-black text-secondary-900">{(payload.patient?.first_name ?? "") + " " + (payload.patient?.last_name ?? "")}</p>
-            <p className="text-xs font-mono text-secondary-500">{payload.global_patient_id}</p>
-            <BaselineChips patient={payload.patient} />
-          </div>
-          <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-widest text-secondary-400">Clinical history sections</p>
-            {Object.keys(sections).length === 0 ? (
-              <p className="text-sm text-secondary-400">Demographics only — no additional clinical records on file.</p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {Object.entries(counts).map(([name, n]) => (
-                  <div key={name} className="rounded-2xl border border-secondary-100 p-4">
-                    <p className="text-xl font-black text-secondary-900">{n}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">{name}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <p className="text-[11px] text-secondary-400">
+        <div className="space-y-4">
+          <RecordSummary payload={payload} counts={counts} sections={sections} />
+          <p className={`text-[11px] ${muted}`}>
             Live record from the referring hospital under referral {recordQuery.data?.referral_no}
             {recordQuery.data?.access_expires_at ? ` — access expires ${fmt(recordQuery.data.access_expires_at)}` : ""}.
             Every access is security-audited.
           </p>
         </div>
       )}
-    </Modal>
+    </DxPopup>
   );
 }
-
 
 function CreatePatientFromReferralModal({ referral, onClose, onCreated }: { referral: InterFacilityReferral | null; onClose: () => void; onCreated?: () => void }) {
   const toast = useToast();
@@ -703,7 +675,6 @@ function CreatePatientFromReferralModal({ referral, onClose, onCreated }: { refe
   const preview = previewQuery.data as ReferralImportPreview | undefined;
   const p = preview?.package?.patient ?? {};
 
-  // Seed the editable form once per referral.
   if (preview && seeded !== referral?.id) {
     const init: Record<string, string> = {};
     for (const k of EDITABLE_FIELDS) init[k] = (p?.[k] ?? "") as string;
@@ -735,108 +706,91 @@ function CreatePatientFromReferralModal({ referral, onClose, onCreated }: { refe
   const warnings = preview?.warnings ?? [];
 
   return (
-    <Modal isOpen={referral !== null} onClose={onClose} title="Create Patient Record from Referral" size="lg"
+    <DxPopup isOpen={referral !== null} onClose={onClose} title="Create patient record from referral" size="lg" locked={createMut.isPending}
       footer={result ? (
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>Done</Button>
-          <Button onClick={() => navigate(routes.patientDetail.replace(":patientId", String(result.patient_id)))} leftIcon={<Eye className="h-4 w-4" />}>Open patient</Button>
-        </div>
+        <><DxButton onClick={onClose}>Done</DxButton><DxButton variant="primary" onClick={() => navigate(routes.patientDetail.replace(":patientId", String(result.patient_id)))} leftIcon={<Eye className="h-4 w-4" />}>Open patient</DxButton></>
       ) : (
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => createMut.mutate()} isLoading={createMut.isPending} disabled={!preview || preview.already_imported}
-            leftIcon={<UserPlus className="h-4 w-4" />}>Create patient record</Button>
-        </div>
+        <><DxButton onClick={onClose} disabled={createMut.isPending}>Cancel</DxButton><DxButton variant="primary" onClick={() => createMut.mutate()} isLoading={createMut.isPending} disabled={!preview || preview.already_imported} leftIcon={<UserPlus className="h-4 w-4" />}>Create patient record</DxButton></>
       )}>
       {previewQuery.isLoading ? (
-        <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+        <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="dx-skeleton h-10 w-full" />)}</div>
       ) : previewQuery.isError ? (
-        <p className="py-10 text-center text-sm font-semibold text-rose-500">{apiErrorMessage(previewQuery.error, "Couldn't load the import preview.")}</p>
+        <p className="py-10 text-center text-[13px] font-semibold text-[var(--dx-danger)]">{apiErrorMessage(previewQuery.error, "Couldn't load the import preview.")}</p>
       ) : result ? (
         <div className="space-y-4 py-4 text-center">
-          <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
+          <CheckCircle2 className="mx-auto h-12 w-12 text-[var(--dx-success)]" />
           <div>
-            <p className="text-lg font-black text-secondary-900">{result.full_name}</p>
-            <p className="text-sm text-secondary-500">registered from referral {result.referral_no}</p>
+            <p className="text-[17px] font-bold text-[var(--dx-text)]">{result.full_name}</p>
+            <p className={`text-[13px] ${muted}`}>registered from referral {result.referral_no}</p>
           </div>
           <div className="mx-auto grid max-w-md grid-cols-2 gap-3 text-left">
-            <div className="rounded-2xl border border-secondary-100 p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">Hospital number</p>
-              <p className="data-mono text-sm font-black text-secondary-900">{result.hospital_number}</p>
+            <div className="rounded-md border border-[var(--dx-border)] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Hospital number</p>
+              <p className="dx-mono text-[13px] font-bold text-[var(--dx-text)]">{result.hospital_number}</p>
             </div>
-            <div className="rounded-2xl border border-secondary-100 p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">Global patient ID</p>
-              <p className="data-mono text-xs font-bold text-secondary-700">{result.global_patient_id}</p>
+            <div className="rounded-md border border-[var(--dx-border)] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Global patient ID</p>
+              <p className="dx-mono text-[12px] font-semibold text-[var(--dx-text)]">{result.global_patient_id}</p>
             </div>
           </div>
           <div className="mx-auto flex max-w-md flex-wrap justify-center gap-2">
             {Object.entries(result.records_created ?? {}).map(([k, n]) => (
-              <span key={k} className="rounded-full bg-primary-500/10 px-3 py-1 text-[11px] font-bold text-primary-600">{n} {k.replace(/_/g, " ")}</span>
+              <DxBadge key={k} tone="accent">{n} {k.replace(/_/g, " ")}</DxBadge>
             ))}
           </div>
         </div>
       ) : !preview ? (
-        <p className="py-10 text-center text-secondary-400">No referral package available.</p>
+        <p className={`py-10 text-center ${muted}`}>No referral package available.</p>
       ) : (
         <div className="space-y-5">
           {preview.already_imported ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-700">
-              This patient has already been registered here from the referral (patient #{preview.existing_patient_id}).
-            </div>
+            <DxMessage tone="warning">This patient has already been registered here from the referral (patient #{preview.existing_patient_id}).</DxMessage>
           ) : null}
 
-          {/* Import plan */}
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-primary-100 bg-primary-500/5 p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">New hospital number</p>
-              <p className="data-mono text-sm font-black text-primary-700">{plan?.next_hospital_number}</p>
+            <div className="rounded-md border border-[var(--dx-accent-soft)] bg-[var(--dx-accent-soft)] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">New hospital number</p>
+              <p className="dx-mono text-[13px] font-bold text-[var(--dx-accent)]">{plan?.next_hospital_number}</p>
             </div>
-            <div className="rounded-2xl border border-secondary-100 p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">Preserved global ID</p>
-              <p className="data-mono text-xs font-bold text-secondary-700">{plan?.global_patient_id_preserved}</p>
+            <div className="rounded-md border border-[var(--dx-border)] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Preserved global ID</p>
+              <p className="dx-mono text-[12px] font-semibold text-[var(--dx-text)]">{plan?.global_patient_id_preserved}</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 text-[11px] font-bold">
-            <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-emerald-600">Patient record</span>
-            {plan?.will_create_baseline_profile ? <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-emerald-600">Baseline medical profile</span> : null}
-            {(plan?.recent_visits_to_import ?? 0) > 0 ? <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-emerald-600">{plan?.recent_visits_to_import} recent visit(s)</span> : null}
+          <div className="flex flex-wrap gap-2">
+            <DxBadge tone="success">Patient record</DxBadge>
+            {plan?.will_create_baseline_profile ? <DxBadge tone="success">Baseline medical profile</DxBadge> : null}
+            {(plan?.recent_visits_to_import ?? 0) > 0 ? <DxBadge tone="success">{plan?.recent_visits_to_import} recent visit(s)</DxBadge> : null}
             {Object.entries(plan?.clinical_records_available ?? {}).map(([k, n]) => (
-              <span key={k} className="rounded-full bg-secondary-500/10 px-3 py-1 text-secondary-500">{n} {k}</span>
+              <DxBadge key={k} tone="neutral">{n} {k}</DxBadge>
             ))}
           </div>
 
           {warnings.length > 0 ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="mb-1 flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-amber-700"><AlertTriangle className="h-3.5 w-3.5" /> Please review</p>
-              <ul className="list-disc space-y-0.5 pl-5 text-sm text-amber-700">{warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
-            </div>
+            <DxMessage tone="warning" title="Please review">
+              <ul className="list-disc space-y-0.5 pl-5">{warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
+            </DxMessage>
           ) : null}
 
           {dupes.length > 0 ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-              <p className="mb-1 text-xs font-black uppercase tracking-widest text-rose-600">Possible existing patients</p>
-              <ul className="space-y-0.5 text-sm text-rose-700">{dupes.map((d) => <li key={d.id}>{d.name} — {d.hospital_number}</li>)}</ul>
-              <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-rose-700">
-                <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} /> Register anyway (not a duplicate)
-              </label>
-            </div>
+            <DxMessage tone="danger" title="Possible existing patients">
+              <ul className="space-y-0.5">{dupes.map((d) => <li key={d.id}>{d.name} — {d.hospital_number}</li>)}</ul>
+              <DxCheckbox className="mt-2 text-[12px] font-medium" checked={force} onChange={(e) => setForce(e.target.checked)} label="Register anyway (not a duplicate)" />
+            </DxMessage>
           ) : null}
 
-          {/* Editable review form */}
           <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-widest text-secondary-400">Review &amp; amend details</p>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Review &amp; amend details</p>
             <div className="grid gap-3 sm:grid-cols-2">
               {EDITABLE_LABELS.map(([k, label]) => (
-                <label key={k} className="text-xs font-bold text-secondary-500">{label}
-                  <Input value={form[k] ?? ""} onChange={set(k)} className="mt-1" />
-                </label>
+                <DxInput key={k} label={label} value={form[k] ?? ""} onChange={set(k)} />
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-secondary-400">Hospital-specific data (membership cards, the referring hospital's number, billing) is never imported. Every import is audited with full provenance.</p>
+            <p className={`mt-2 text-[11px] ${muted}`}>Hospital-specific data (membership cards, the referring hospital's number, billing) is never imported. Every import is audited with full provenance.</p>
           </div>
         </div>
       )}
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -870,38 +824,18 @@ function ViewRecordModal({ request, onClose }: { request: DataRequest | null; on
     toast.success("Downloaded", "The shared record was saved as JSON.");
   }
   return (
-    <Modal isOpen={request !== null} onClose={onClose} title="Shared Patient Record" size="lg"
-      footer={<div className="flex justify-end gap-3"><Button variant="secondary" onClick={onClose}>Close</Button><Button onClick={download} disabled={!payload} leftIcon={<Download className="h-4 w-4" />}>Download JSON</Button></div>}>
+    <DxPopup isOpen={request !== null} onClose={onClose} title="Shared patient record" size="lg"
+      footer={<><DxButton onClick={onClose}>Close</DxButton><DxButton onClick={download} disabled={!payload} leftIcon={<Download className="h-4 w-4" />}>Download JSON</DxButton></>}>
       {recordQuery.isLoading ? (
-        <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+        <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="dx-skeleton h-10 w-full" />)}</div>
       ) : !payload ? (
-        <p className="py-10 text-center text-secondary-400">No record available.</p>
+        <p className={`py-10 text-center ${muted}`}>No record available.</p>
       ) : (
-        <div className="space-y-5">
-          <div className="rounded-2xl bg-primary-500/5 p-5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">Patient</p>
-            <p className="text-lg font-black text-secondary-900">{(payload.patient?.first_name ?? "") + " " + (payload.patient?.last_name ?? "")}</p>
-            <p className="text-xs font-mono text-secondary-500">{payload.global_patient_id}</p>
-            <BaselineChips patient={payload.patient} />
-          </div>
-          <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-widest text-secondary-400">Included sections</p>
-            {Object.keys(sections).length === 0 ? (
-              <p className="text-sm text-secondary-400">Demographics only — no additional clinical records on file.</p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {Object.entries(counts).map(([name, n]) => (
-                  <div key={name} className="rounded-2xl border border-secondary-100 p-4">
-                    <p className="text-xl font-black text-secondary-900">{n}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">{name}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <p className="text-[11px] text-secondary-400">Point-in-time export shared with your hospital under the patient's consent. Access reference: {recordQuery.data?.request_no}.</p>
+        <div className="space-y-4">
+          <RecordSummary payload={payload} counts={counts} sections={sections} />
+          <p className={`text-[11px] ${muted}`}>Point-in-time export shared with your hospital under the patient's consent. Access reference: {recordQuery.data?.request_no}.</p>
         </div>
       )}
-    </Modal>
+    </DxPopup>
   );
 }

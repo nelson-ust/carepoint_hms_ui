@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import { DxPopup, DxButton, DxInput, DxSelect, DxMessage } from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import {
@@ -176,51 +173,65 @@ export function FacilityFormModal({
   };
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={onClose}
       title={isEdit ? "Edit facility" : "Add a facility"}
       size="lg"
+      locked={save.isPending}
+      footer={
+        <>
+          <DxButton onClick={onClose} disabled={save.isPending}>
+            Cancel
+          </DxButton>
+          <DxButton
+            variant="primary"
+            onClick={submit}
+            isLoading={save.isPending}
+            leftIcon={<Building2 className="h-4 w-4" />}
+          >
+            {isEdit ? "Save changes" : "Create facility"}
+          </DxButton>
+        </>
+      }
     >
-      <div className="space-y-6">
-        <div className="flex items-center gap-3 rounded-2xl border border-primary-200 bg-primary-500/5 p-4 dark:border-primary-500/20">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-600">
-            <Building2 className="h-5 w-5" />
-          </div>
-          <p className="text-xs font-medium text-secondary-500">
-            Facilities are your hospital's branches, clinics and service sites. The one you
-            mark <span className="font-bold">Active</span> is used for card issuance and other
-            facility-scoped operations.
-          </p>
-        </div>
+      <div className="space-y-5">
+        <DxMessage tone="info">
+          Facilities are your hospital's branches, clinics and service sites. The one you mark{" "}
+          <strong>Active</strong> is used for card issuance and other facility-scoped operations.
+        </DxMessage>
 
         {/* Identity */}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="Facility name *"
+          <DxInput
+            label="Facility name"
+            required
             placeholder="e.g. Meridian Main Hospital"
             value={form.name}
             onChange={set("name")}
             error={errors.name}
           />
-          <Input
-            label={isEdit ? "Code (immutable)" : "Code *"}
+          <DxInput
+            label={isEdit ? "Code (immutable)" : "Code"}
+            required={!isEdit}
+            mono
             placeholder="e.g. MERIDIAN-HQ"
             value={form.code}
             onChange={set("code")}
             error={errors.code}
             disabled={isEdit}
+            hint={isEdit ? "Code cannot be changed after creation" : undefined}
           />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select
+          <DxSelect
             label="Facility type"
             value={form.facility_type}
             onChange={set("facility_type")}
             options={FACILITY_TYPE_OPTIONS}
           />
-          <Select
+          <DxSelect
             label="Status"
             value={form.status}
             onChange={set("status")}
@@ -230,13 +241,13 @@ export function FacilityFormModal({
 
         {/* Contact */}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input
+          <DxInput
             label="Phone number"
             placeholder="+234…"
             value={form.phone_number}
             onChange={set("phone_number")}
           />
-          <Input
+          <DxInput
             label="Email"
             type="email"
             placeholder="branch@hospital.com"
@@ -245,7 +256,7 @@ export function FacilityFormModal({
             error={errors.email}
           />
         </div>
-        <Input
+        <DxInput
           label="Website"
           placeholder="https://…"
           value={form.website}
@@ -254,35 +265,30 @@ export function FacilityFormModal({
 
         {/* Address */}
         <div className="space-y-4">
-          <Input
+          <DxInput
             label="Address line 1"
             value={form.address_line_1}
             onChange={set("address_line_1")}
           />
-          <Input
+          <DxInput
             label="Address line 2"
             value={form.address_line_2}
             onChange={set("address_line_2")}
           />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Input label="City" value={form.city} onChange={set("city")} />
-            <Input label="State" value={form.state} onChange={set("state")} />
-            <Input label="Country" value={form.country} onChange={set("country")} />
-            <Input
-              label="Postal code"
-              value={form.postal_code}
-              onChange={set("postal_code")}
-            />
+            <DxInput label="City" value={form.city} onChange={set("city")} />
+            <DxInput label="State" value={form.state} onChange={set("state")} />
+            <DxInput label="Country" value={form.country} onChange={set("country")} />
+            <DxInput label="Postal code" value={form.postal_code} onChange={set("postal_code")} />
           </div>
         </div>
 
         {/* Org */}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select
+          <DxSelect
             label="Network (optional)"
             value={form.network_id}
             onChange={set("network_id")}
-            placeholder="No network"
           >
             <option value="">No network</option>
             {networks.map((n) => (
@@ -290,28 +296,15 @@ export function FacilityFormModal({
                 {n.name}
               </option>
             ))}
-          </Select>
-          <Input
+          </DxSelect>
+          <DxInput
             label="Timezone"
             placeholder="Africa/Lagos"
             value={form.timezone}
             onChange={set("timezone")}
           />
         </div>
-
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="secondary" onClick={onClose} disabled={save.isPending}>
-            Cancel
-          </Button>
-          <Button
-            onClick={submit}
-            isLoading={save.isPending}
-            leftIcon={<Building2 className="h-4 w-4" />}
-          >
-            {isEdit ? "Save changes" : "Create facility"}
-          </Button>
-        </div>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

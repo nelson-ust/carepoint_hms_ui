@@ -1,7 +1,8 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Mail, Shield, RefreshCw } from "lucide-react";
+import { Mail } from "lucide-react";
+import { DxButton, DxInput } from "@/components/dx";
 import { useCreateEmailConfig } from "../hooks/use-email-settings";
 
 const emailSchema = z.object({
@@ -36,7 +37,7 @@ export function CreateEmailConfigForm({ onSuccess, onCancel }: CreateEmailConfig
       smtp_port: 587,
       use_tls: true,
       is_active: true,
-    }
+    },
   });
 
   const onSubmit = (data: EmailFormValues) => {
@@ -48,91 +49,83 @@ export function CreateEmailConfigForm({ onSuccess, onCancel }: CreateEmailConfig
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="grid grid-cols-2 gap-6">
-        <div className="space-y-2 col-span-2">
-          <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">Provider Name</label>
-          <input
-            {...register("provider_name")}
-            className={`w-full bg-secondary-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium ${errors.provider_name ? 'ring-2 ring-rose-500/50' : ''}`}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-2">
+          <DxInput
+            label="Provider Name"
             placeholder="e.g. SendGrid Production"
+            error={errors.provider_name?.message}
+            {...register("provider_name")}
           />
         </div>
 
-        <div className="space-y-2 col-span-2 sm:col-span-1">
-          <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">SMTP Host</label>
-          <input
-            {...register("smtp_host")}
-            className="w-full bg-secondary-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
+        <div className="col-span-2 sm:col-span-1">
+          <DxInput
+            label="SMTP Host"
             placeholder="smtp.sendgrid.net"
+            error={errors.smtp_host?.message}
+            {...register("smtp_host")}
           />
         </div>
 
-        <div className="space-y-2 col-span-2 sm:col-span-1">
-          <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">SMTP Port</label>
-          <input
+        <div className="col-span-2 sm:col-span-1">
+          <DxInput
+            label="SMTP Port"
             type="number"
+            error={errors.smtp_port?.message}
             {...register("smtp_port", { valueAsNumber: true })}
-            className="w-full bg-secondary-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
           />
         </div>
 
-        <div className="space-y-2 col-span-2 sm:col-span-1">
-          <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">SMTP Username</label>
-          <input
+        <div className="col-span-2 sm:col-span-1">
+          <DxInput
+            label="SMTP Username"
+            error={errors.smtp_user?.message}
             {...register("smtp_user")}
-            className="w-full bg-secondary-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
           />
         </div>
 
-        <div className="space-y-2 col-span-2 sm:col-span-1">
-          <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">SMTP Password</label>
-          <input
+        <div className="col-span-2 sm:col-span-1">
+          <DxInput
+            label="SMTP Password"
             type="password"
+            error={errors.smtp_password?.message}
             {...register("smtp_password")}
-            className="w-full bg-secondary-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
           />
         </div>
 
-        <div className="space-y-2 col-span-2 sm:col-span-1">
-          <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">Sender Email</label>
-          <input
-            {...register("sender_email")}
-            className="w-full bg-secondary-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
+        <div className="col-span-2 sm:col-span-1">
+          <DxInput
+            label="Sender Email"
             placeholder="noreply@hospital.com"
+            error={errors.sender_email?.message}
+            {...register("sender_email")}
           />
         </div>
 
-        <div className="space-y-2 col-span-2 sm:col-span-1">
-          <label className="text-xs font-bold text-secondary-500 uppercase tracking-widest ml-1">Sender Name</label>
-          <input
-            {...register("sender_name")}
-            className="w-full bg-secondary-50 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
+        <div className="col-span-2 sm:col-span-1">
+          <DxInput
+            label="Sender Name"
             placeholder="Carepoint HMS"
+            error={errors.sender_name?.message}
+            {...register("sender_name")}
           />
         </div>
       </div>
 
-      <div className="flex gap-4 pt-6 border-t border-secondary-400">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 px-8 py-4 rounded-2xl bg-secondary-100 text-secondary-600 text-sm font-bold hover:bg-secondary-200 transition-all"
-        >
+      <div className="flex justify-end gap-3 border-t border-[var(--dx-border)] pt-5">
+        <DxButton type="button" onClick={onCancel} disabled={isPending}>
           Cancel
-        </button>
-        <button
+        </DxButton>
+        <DxButton
           type="submit"
-          disabled={isPending}
-          className="flex-3 px-8 py-4 rounded-2xl bg-secondary-900 text-white text-sm font-bold shadow-lg shadow-secondary-900/10 hover:bg-black transition-all flex items-center justify-center gap-2"
+          variant="primary"
+          isLoading={isPending}
+          leftIcon={<Mail className="h-4 w-4" />}
         >
-          {isPending ? (
-            <RefreshCw className="h-4 w-4 animate-spin" />
-          ) : (
-            <Mail className="h-4 w-4" />
-          )}
-          <span>{isPending ? 'Connecting...' : 'Save Configuration'}</span>
-        </button>
+          {isPending ? "Connecting…" : "Save Configuration"}
+        </DxButton>
       </div>
     </form>
   );

@@ -99,3 +99,49 @@ export async function resetTenantModule(
   );
   return response.data;
 }
+
+// ---------- Facility profiles (verticals) ----------
+
+export type FacilityProfileCode = "HOSPITAL" | "DENTAL" | "EYE" | "PHARMACY";
+
+export type FacilityProfile = {
+  code: FacilityProfileCode;
+  label: string;
+  workspace_name: string;
+  home: string;
+  description: string;
+  modules?: string[];
+  is_default?: boolean;
+};
+
+export type CurrentFacilityProfile = {
+  code: FacilityProfileCode;
+  label: string;
+  workspace_name: string;
+  home: string;
+  description: string;
+};
+
+/** Catalog of selectable facility profiles (verticals). */
+export async function listFacilityProfiles(): Promise<FacilityProfile[]> {
+  const response = await apiClient.get<unknown>("/tenant-modules/profiles");
+  return asArray<FacilityProfile>(response.data);
+}
+
+/** The current tenant's facility profile. */
+export async function getMyFacilityProfile(): Promise<CurrentFacilityProfile> {
+  const response = await apiClient.get<CurrentFacilityProfile>("/tenant-modules/me/profile");
+  return response.data;
+}
+
+/**
+ * SaaS-admin: apply a facility profile to any tenant. This is the only path for
+ * switching a tenant's facility type — tenants cannot change their own.
+ */
+export async function applyFacilityProfile(
+  tenantId: number | string,
+  profile: string,
+): Promise<unknown> {
+  const response = await apiClient.put(`/tenant-modules/${tenantId}/profile`, { profile });
+  return response.data;
+}

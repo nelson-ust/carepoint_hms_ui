@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { RotateCcw, Save, Eye, Glasses, Activity, Plus, CheckCircle2 } from "lucide-react";
+import { RotateCcw, Save, Eye, Glasses, Activity, Plus, CheckCircle2, Contact } from "lucide-react";
 import {
   DxBadge, DxButton, DxPage, DxPageHeader, DxPageLoading, DxPanel, DxPopup,
   DxInput, DxSelect, DxTextarea, apiErrorMessage,
 } from "@/components/dx";
 import { routes } from "@/config/routes";
 import { useToast } from "@/components/feedback/ToastProvider";
-import { eyeApi, LENS_TYPES, type EyeExam, type SpectaclePrescription } from "../api/eye.api";
+import {
+  eyeApi, LENS_TYPES, CONTACT_LENS_MODALITIES,
+  type SpectaclePrescription, type ContactLensPrescription,
+} from "../api/eye.api";
 
 type Form = Record<string, string>;
 const str = (v: unknown) => (v == null ? "" : String(v));
@@ -83,7 +86,37 @@ export function EyeExamPage() {
     onError: (e) => toast.error(apiErrorMessage(e)),
   });
 
+  // contact-lens Rx (fetched by patient)
+  const clQ = useQuery({
+    queryKey: ["eye", "contact-lens", exam?.patient_id],
+    queryFn: () => eyeApi.listContactLens({ patient_id: exam!.patient_id, limit: 50 }),
+    enabled: !!exam?.patient_id,
+  });
+  const clList = clQ.data?.items ?? [];
+  const [clOpen, setClOpen] = useState(false);
+  const [cl, setCl] = useState<Form>({ modality: "MONTHLY" });
+  const setClF = (k: string, v: string) => setCl((f) => ({ ...f, [k]: v }));
+  const issueCl = useMutation({
+    mutationFn: () => {
+      const payload: Record<string, unknown> = { patient_id: exam!.patient_id, exam_id: id };
+      ["modality", "od_sphere", "od_cyl", "od_axis", "od_add", "od_base_curve", "od_diameter", "od_brand",
+       "os_sphere", "os_cyl", "os_axis", "os_add", "os_base_curve", "os_diameter", "os_brand", "notes"]
+        .forEach((k) => { if (cl[k]) payload[k] = cl[k]; });
+      return eyeApi.createContactLens(payload);
+    },
+    onSuccess: () => { toast.success("Contact-lens Rx issued."); clQ.refetch(); setClOpen(false); setCl({ modality: "MONTHLY" }); },
+    onError: (e) => toast.error(apiErrorMessage(e)),
+  });
+
   if (examQ.isLoading || !exam) return <DxPageLoading label="Loading eye exam..." />;
+
+  const fmtCl = (r: ContactLensPrescription, eye: "od" | "os") => {
+    const sph = r[`${eye}_sphere` as keyof ContactLensPrescription];
+    const bc = r[`${eye}_base_curve` as keyof ContactLensPrescription];
+    const dia = r[`${eye}_diameter` as keyof ContactLensPrescription];
+    if (sph == null && bc == null) return "--";
+    return `${sph ?? "0.00"}${bc ? ` BC ${bc}` : ""}${dia ? ` ⌀ ${dia}` : ""}`;
+  };
 
   const fmtRx = (r: SpectaclePrescription, eye: "od" | "os") => {
     const sph = r[`${eye}_sphere` as keyof SpectaclePrescription];
@@ -196,6 +229,72 @@ export function EyeExamPage() {
           </div>
         </DxPanel>
       </div>
+
+      <div className="mt-4">
+        <DxPanel title="Contact-lens prescriptions" icon={<Contact />}
+          actions={<DxButton size="sm" variant="primary" onClick={() => setClOpen(true)}><Plus /> Issue CL Rx</DxButton>} flush>
+          <div className="divide-y divide-[var(--dx-border)]">
+            {clList.length === 0 ? (
+              <p className="px-3 py-6 text-center text-[12.5px] text-[var(--dx-text-muted)]">No contact-lens prescriptions issued.</p>
+            ) : (
+              clList.map((r) => (
+                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+                  <div className="text-[12.5px]">
+                    <div className="font-semibold text-[var(--dx-text)]">
+                      OD {fmtCl(r, "od")} &nbsp;|&nbsp; OS {fmtCl(r, "os")}
+                    </div>
+                    <div className="text-[11.5px] text-[var(--dx-text-muted)]">
+                      {r.modality ?? "Contact lens"}
+                      {r.od_brand ? ` - ${r.od_brand}` : ""}{r.prescribed_date ? ` - ${r.prescribed_date}` : ""}
+                    </div>
+                  </div>
+                  <DxBadge tone="info">{r.prescriber ?? "Rx"}</DxBadge>
+                </div>
+              ))
+            )}
+          </div>
+        </DxPanel>
+      </div>
+
+      <DxPopup isOpen={clOpen} onClose={() => setClOpen(false)} title="Issue contact-lens prescription" size="lg"
+        footer={
+          <>
+            <DxButton variant="text" onClick={() => setClOpen(false)}>Cancel</DxButton>
+            <DxButton variant="primary" isLoading={issueCl.isPending} onClick={() => issueCl.mutate()}>Issue</DxButton>
+          </>
+        }>
+        <div className="space-y-3">
+          <div className="grid grid-cols-[60px_repeat(6,1fr)] items-end gap-2">
+            <span className="pb-2 text-[11px] font-semibold uppercase text-[var(--dx-text-faint)]">Eye</span>
+            <span className="text-[11px] font-semibold uppercase text-[var(--dx-text-faint)]">Sph</span>
+            <span className="text-[11px] font-semibold uppercase text-[var(--dx-text-faint)]">Cyl</span>
+            <span className="text-[11px] font-semibold uppercase text-[var(--dx-text-faint)]">Axis</span>
+            <span className="text-[11px] font-semibold uppercase text-[var(--dx-text-faint)]">BC</span>
+            <span className="text-[11px] font-semibold uppercase text-[var(--dx-text-faint)]">Dia</span>
+            <span className="text-[11px] font-semibold uppercase text-[var(--dx-text-faint)]">Add</span>
+            <span className="pb-2 text-[12.5px] font-semibold">OD</span>
+            <DxInput editorSize="sm" value={cl.od_sphere ?? ""} onChange={(e) => setClF("od_sphere", e.target.value)} placeholder="-1.25" />
+            <DxInput editorSize="sm" value={cl.od_cyl ?? ""} onChange={(e) => setClF("od_cyl", e.target.value)} placeholder="-0.50" />
+            <DxInput editorSize="sm" value={cl.od_axis ?? ""} onChange={(e) => setClF("od_axis", e.target.value)} placeholder="180" />
+            <DxInput editorSize="sm" value={cl.od_base_curve ?? ""} onChange={(e) => setClF("od_base_curve", e.target.value)} placeholder="8.6" />
+            <DxInput editorSize="sm" value={cl.od_diameter ?? ""} onChange={(e) => setClF("od_diameter", e.target.value)} placeholder="14.2" />
+            <DxInput editorSize="sm" value={cl.od_add ?? ""} onChange={(e) => setClF("od_add", e.target.value)} placeholder="+2.00" />
+            <span className="pb-2 text-[12.5px] font-semibold">OS</span>
+            <DxInput editorSize="sm" value={cl.os_sphere ?? ""} onChange={(e) => setClF("os_sphere", e.target.value)} placeholder="-1.25" />
+            <DxInput editorSize="sm" value={cl.os_cyl ?? ""} onChange={(e) => setClF("os_cyl", e.target.value)} placeholder="-0.50" />
+            <DxInput editorSize="sm" value={cl.os_axis ?? ""} onChange={(e) => setClF("os_axis", e.target.value)} placeholder="180" />
+            <DxInput editorSize="sm" value={cl.os_base_curve ?? ""} onChange={(e) => setClF("os_base_curve", e.target.value)} placeholder="8.6" />
+            <DxInput editorSize="sm" value={cl.os_diameter ?? ""} onChange={(e) => setClF("os_diameter", e.target.value)} placeholder="14.2" />
+            <DxInput editorSize="sm" value={cl.os_add ?? ""} onChange={(e) => setClF("os_add", e.target.value)} placeholder="+2.00" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <DxSelect label="Modality" value={cl.modality ?? "MONTHLY"} onChange={(e) => setClF("modality", e.target.value)}
+              options={CONTACT_LENS_MODALITIES.map((m) => ({ value: m, label: m }))} />
+            <DxInput label="Brand" value={cl.od_brand ?? ""} onChange={(e) => { setClF("od_brand", e.target.value); setClF("os_brand", e.target.value); }} placeholder="e.g. Acuvue Oasys" />
+          </div>
+          <DxTextarea label="Notes" rows={2} value={cl.notes ?? ""} onChange={(e) => setClF("notes", e.target.value)} />
+        </div>
+      </DxPopup>
 
       <DxPopup isOpen={rxOpen} onClose={() => setRxOpen(false)} title="Issue spectacle prescription" size="lg"
         footer={

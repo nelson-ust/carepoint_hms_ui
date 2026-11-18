@@ -1,15 +1,11 @@
-import { PageHeader } from "@/components/layout/PageHeader";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
   Building2,
-  CheckCircle2,
-  ClipboardList,
-  Copy,
   Edit3,
-  FileText,
   GitBranch,
   Hash,
   Layers,
@@ -17,8 +13,7 @@ import {
   ListPlus,
   MapPin,
   Plus,
-  RefreshCw,
-  Save,
+  RotateCcw,
   Search,
   ShieldAlert,
   Sparkles,
@@ -26,6 +21,11 @@ import {
   Wand2,
   X,
 } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxPanel, DxButton, DxBadge, DxPopup,
+  DxInput, DxTextarea, DxSelect, DxCheckbox, DxMessage,
+  DxStatusBar, DxStatusItem,
+} from "@/components/dx";
 import {
   createCombinedFlow,
   createTemplateStep,
@@ -87,6 +87,9 @@ type ActionKind =
 export function VisitFlowManagementPage() {
   const [templates, setTemplates] = useState<VisitTemplate[]>([]);
   const [sdps, setSdps] = useState<ServiceDeliveryPoint[]>([]);
+  const [searchParams] = useSearchParams();
+  const wantedTemplateId = Number(searchParams.get("template")) || null;
+  const wantedCode = searchParams.get("code");
   const [activeTemplateId, setActiveTemplateId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSeeding, setIsSeeding] = useState(false);
@@ -150,7 +153,11 @@ export function VisitFlowManagementPage() {
       setTemplates(items);
       setSdps(sdpRes?.items ?? []);
       if (activeTemplateId == null && items.length > 0) {
-        setActiveTemplateId(items[0].id);
+        const preferred =
+          (wantedCode ? items.find((t) => t.code === wantedCode) : undefined) ??
+          (wantedTemplateId ? items.find((t) => t.id === wantedTemplateId) : undefined) ??
+          items[0];
+        setActiveTemplateId(preferred.id);
       }
     } catch (err: any) {
       setError(err?.response?.data?.message || "Unable to load visit flow templates.");
@@ -449,302 +456,162 @@ export function VisitFlowManagementPage() {
     }
   };
 
+  const sdpOptions = sdps.map((s) => ({ value: String(s.id), label: `${s.name} (${s.code}) · ${s.service_point_type}` }));
+
   return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader
-          title="Care Pathway Orchestration"
-          description="Design clinical visit flow templates that map a patient's journey through service delivery points."
-        />
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={handleSeedStandard}
-            disabled={isSeeding}
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400 disabled:opacity-50"
-            title="Create the standard outpatient pathway from your service points"
-          >
-            <Sparkles className="h-4 w-4" />
-            <span className="text-sm font-bold">
-              {isSeeding ? "Seeding..." : "Seed Standard Pathway"}
-            </span>
-          </button>
-          <button
-            onClick={openCombined}
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
-          >
-            <Wand2 className="h-4 w-4" />
-            <span className="text-sm font-bold">Pathway Wizard</span>
-          </button>
-          <button
-            onClick={openCreateTemplate}
-            className="btn-primary gap-3 py-3 px-7 shadow-xl shadow-primary-500/20"
-          >
-            <Plus className="h-5 w-5" />
-            <span className="font-bold">New Template</span>
-          </button>
-        </div>
-      </div>
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Visits" }, { label: "Care pathways" }]}
+        title="Care Pathway Orchestration"
+        subtitle="Design clinical visit-flow templates that map a patient's journey through service delivery points."
+        actions={
+          <>
+            <DxButton icon title="Refresh" onClick={load} isLoading={isLoading}><RotateCcw /></DxButton>
+            <DxButton leftIcon={<Sparkles className="h-4 w-4" />} isLoading={isSeeding} onClick={handleSeedStandard} title="Create the standard outpatient pathway from your service points">
+              {isSeeding ? "Seeding…" : "Seed standard pathway"}
+            </DxButton>
+            <DxButton leftIcon={<Wand2 className="h-4 w-4" />} onClick={openCombined}>Pathway wizard</DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={openCreateTemplate}>New template</DxButton>
+          </>
+        }
+      />
 
-      {feedback && (
-        <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
-              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-              : "bg-rose-50 text-rose-700 border-rose-100"
-            }`}
-        >
-          {feedback.tone === "success" ? (
-            <CheckCircle2 className="h-5 w-5" />
-          ) : (
-            <AlertCircle className="h-5 w-5" />
-          )}
-          <span className="text-sm font-bold">{feedback.message}</span>
-        </div>
-      )}
+      <DxStatusBar>
+        <DxStatusItem icon={<Layers className="h-3.5 w-3.5" />}>{templates.length} template{templates.length === 1 ? "" : "s"}</DxStatusItem>
+        <DxStatusItem icon={<Building2 className="h-3.5 w-3.5" />}>{sdps.length} active service point{sdps.length === 1 ? "" : "s"}</DxStatusItem>
+        {activeTemplate ? <DxStatusItem icon={<ListChecks className="h-3.5 w-3.5" />}>{sortedSteps.length} checkpoint{sortedSteps.length === 1 ? "" : "s"} in view</DxStatusItem> : null}
+      </DxStatusBar>
 
-      <div className="grid gap-8 lg:grid-cols-12">
+      {feedback ? (
+        <DxMessage tone={feedback.tone === "success" ? "success" : "danger"}>{feedback.message}</DxMessage>
+      ) : null}
+
+      <div className="grid gap-4 lg:grid-cols-12">
         {/* Templates list */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="glass-card rounded-[2.5rem] p-6 bg-white/50 backdrop-blur-xl">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-sm font-black flex items-center gap-2">
-                <Layers className="h-4 w-4 text-secondary-500" />
-                Pathway Templates
-              </h3>
-              <span className="px-2.5 py-1 rounded-lg bg-secondary-100 text-secondary-600 text-[10px] font-bold uppercase tracking-widest">
-                {templates.length}
-              </span>
-            </div>
+        <div className="lg:col-span-4">
+          <DxPanel
+            title="Pathway templates"
+            icon={<Layers className="h-4 w-4" />}
+            actions={<DxBadge tone="neutral">{templates.length}</DxBadge>}
+          >
+            <div className="space-y-3">
+              <DxInput leftIcon={<Search className="h-3.5 w-3.5" />} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search templates…" />
 
-            <div className="relative mb-4">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search templates..."
-                className="w-full bg-white/70 border border-secondary-400 rounded-xl pl-11 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary-500/40 transition-all"
-              />
-            </div>
-
-            {isLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-20 rounded-2xl bg-secondary-100/40 animate-pulse" />
-                ))}
-              </div>
-            ) : error ? (
-              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 text-center">
-                <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-                <p className="text-xs font-bold">{error}</p>
-                <button onClick={load} className="text-xs font-bold underline mt-2">
-                  Retry
-                </button>
-              </div>
-            ) : filteredTemplates.length === 0 ? (
-              <div className="py-8 text-center">
-                <GitBranch className="h-10 w-10 mx-auto text-secondary-200 mb-3" />
-                <p className="text-xs text-secondary-500 font-bold">
-                  {templates.length === 0
-                    ? "Design your first care pathway."
-                    : "No templates match your search."}
-                </p>
-                {templates.length === 0 && (
-                  <button
-                    onClick={openCombined}
-                    className="btn-primary mt-4 gap-2 px-4 py-2 text-xs"
-                  >
-                    <Wand2 className="h-3 w-3" />
-                    Use Pathway Wizard
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
-                {filteredTemplates.map((t) => {
-                  const stepCount = Array.isArray(t.associated_visit_flow_templates_steps)
-                    ? t.associated_visit_flow_templates_steps.length
-                    : 0;
-                  const isActive = t.id === activeTemplateId;
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => setActiveTemplateId(t.id)}
-                      className={`w-full text-left p-4 rounded-2xl border transition-all ${isActive
-                          ? "bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/20"
-                          : "bg-white border-secondary-400 hover:border-primary-200"
-                        }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${isActive
-                              ? "bg-white/20 text-white"
-                              : "bg-secondary-100 text-secondary-500"
-                            }`}
-                        >
-                          <Hash className="h-2.5 w-2.5" />
-                          {t.code}
-                        </span>
-                        <span className="flex items-center gap-2">
-                          {t.is_default && (
-                            <span
-                              className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${isActive ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-700"
-                                }`}
-                            >
-                              Default
-                            </span>
-                          )}
-                          <span
-                            className={`text-[10px] font-bold uppercase tracking-widest ${isActive ? "text-white/70" : "text-secondary-400"
-                              }`}
-                          >
-                            {stepCount} step{stepCount === 1 ? "" : "s"}
+              {isLoading ? (
+                <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="dx-skeleton h-16 w-full" />)}</div>
+              ) : error ? (
+                <DxMessage tone="danger" action={<DxButton size="sm" onClick={load}>Retry</DxButton>}>{error}</DxMessage>
+              ) : filteredTemplates.length === 0 ? (
+                <div className="py-8 text-center">
+                  <GitBranch className="mx-auto mb-3 h-9 w-9 text-[var(--dx-text-faint)]" />
+                  <p className="text-[12.5px] font-medium text-[var(--dx-text-muted)]">
+                    {templates.length === 0 ? "Design your first care pathway." : "No templates match your search."}
+                  </p>
+                  {templates.length === 0 ? (
+                    <DxButton className="mx-auto mt-4" size="sm" variant="primary" leftIcon={<Wand2 className="h-3.5 w-3.5" />} onClick={openCombined}>Use pathway wizard</DxButton>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
+                  {filteredTemplates.map((t) => {
+                    const stepCount = Array.isArray(t.associated_visit_flow_templates_steps) ? t.associated_visit_flow_templates_steps.length : 0;
+                    const isActive = t.id === activeTemplateId;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => setActiveTemplateId(t.id)}
+                        className="w-full rounded-md border p-3 text-left transition-colors"
+                        style={{
+                          borderColor: isActive ? "var(--dx-accent)" : "var(--dx-border)",
+                          background: isActive ? "var(--dx-accent-soft)" : "var(--dx-surface)",
+                        }}
+                      >
+                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1 dx-mono text-[11px] font-semibold text-[var(--dx-text-muted)]">
+                            <Hash className="h-2.5 w-2.5" />{t.code}
                           </span>
-                        </span>
-                      </div>
-                      <p className="text-sm font-black">{t.name}</p>
-                      {t.description && (
-                        <p
-                          className={`text-[11px] mt-1 line-clamp-2 ${isActive ? "text-white/70" : "text-secondary-500"
-                            }`}
-                        >
-                          {t.description}
-                        </p>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                          <span className="flex items-center gap-1.5">
+                            {t.is_default ? <DxBadge tone="success">Default</DxBadge> : null}
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">{stepCount} step{stepCount === 1 ? "" : "s"}</span>
+                          </span>
+                        </div>
+                        <p className="text-[13.5px] font-semibold text-[var(--dx-text)]">{t.name}</p>
+                        {t.description ? <p className="mt-0.5 line-clamp-2 text-[11.5px] text-[var(--dx-text-muted)]">{t.description}</p> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </DxPanel>
         </div>
 
         {/* Builder */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className="space-y-4 lg:col-span-8">
           {!activeTemplate ? (
-            <div className="glass-card rounded-[3rem] p-16 text-center bg-white/50">
-              <div className="h-20 w-20 mx-auto bg-secondary-50 rounded-3xl flex items-center justify-center mb-4">
-                <GitBranch className="h-10 w-10 text-secondary-200" />
+            <DxPanel>
+              <div className="py-16 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]">
+                  <GitBranch className="h-8 w-8 text-[var(--dx-text-faint)]" />
+                </div>
+                <h3 className="text-[17px] font-bold text-[var(--dx-text)]">No template selected</h3>
+                <p className="mx-auto mt-1 max-w-md text-[13px] text-[var(--dx-text-muted)]">
+                  Pick a template on the left to manage its checkpoints, or create a new one to design a fresh patient pathway.
+                </p>
+                <div className="mt-5 flex items-center justify-center gap-2">
+                  <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={openCreateTemplate}>New template</DxButton>
+                  <DxButton leftIcon={<Wand2 className="h-4 w-4" />} onClick={openCombined}>Wizard</DxButton>
+                </div>
               </div>
-              <h3 className="text-xl font-bold text-secondary-900">No Template Selected</h3>
-              <p className="text-sm text-secondary-500 mt-2 max-w-md mx-auto">
-                Pick a template on the left to manage its checkpoints, or create a new one
-                to design a fresh patient pathway.
-              </p>
-              <div className="mt-6 flex items-center justify-center gap-3">
-                <button onClick={openCreateTemplate} className="btn-primary gap-2 px-6 py-3">
-                  <Plus className="h-4 w-4" />
-                  <span>New Template</span>
-                </button>
-                <button onClick={openCombined} className="btn-secondary gap-2 px-6 py-3">
-                  <Wand2 className="h-4 w-4" />
-                  <span>Wizard</span>
-                </button>
-              </div>
-            </div>
+            </DxPanel>
           ) : (
             <>
               {/* Template header */}
-              <div className="glass-card rounded-[2.5rem] p-8 bg-white/80 shadow-premium">
-                <div className="flex items-start justify-between flex-wrap gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="h-14 w-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md">
-                      <GitBranch className="h-7 w-7" />
+              <DxPanel>
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--dx-accent)] text-white">
+                      <GitBranch className="h-6 w-6" />
                     </div>
                     <div>
-                      <h3 className="text-2xl font-black font-display tracking-tight">
-                        {activeTemplate.name}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <span className="inline-flex items-center gap-1 bg-secondary-100 text-secondary-600 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold">
-                          <Hash className="h-2.5 w-2.5" />
-                          {activeTemplate.code}
-                        </span>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-50 text-primary-600 border border-primary-100 text-[10px] font-bold uppercase tracking-widest">
-                          <ListChecks className="h-3 w-3" />
-                          {sortedSteps.length} Checkpoint
-                          {sortedSteps.length === 1 ? "" : "s"}
-                        </span>
+                      <h3 className="text-[20px] font-bold text-[var(--dx-text)]">{activeTemplate.name}</h3>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 dx-mono text-[11px] font-semibold text-[var(--dx-text-muted)]"><Hash className="h-2.5 w-2.5" />{activeTemplate.code}</span>
+                        <DxBadge tone="accent"><ListChecks className="mr-1 inline h-3 w-3" />{sortedSteps.length} checkpoint{sortedSteps.length === 1 ? "" : "s"}</DxBadge>
+                        {activeTemplate.is_default ? <DxBadge tone="success">Default</DxBadge> : null}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={openEditTemplate}
-                      className="btn-secondary gap-2 px-4 py-2.5 text-xs"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                      Edit
-                    </button>
-                    <button
-                      onClick={openDeleteTemplate}
-                      className="p-2.5 rounded-xl hover:bg-rose-50 text-rose-500"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <DxButton size="sm" leftIcon={<Edit3 className="h-3.5 w-3.5" />} onClick={openEditTemplate}>Edit</DxButton>
+                    <DxButton size="sm" icon variant="outline-danger" title="Delete" onClick={openDeleteTemplate}><Trash2 /></DxButton>
                   </div>
                 </div>
-                {activeTemplate.description && (
-                  <p className="text-sm text-secondary-600 mt-4 leading-relaxed">
-                    {activeTemplate.description}
-                  </p>
-                )}
-              </div>
+                {activeTemplate.description ? <p className="mt-4 text-[13px] leading-relaxed text-[var(--dx-text-muted)]">{activeTemplate.description}</p> : null}
+              </DxPanel>
 
               {/* Steps builder */}
-              <div className="glass-card rounded-[2.5rem] p-8 bg-white/80 shadow-premium">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-black flex items-center gap-2">
-                    <ListChecks className="h-5 w-5 text-secondary-500" />
-                    Checkpoints
-                  </h3>
-                  <button
-                    onClick={openCreateStep}
-                    disabled={sdps.length === 0}
-                    className="btn-primary gap-2 px-5 py-2.5 text-xs disabled:opacity-50"
-                  >
-                    <ListPlus className="h-3.5 w-3.5" />
-                    <span>Add Step</span>
-                  </button>
-                </div>
-
-                {sdps.length === 0 && (
-                  <div className="mb-4 p-4 rounded-2xl bg-amber-50 border border-amber-100 flex items-center gap-3">
-                    <ShieldAlert className="h-5 w-5 text-amber-600" />
-                    <p className="text-xs text-amber-700 font-bold">
-                      No active service delivery points. Configure them first to add steps.
-                    </p>
-                  </div>
-                )}
+              <DxPanel
+                title="Checkpoints"
+                icon={<ListChecks className="h-4 w-4" />}
+                actions={<DxButton size="sm" variant="primary" leftIcon={<ListPlus className="h-3.5 w-3.5" />} disabled={sdps.length === 0} onClick={openCreateStep}>Add step</DxButton>}
+              >
+                {sdps.length === 0 ? (
+                  <DxMessage tone="warning" className="mb-4">No active service delivery points. Configure them first to add steps.</DxMessage>
+                ) : null}
 
                 {sortedSteps.length === 0 ? (
                   <div className="py-12 text-center">
-                    <div className="h-14 w-14 mx-auto bg-secondary-50 rounded-3xl flex items-center justify-center mb-3">
-                      <Sparkles className="h-7 w-7 text-secondary-300" />
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]">
+                      <Sparkles className="h-6 w-6 text-[var(--dx-text-faint)]" />
                     </div>
-                    <p className="text-sm text-secondary-500 font-bold">
-                      No checkpoints yet — add the first stage of this pathway.
-                    </p>
-                    {sdps.length > 0 && (
-                      <button
-                        onClick={openCreateStep}
-                        className="btn-primary mt-4 gap-2 px-5 py-2.5 text-xs"
-                      >
-                        <ListPlus className="h-3.5 w-3.5" />
-                        <span>Add First Step</span>
-                      </button>
-                    )}
+                    <p className="text-[13px] font-medium text-[var(--dx-text-muted)]">No checkpoints yet — add the first stage of this pathway.</p>
+                    {sdps.length > 0 ? <DxButton className="mx-auto mt-4" size="sm" variant="primary" leftIcon={<ListPlus className="h-3.5 w-3.5" />} onClick={openCreateStep}>Add first step</DxButton> : null}
                   </div>
                 ) : (
                   <div className="relative">
-                    <div className="absolute left-[39px] top-10 bottom-10 w-0.5 bg-gradient-to-b from-primary-500/20 via-primary-500 to-primary-500/20" />
-                    <div className="space-y-4">
+                    <div className="absolute bottom-8 left-[27px] top-8 w-px bg-[var(--dx-border-strong)]" />
+                    <div className="space-y-3">
                       {sortedSteps.map((step, idx) => {
                         const sdp = step.service_delivery_point;
                         const sdpType = sdp?.service_point_type;
@@ -752,88 +619,39 @@ export function VisitFlowManagementPage() {
                         const isLast = idx === sortedSteps.length - 1;
                         const isReordering = reorderingStepId === step.id;
                         return (
-                          <div key={step.id} className="flex items-start gap-6 relative">
-                            <div className="h-20 w-20 rounded-[2rem] bg-primary-500 text-white flex flex-col items-center justify-center shadow-md shadow-primary-500/20 z-10 shrink-0">
-                              <span className="text-[8px] font-bold uppercase tracking-widest opacity-70">
-                                Step
-                              </span>
-                              <span className="text-2xl font-black">{step.step_order}</span>
+                          <div key={step.id} className="relative flex items-start gap-4">
+                            <div className="z-10 flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-lg bg-[var(--dx-accent)] text-white">
+                              <span className="text-[7px] font-semibold uppercase tracking-wide opacity-80">Step</span>
+                              <span className="text-[18px] font-bold leading-none">{step.step_order}</span>
                             </div>
-                            <div className="flex-1 p-6 rounded-[2rem] bg-white border border-secondary-400 hover:border-primary-300 transition-all">
-                              <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
-                                <div className="flex items-center gap-3 flex-wrap">
-                                  <div className="h-10 w-10 rounded-xl bg-secondary-100 text-secondary-600 flex items-center justify-center">
-                                    <Building2 className="h-5 w-5" />
+                            <div className="flex-1 rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface)] p-4">
+                              <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--dx-surface-sunken)] text-[var(--dx-text-muted)]">
+                                    <Building2 className="h-4 w-4" />
                                   </div>
                                   <div>
-                                    <p className="text-sm font-black text-secondary-900">
-                                      {sdp?.name ?? sdpName(step.service_delivery_point_id)}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                      {sdp?.code && (
-                                        <span className="inline-flex items-center gap-1 bg-secondary-100 text-secondary-500 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold">
-                                          <Hash className="h-2.5 w-2.5" />
-                                          {sdp.code}
-                                        </span>
-                                      )}
-                                      {sdpType && (
-                                        <span className="inline-flex px-2 py-0.5 rounded-md bg-primary-50 text-primary-600 border border-primary-100 text-[9px] font-bold uppercase tracking-widest">
-                                          {sdpType}
-                                        </span>
-                                      )}
-                                      {step.is_required && (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-100 text-[9px] font-bold uppercase tracking-widest">
-                                          <ShieldAlert className="h-2.5 w-2.5" />
-                                          Required
-                                        </span>
-                                      )}
+                                    <p className="text-[13.5px] font-semibold text-[var(--dx-text)]">{sdp?.name ?? sdpName(step.service_delivery_point_id)}</p>
+                                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                      {sdp?.code ? <span className="inline-flex items-center gap-1 dx-mono text-[10px] font-semibold text-[var(--dx-text-muted)]"><Hash className="h-2.5 w-2.5" />{sdp.code}</span> : null}
+                                      {sdpType ? <DxBadge tone="info">{sdpType}</DxBadge> : null}
+                                      {step.is_required ? <DxBadge tone="danger"><ShieldAlert className="mr-1 inline h-2.5 w-2.5" />Required</DxBadge> : null}
                                     </div>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleReorderStep(step, "up")}
-                                    disabled={isFirst || isReordering}
-                                    className="p-2 rounded-lg hover:bg-secondary-100 text-secondary-500 disabled:opacity-30"
-                                    title="Move up"
-                                  >
-                                    <ArrowUp className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleReorderStep(step, "down")}
-                                    disabled={isLast || isReordering}
-                                    className="p-2 rounded-lg hover:bg-secondary-100 text-secondary-500 disabled:opacity-30"
-                                    title="Move down"
-                                  >
-                                    <ArrowDown className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => openEditStep(step)}
-                                    className="p-2 rounded-lg hover:bg-secondary-100 text-secondary-500"
-                                    title="Edit"
-                                  >
-                                    <Edit3 className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => openDeleteStep(step)}
-                                    className="p-2 rounded-lg hover:bg-rose-50 text-rose-500"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
+                                <div className="flex items-center gap-0.5">
+                                  <DxButton icon size="sm" variant="text" title="Move up" disabled={isFirst || isReordering} onClick={() => handleReorderStep(step, "up")}><ArrowUp /></DxButton>
+                                  <DxButton icon size="sm" variant="text" title="Move down" disabled={isLast || isReordering} onClick={() => handleReorderStep(step, "down")}><ArrowDown /></DxButton>
+                                  <DxButton icon size="sm" variant="text" title="Edit" onClick={() => openEditStep(step)}><Edit3 /></DxButton>
+                                  <DxButton icon size="sm" variant="text" title="Delete" onClick={() => openDeleteStep(step)}><Trash2 /></DxButton>
                                 </div>
                               </div>
-                              {sdp?.location_description && (
-                                <p className="text-[11px] font-bold text-secondary-400 flex items-center gap-1.5 mt-2">
-                                  <MapPin className="h-3 w-3" />
-                                  {sdp.location_description}
-                                </p>
-                              )}
-                              {step.notes && (
-                                <p className="text-[11px] text-secondary-600 mt-3 italic bg-secondary-50 rounded-xl px-3 py-2 border border-secondary-400">
-                                  {step.notes}
-                                </p>
-                              )}
+                              {sdp?.location_description ? (
+                                <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-[var(--dx-text-muted)]"><MapPin className="h-3 w-3" />{sdp.location_description}</p>
+                              ) : null}
+                              {step.notes ? (
+                                <p className="mt-2 rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] px-3 py-2 text-[11.5px] italic text-[var(--dx-text-muted)]">{step.notes}</p>
+                              ) : null}
                             </div>
                           </div>
                         );
@@ -841,527 +659,146 @@ export function VisitFlowManagementPage() {
                     </div>
                   </div>
                 )}
-              </div>
+              </DxPanel>
             </>
           )}
         </div>
       </div>
 
-      {/* MODALS */}
+      {/* ───── Template create / edit ───── */}
+      <DxPopup
+        isOpen={actionKind === "create-template" || actionKind === "edit-template"}
+        onClose={closeAction}
+        title={actionKind === "edit-template" ? "Edit template" : "New template"}
+        locked={actionPending}
+        footer={
+          <>
+            <DxButton onClick={closeAction} disabled={actionPending}>Cancel</DxButton>
+            <DxButton variant="primary" isLoading={actionPending} onClick={handleSaveTemplate}>{actionKind === "edit-template" ? "Save changes" : "Create template"}</DxButton>
+          </>
+        }
+      >
+        {actionError ? <DxMessage tone="danger" className="mb-4">{actionError}</DxMessage> : null}
+        <div className="space-y-4">
+          <DxInput label="Name" required value={templateForm.name} onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })} placeholder="Standard Outpatient Flow" />
+          <DxInput label="Code" required mono value={templateForm.code} onChange={(e) => setTemplateForm({ ...templateForm, code: e.target.value.toUpperCase() })} placeholder="OPD_STD"
+            disabled={actionKind === "edit-template"} hint={actionKind === "edit-template" ? "Code can't be changed after creation." : undefined} />
+          <DxTextarea label="Description" rows={3} value={templateForm.description} onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })} placeholder="Briefly describe the clinical workflow…" />
+          <DxCheckbox label="Set as the hospital's default care pathway" checked={templateForm.is_default} onChange={(e) => setTemplateForm({ ...templateForm, is_default: e.target.checked })} />
+        </div>
+      </DxPopup>
 
-      {(actionKind === "create-template" || actionKind === "edit-template") && (
-        <Modal
-          title={actionKind === "edit-template" ? "Edit Template" : "New Template"}
-          subtitle="Define A Care Pathway Shell"
-          icon={actionKind === "edit-template" ? Edit3 : Plus}
-          onClose={closeAction}
-        >
-          {actionError && <ErrorBanner message={actionError} />}
-          <div className="space-y-5">
-            <Field
-              label="Name *"
-              value={templateForm.name}
-              onChange={(v) => setTemplateForm({ ...templateForm, name: v })}
-              placeholder="Standard Outpatient Flow"
-            />
-            <Field
-              label="Code *"
-              value={templateForm.code}
-              onChange={(v) => setTemplateForm({ ...templateForm, code: v.toUpperCase() })}
-              placeholder="OPD_STD"
-              mono
-              disabled={actionKind === "edit-template"}
-              hint={actionKind === "edit-template" ? "Code cannot be changed after creation" : undefined}
-            />
-            <FieldLabel label="Description">
-              <textarea
-                value={templateForm.description}
-                onChange={(e) =>
-                  setTemplateForm({ ...templateForm, description: e.target.value })
-                }
-                placeholder="Briefly describe the clinical workflow..."
-                className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-              />
-            </FieldLabel>
-            <label className="flex items-center gap-3 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={templateForm.is_default}
-                onChange={(e) =>
-                  setTemplateForm({ ...templateForm, is_default: e.target.checked })
-                }
-                className="h-4 w-4 rounded border-secondary-400 text-primary-600"
-              />
-              <span className="text-sm font-semibold text-secondary-700">
-                Set as the hospital's default care pathway
-              </span>
-            </label>
+      {/* ───── Step create / edit ───── */}
+      <DxPopup
+        isOpen={(actionKind === "create-step" || actionKind === "edit-step") && !!activeTemplate}
+        onClose={closeAction}
+        title={actionKind === "edit-step" ? "Edit checkpoint" : "Add checkpoint"}
+        locked={actionPending}
+        footer={
+          <>
+            <DxButton onClick={closeAction} disabled={actionPending}>Cancel</DxButton>
+            <DxButton variant="primary" isLoading={actionPending} onClick={handleSaveStep}>{actionKind === "edit-step" ? "Save changes" : "Add step"}</DxButton>
+          </>
+        }
+      >
+        {actionError ? <DxMessage tone="danger" className="mb-4">{actionError}</DxMessage> : null}
+        <div className="space-y-4">
+          <DxSelect label="Service delivery point" required value={stepForm.service_delivery_point_id}
+            onChange={(e) => setStepForm({ ...stepForm, service_delivery_point_id: e.target.value })}
+            placeholder="Pick a service point…" options={sdpOptions} />
+          <DxInput label="Step order" type="number" mono value={stepForm.step_order} onChange={(e) => setStepForm({ ...stepForm, step_order: e.target.value })} placeholder="1" />
+          <DxCheckbox label="Required checkpoint" description="Patient must complete this step before moving on." checked={stepForm.is_required} onChange={(e) => setStepForm({ ...stepForm, is_required: e.target.checked })} />
+          <DxTextarea label="Notes" rows={2} value={stepForm.notes} onChange={(e) => setStepForm({ ...stepForm, notes: e.target.value })} placeholder="Operating notes for the staff at this stage…" />
+        </div>
+      </DxPopup>
+
+      {/* ───── Delete template ───── */}
+      <DxPopup
+        isOpen={actionKind === "delete-template" && !!activeTemplate}
+        onClose={closeAction}
+        title="Delete template"
+        locked={actionPending}
+        footer={
+          <>
+            <DxButton onClick={closeAction} disabled={actionPending}>Cancel</DxButton>
+            <DxButton variant="danger" leftIcon={<Trash2 className="h-4 w-4" />} isLoading={actionPending} onClick={handleDeleteTemplate}>Delete template</DxButton>
+          </>
+        }
+      >
+        <DxMessage tone="danger" title="This cannot be undone">
+          Delete <strong>{activeTemplate?.name}</strong> (<span className="dx-mono">{activeTemplate?.code}</span>)? Active visits already linked to this template will not be affected, but it will no longer be available for new visits.
+        </DxMessage>
+      </DxPopup>
+
+      {/* ───── Delete step ───── */}
+      <DxPopup
+        isOpen={actionKind === "delete-step" && !!stepUnderEdit}
+        onClose={closeAction}
+        title="Remove checkpoint"
+        locked={actionPending}
+        footer={
+          <>
+            <DxButton onClick={closeAction} disabled={actionPending}>Cancel</DxButton>
+            <DxButton variant="danger" leftIcon={<Trash2 className="h-4 w-4" />} isLoading={actionPending} onClick={handleDeleteStep}>Remove step</DxButton>
+          </>
+        }
+      >
+        <DxMessage tone="danger" title="This cannot be undone">
+          Remove step <strong>{stepUnderEdit?.step_order}</strong> ({stepUnderEdit?.service_delivery_point?.name ?? `SDP #${stepUnderEdit?.service_delivery_point_id}`}) from this template?
+        </DxMessage>
+      </DxPopup>
+
+      {/* ───── Pathway wizard (combined) ───── */}
+      <DxPopup
+        isOpen={actionKind === "combined"}
+        onClose={closeAction}
+        title="Pathway wizard"
+        size="lg"
+        locked={actionPending}
+        footer={
+          <>
+            <DxButton onClick={closeAction} disabled={actionPending}>Cancel</DxButton>
+            <DxButton variant="primary" leftIcon={<Wand2 className="h-4 w-4" />} isLoading={actionPending} onClick={handleCombinedCreate}>Create pathway</DxButton>
+          </>
+        }
+      >
+        {actionError ? <DxMessage tone="danger" className="mb-4">{actionError}</DxMessage> : null}
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <DxInput label="Name" required value={combinedTemplate.name} onChange={(e) => setCombinedTemplate({ ...combinedTemplate, name: e.target.value })} placeholder="Maternity Antenatal Flow" />
+            <DxInput label="Code" required mono value={combinedTemplate.code} onChange={(e) => setCombinedTemplate({ ...combinedTemplate, code: e.target.value.toUpperCase() })} placeholder="MAT_ANC" />
           </div>
-          <ModalActions
-            onClose={closeAction}
-            onSubmit={handleSaveTemplate}
-            pending={actionPending}
-            submitLabel={actionKind === "edit-template" ? "Save Changes" : "Create Template"}
-            submitIcon={Save}
-          />
-        </Modal>
-      )}
-
-      {(actionKind === "create-step" || actionKind === "edit-step") && activeTemplate && (
-        <Modal
-          title={actionKind === "edit-step" ? "Edit Checkpoint" : "Add Checkpoint"}
-          subtitle="Configure A Stop On The Patient Pathway"
-          icon={actionKind === "edit-step" ? Edit3 : ListPlus}
-          onClose={closeAction}
-        >
-          {actionError && <ErrorBanner message={actionError} />}
-          <div className="space-y-5">
-            <FieldLabel label="Service Delivery Point *">
-              <select
-                value={stepForm.service_delivery_point_id}
-                onChange={(e) =>
-                  setStepForm({ ...stepForm, service_delivery_point_id: e.target.value })
-                }
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-              >
-                <option value="">Pick a service point...</option>
-                {sdps.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.code}) · {s.service_point_type}
-                  </option>
-                ))}
-              </select>
-            </FieldLabel>
-            <Field
-              label="Step Order"
-              value={stepForm.step_order}
-              onChange={(v) => setStepForm({ ...stepForm, step_order: v })}
-              placeholder="1"
-              type="number"
-              mono
-            />
-            <ToggleSwitch
-              label="Required Checkpoint"
-              hint="Patient must complete this step before moving on"
-              value={stepForm.is_required}
-              onChange={(v) => setStepForm({ ...stepForm, is_required: v })}
-            />
-            <FieldLabel label="Notes">
-              <textarea
-                value={stepForm.notes}
-                onChange={(e) => setStepForm({ ...stepForm, notes: e.target.value })}
-                placeholder="Operating notes for the staff at this stage..."
-                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-              />
-            </FieldLabel>
-          </div>
-          <ModalActions
-            onClose={closeAction}
-            onSubmit={handleSaveStep}
-            pending={actionPending}
-            submitLabel={actionKind === "edit-step" ? "Save Changes" : "Add Step"}
-            submitIcon={Save}
-          />
-        </Modal>
-      )}
-
-      {actionKind === "delete-template" && activeTemplate && (
-        <Modal
-          title="Delete Template"
-          subtitle="This Cannot Be Undone"
-          icon={Trash2}
-          tone="rose"
-          onClose={closeAction}
-        >
-          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-100 flex items-start gap-3">
-            <ShieldAlert className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-rose-700 leading-relaxed">
-              Delete <strong>{activeTemplate.name}</strong> (
-              <span className="font-mono">{activeTemplate.code}</span>)? Active visits
-              already linked to this template will not be affected, but it will no longer
-              be available for new visits.
-            </p>
-          </div>
-          <ModalActions
-            onClose={closeAction}
-            onSubmit={handleDeleteTemplate}
-            pending={actionPending}
-            submitLabel="Delete Template"
-            submitIcon={Trash2}
-            tone="rose"
-          />
-        </Modal>
-      )}
-
-      {actionKind === "delete-step" && stepUnderEdit && (
-        <Modal
-          title="Remove Checkpoint"
-          subtitle="This Cannot Be Undone"
-          icon={Trash2}
-          tone="rose"
-          onClose={closeAction}
-        >
-          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-100 flex items-start gap-3">
-            <ShieldAlert className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-rose-700 leading-relaxed">
-              Remove step <strong>{stepUnderEdit.step_order}</strong> (
-              {stepUnderEdit.service_delivery_point?.name ?? `SDP #${stepUnderEdit.service_delivery_point_id}`}
-              ) from this template?
-            </p>
-          </div>
-          <ModalActions
-            onClose={closeAction}
-            onSubmit={handleDeleteStep}
-            pending={actionPending}
-            submitLabel="Remove Step"
-            submitIcon={Trash2}
-            tone="rose"
-          />
-        </Modal>
-      )}
-
-      {actionKind === "combined" && (
-        <Modal
-          title="Pathway Wizard"
-          subtitle="Build A Template With Its Checkpoints In One Shot"
-          icon={Wand2}
-          onClose={closeAction}
-          tone="emerald"
-        >
-          {actionError && <ErrorBanner message={actionError} />}
-          <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              <Field
-                label="Name *"
-                value={combinedTemplate.name}
-                onChange={(v) => setCombinedTemplate({ ...combinedTemplate, name: v })}
-                placeholder="Maternity Antenatal Flow"
-              />
-              <Field
-                label="Code *"
-                value={combinedTemplate.code}
-                onChange={(v) =>
-                  setCombinedTemplate({ ...combinedTemplate, code: v.toUpperCase() })
-                }
-                placeholder="MAT_ANC"
-                mono
-              />
+          <DxTextarea label="Description" rows={2} value={combinedTemplate.description} onChange={(e) => setCombinedTemplate({ ...combinedTemplate, description: e.target.value })} placeholder="What this pathway is for…" />
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h4 className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]"><ListChecks className="h-3 w-3" /> Checkpoints</h4>
+              <DxButton size="sm" variant="text" leftIcon={<Plus className="h-3 w-3" />} onClick={() => setCombinedSteps((prev) => [...prev, { service_delivery_point_id: "", is_required: false, notes: "" }])}>Add step</DxButton>
             </div>
-            <FieldLabel label="Description">
-              <textarea
-                value={combinedTemplate.description}
-                onChange={(e) =>
-                  setCombinedTemplate({ ...combinedTemplate, description: e.target.value })
-                }
-                placeholder="What this pathway is for..."
-                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-              />
-            </FieldLabel>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-1">
-                  <ListChecks className="h-3 w-3" /> Checkpoints
-                </h4>
-                <button
-                  onClick={() =>
-                    setCombinedSteps((prev) => [
-                      ...prev,
-                      { service_delivery_point_id: "", is_required: false, notes: "" },
-                    ])
-                  }
-                  className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1"
-                >
-                  <Plus className="h-3 w-3" /> Add Step
-                </button>
-              </div>
-              {combinedSteps.map((s, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-2xl border border-secondary-400 p-4 bg-secondary-50/50 space-y-3 relative"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                      Step {idx + 1}
-                    </span>
-                    {combinedSteps.length > 1 && (
-                      <button
-                        onClick={() =>
-                          setCombinedSteps((prev) => prev.filter((_, i) => i !== idx))
-                        }
-                        className="p-1 rounded-lg hover:bg-rose-50 text-rose-500"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                  <select
-                    value={s.service_delivery_point_id}
-                    onChange={(e) =>
-                      setCombinedSteps((prev) =>
-                        prev.map((row, i) =>
-                          i === idx ? { ...row, service_delivery_point_id: e.target.value } : row,
-                        ),
-                      )
-                    }
-                    className="input-field h-11 bg-white border-secondary-400 w-full text-xs"
-                  >
-                    <option value="">Pick a service point...</option>
-                    {sdps.map((sdp) => (
-                      <option key={sdp.id} value={sdp.id}>
-                        {sdp.name} ({sdp.code})
-                      </option>
-                    ))}
-                  </select>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCombinedSteps((prev) =>
-                          prev.map((row, i) =>
-                            i === idx ? { ...row, is_required: !row.is_required } : row,
-                          ),
-                        )
-                      }
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border ${s.is_required
-                          ? "bg-rose-50 border-rose-200 text-rose-600"
-                          : "bg-secondary-100 border-secondary-200 text-secondary-500"
-                        }`}
-                    >
-                      <ShieldAlert className="h-3 w-3" />
-                      {s.is_required ? "Required" : "Optional"}
-                    </button>
-                    <input
-                      type="text"
-                      value={s.notes}
-                      onChange={(e) =>
-                        setCombinedSteps((prev) =>
-                          prev.map((row, i) =>
-                            i === idx ? { ...row, notes: e.target.value } : row,
-                          ),
-                        )
-                      }
-                      placeholder="Notes for staff at this stage..."
-                      className="flex-1 input-field h-11 bg-white border-secondary-400 text-xs"
-                    />
+            {combinedSteps.map((s, idx) => (
+              <div key={idx} className="space-y-2.5 rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Step {idx + 1}</span>
+                  {combinedSteps.length > 1 ? (
+                    <DxButton icon size="sm" variant="text" title="Remove" onClick={() => setCombinedSteps((prev) => prev.filter((_, i) => i !== idx))}><Trash2 /></DxButton>
+                  ) : null}
+                </div>
+                <DxSelect value={s.service_delivery_point_id} placeholder="Pick a service point…"
+                  options={sdps.map((sdp) => ({ value: String(sdp.id), label: `${sdp.name} (${sdp.code})` }))}
+                  onChange={(e) => setCombinedSteps((prev) => prev.map((row, i) => (i === idx ? { ...row, service_delivery_point_id: e.target.value } : row)))} />
+                <div className="flex items-center gap-3">
+                  <DxCheckbox label="Required" checked={s.is_required}
+                    onChange={() => setCombinedSteps((prev) => prev.map((row, i) => (i === idx ? { ...row, is_required: !row.is_required } : row)))} />
+                  <div className="flex-1">
+                    <DxInput value={s.notes} placeholder="Notes for staff at this stage…"
+                      onChange={(e) => setCombinedSteps((prev) => prev.map((row, i) => (i === idx ? { ...row, notes: e.target.value } : row)))} />
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-          <ModalActions
-            onClose={closeAction}
-            onSubmit={handleCombinedCreate}
-            pending={actionPending}
-            submitLabel="Create Pathway"
-            submitIcon={Wand2}
-            tone="emerald"
-          />
-          <p className="mt-4 text-[10px] text-secondary-400 font-bold uppercase tracking-[0.25em] flex items-center gap-1.5">
-            <Copy className="h-3 w-3" />
-            Steps are auto-numbered in the order shown above
-          </p>
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-// =====================================================================
-// Reusable Subcomponents
-// =====================================================================
-
-function ErrorBanner({ message }: { message: string }) {
-  return (
-    <div className="mb-5 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-      <AlertCircle className="h-5 w-5" />
-      <span className="text-sm font-bold">{message}</span>
-    </div>
-  );
-}
-
-function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-  mono,
-  disabled,
-  hint,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  type?: string;
-  mono?: boolean;
-  disabled?: boolean;
-  hint?: string;
-}) {
-  return (
-    <FieldLabel label={label}>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${mono ? "font-mono" : ""
-          } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
-      />
-      {hint && (
-        <p className="text-[9px] font-bold uppercase tracking-widest text-secondary-400">
-          {hint}
-        </p>
-      )}
-    </FieldLabel>
-  );
-}
-
-function ToggleSwitch({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
-      className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${value
-          ? "bg-rose-50 border-rose-200 text-rose-700"
-          : "bg-secondary-50 border-secondary-400 text-secondary-500"
-        }`}
-    >
-      <div className="text-left flex items-center gap-3">
-        <ShieldAlert
-          className={`h-4 w-4 ${value ? "text-rose-600" : "text-secondary-400"}`}
-        />
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest">{label}</p>
-          <p className="text-[10px] font-bold opacity-70 mt-0.5">{hint}</p>
+          <p className="flex items-center gap-1.5 text-[11px] text-[var(--dx-text-muted)]"><AlertCircle className="h-3 w-3" /> Steps are auto-numbered in the order shown above.</p>
         </div>
-      </div>
-      <div
-        className={`h-6 w-12 rounded-full p-0.5 transition-all ${value ? "bg-rose-500" : "bg-secondary-200"
-          }`}
-      >
-        <div
-          className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${value ? "translate-x-6" : ""
-            }`}
-        />
-      </div>
-    </button>
+      </DxPopup>
+    </DxPage>
   );
 }
-
-function ModalActions({
-  onClose,
-  onSubmit,
-  pending,
-  submitLabel,
-  submitIcon: Icon,
-  tone = "primary",
-}: {
-  onClose: () => void;
-  onSubmit: () => void;
-  pending: boolean;
-  submitLabel: string;
-  submitIcon: typeof Save;
-  tone?: "primary" | "emerald" | "rose";
-}) {
-  const cls =
-    tone === "rose"
-      ? "bg-rose-500 hover:bg-rose-600 shadow-rose-500/20"
-      : tone === "emerald"
-        ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
-        : "bg-primary-500 hover:bg-primary-600 shadow-primary-500/20";
-  return (
-    <div className="pt-6 flex gap-4">
-      <button
-        onClick={onClose}
-        disabled={pending}
-        className="flex-1 btn-secondary py-4 rounded-2xl font-bold disabled:opacity-50"
-      >
-        Cancel
-      </button>
-      <button
-        onClick={onSubmit}
-        disabled={pending}
-        className={`flex-[2] py-4 rounded-2xl text-white font-black tracking-tight shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 ${cls}`}
-      >
-        <Icon className="h-4 w-4" />
-        {pending ? "Working..." : submitLabel}
-      </button>
-    </div>
-  );
-}
-
-function Modal({
-  title,
-  subtitle,
-  onClose,
-  children,
-  icon: Icon,
-  tone = "primary",
-}: {
-  title: string;
-  subtitle: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  icon: typeof Save;
-  tone?: "primary" | "emerald" | "rose";
-}) {
-  const cls =
-    tone === "rose"
-      ? "bg-rose-500 shadow-rose-500/20"
-      : tone === "emerald"
-        ? "bg-emerald-500 shadow-emerald-500/20"
-        : "bg-primary-600 shadow-primary-500/20";
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] p-10 max-w-2xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"
-        >
-          <X className="h-5 w-5 text-secondary-400" />
-        </button>
-        <div className="flex items-center gap-5 mb-8">
-          <div
-            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${cls}`}
-          >
-            <Icon className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-black font-display tracking-tight">{title}</h3>
-            <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-              {subtitle}
-            </p>
-          </div>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-// Suppress unused-import lints — these icons are reserved for future detail panels
-void ClipboardList;
-void FileText;

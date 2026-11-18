@@ -425,7 +425,7 @@ export function QueueDashboardPage() {
                 </div>
               ) : (
                 serving.map((ticket) => {
-                  const ws = workstationPathFor(deskType, ticket.visit_id);
+                  const ws = workstationPathFor(deskType, ticket.visit_id, worklist?.service_delivery_point_name);
                   return (
                     <ServingTicketCard
                       key={ticket.id}

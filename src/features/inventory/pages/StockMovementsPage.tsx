@@ -1,30 +1,35 @@
-import { PageHeader } from "@/components/layout/PageHeader";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  AlertCircle,
-  ArrowDownToLine,
   ArrowLeftRight,
-  ArrowUpFromLine,
   Boxes,
-  CheckCircle2,
-  Clock,
-  FileText,
-  Filter,
   Hash,
   History,
   Package,
   Plus,
-  RefreshCw,
-  Save,
+  RotateCcw,
   Search,
-  Sigma,
   Sliders,
   TrendingDown,
   TrendingUp,
-  Truck,
-  X,
 } from "lucide-react";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxKpi,
+  DxGrid,
+  DxBadge,
+  DxButton,
+  DxInput,
+  DxSelect,
+  DxTextarea,
+  DxPopup,
+  DxMessage,
+  formatDateTime,
+  type DxBadgeTone,
+  type DxGridColumn,
+} from "@/components/dx";
 import {
   listInventoryMovements,
   listStockItems,
@@ -37,40 +42,15 @@ import { transferStock } from "../api/stock-movements.api";
 import { getStaff, staffDisplayName } from "@/features/staff/api/staff.api";
 import type { Staff } from "@/features/staff/api/staff.api";
 import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
+import { apiErrorMessage } from "@/lib/api/api-error";
 
-const movementToneStyles: Record<string, string> = {
-  RECEIPT: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  ISSUE: "bg-amber-50 text-amber-600 border-amber-100",
-  ADJUSTMENT: "bg-secondary-100 text-secondary-600 border-secondary-200",
-  TRANSFER_IN: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  TRANSFER_OUT: "bg-amber-50 text-amber-600 border-amber-100",
-  RETURN: "bg-primary-50 text-primary-600 border-primary-100",
-  WASTAGE: "bg-rose-50 text-rose-600 border-rose-100",
-};
+const INBOUND = ["RECEIPT", "TRANSFER_IN", "RETURN"];
+const OUTBOUND = ["ISSUE", "TRANSFER_OUT", "WASTAGE"];
 
-const movementIcon: Record<string, typeof ArrowDownToLine> = {
-  RECEIPT: ArrowDownToLine,
-  ISSUE: ArrowUpFromLine,
-  ADJUSTMENT: Sliders,
-  TRANSFER_IN: ArrowDownToLine,
-  TRANSFER_OUT: ArrowUpFromLine,
-  RETURN: ArrowDownToLine,
-  WASTAGE: TrendingDown,
-};
-
-function formatDateTime(value?: string) {
-  if (!value) return "—";
-  try {
-    return new Date(value).toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return value;
-  }
+function movementTone(type: string): DxBadgeTone {
+  if (INBOUND.includes(type)) return "success";
+  if (OUTBOUND.includes(type)) return type === "WASTAGE" ? "danger" : "warning";
+  return "neutral";
 }
 
 function readStoredUserId(): number | null {
@@ -172,8 +152,8 @@ export function StockMovementsPage() {
       setStores(storesRes.items ?? []);
       setItems(itemsRes.items ?? []);
       setStaffList(Array.isArray(staffRes) ? staffRes : []);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Unable to load stock movements.");
+    } catch (err) {
+      setError(apiErrorMessage(err, "Unable to load stock movements."));
     } finally {
       setIsLoading(false);
     }
@@ -221,12 +201,8 @@ export function StockMovementsPage() {
 
   const stats = useMemo(() => {
     const total = movements.length;
-    const inbound = movements.filter((m) =>
-      ["RECEIPT", "TRANSFER_IN", "RETURN"].includes(m.movement_type),
-    ).length;
-    const outbound = movements.filter((m) =>
-      ["ISSUE", "TRANSFER_OUT", "WASTAGE"].includes(m.movement_type),
-    ).length;
+    const inbound = movements.filter((m) => INBOUND.includes(m.movement_type)).length;
+    const outbound = movements.filter((m) => OUTBOUND.includes(m.movement_type)).length;
     const adjustments = movements.filter((m) => m.movement_type === "ADJUSTMENT").length;
     return { total, inbound, outbound, adjustments };
   }, [movements]);
@@ -269,8 +245,8 @@ export function StockMovementsPage() {
       // Refresh items so new quantities show in the picker
       const itemsRes = await listStockItems({ skip: 0, limit: 500 });
       setItems(itemsRes.items ?? []);
-    } catch (err: any) {
-      setRecordError(err?.response?.data?.message || "Failed to record movement.");
+    } catch (err) {
+      setRecordError(apiErrorMessage(err, "Failed to record movement."));
     } finally {
       setRecordSaving(false);
     }
@@ -307,626 +283,318 @@ export function StockMovementsPage() {
       setTransferOpen(false);
       // Reload movements + items to capture both transfer-out & transfer-in entries
       load();
-    } catch (err: any) {
-      setTransferError(err?.response?.data?.message || "Failed to transfer stock.");
+    } catch (err) {
+      setTransferError(apiErrorMessage(err, "Failed to transfer stock."));
     } finally {
       setTransferSaving(false);
     }
   };
 
-  return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader
-          title="Stock Movements"
-          description="Every receipt, issue, adjustment and transfer — your complete inventory ledger."
-        />
-        <div className="flex items-center gap-3 flex-wrap">
-          <Link
-            to="/inventory/stores"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
-          >
-            <Package className="h-4 w-4" />
-            <span className="text-sm font-bold">Stores</span>
-          </Link>
-          <Link
-            to="/inventory/items"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
-          >
-            <Boxes className="h-4 w-4" />
-            <span className="text-sm font-bold">Items</span>
-          </Link>
-          <button
-            onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={openTransfer}
-            className="btn-secondary gap-2 px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 border-amber-500 text-white shadow-lg shadow-amber-500/20"
-          >
-            <ArrowLeftRight className="h-4 w-4" />
-            <span className="font-bold text-sm">Transfer</span>
-          </button>
-          <button
-            onClick={openRecord}
-            className="btn-primary gap-3 py-3 px-7 shadow-xl shadow-primary-500/20"
-          >
-            <Plus className="h-5 w-5" />
-            <span className="font-bold">Record Movement</span>
-          </button>
+  const columns: DxGridColumn<StockMovement>[] = [
+    {
+      key: "movement_type",
+      header: "Type",
+      render: (m) => (
+        <div className="space-y-1">
+          <DxBadge tone={movementTone(m.movement_type)} dot>{m.movement_type.replace(/_/g, " ")}</DxBadge>
+          <div className="dx-mono text-[11px] text-[var(--dx-text-faint)]">MOV-{m.id}</div>
         </div>
-      </div>
+      ),
+    },
+    {
+      key: "stock_item_id",
+      header: "Item",
+      accessor: (m) => items.find((i) => i.id === m.stock_item_id)?.item_name ?? "",
+      render: (m) => {
+        const sItem = items.find((i) => i.id === m.stock_item_id);
+        return (
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-[var(--dx-text)]">{sItem?.item_name ?? itemName(m.stock_item_id)}</div>
+            {sItem?.sku ? (
+              <span className="inline-flex items-center gap-1 dx-mono text-[11px] text-[var(--dx-text-muted)]">
+                <Hash className="h-2.5 w-2.5" />
+                {sItem.sku}
+              </span>
+            ) : null}
+          </div>
+        );
+      },
+    },
+    {
+      key: "store_id",
+      header: "Store",
+      accessor: (m) => storeName(m.store_id),
+      render: (m) => (
+        <span className="inline-flex items-center gap-1.5 text-[var(--dx-text-muted)]">
+          <Package className="h-3 w-3" />
+          {storeName(m.store_id)}
+        </span>
+      ),
+    },
+    {
+      key: "quantity",
+      header: "Qty",
+      align: "right",
+      accessor: (m) => m.quantity,
+      render: (m) => {
+        const outbound = OUTBOUND.includes(m.movement_type);
+        return (
+          <span
+            className="dx-mono font-semibold"
+            style={{ color: outbound ? "var(--dx-danger)" : "var(--dx-success)" }}
+          >
+            {outbound ? "−" : "+"}{Math.abs(m.quantity)}
+          </span>
+        );
+      },
+    },
+    {
+      key: "balance_after",
+      header: "Balance",
+      align: "right",
+      accessor: (m) => m.balance_after,
+      render: (m) => <span className="dx-mono text-[var(--dx-text-muted)]">{m.balance_after ?? "—"}</span>,
+    },
+    {
+      key: "reference_no",
+      header: "Reference",
+      wrap: true,
+      render: (m) => (
+        <div className="space-y-0.5">
+          {m.reference_no ? <div className="dx-mono text-[12px] text-[var(--dx-text)]">{m.reference_no}</div> : null}
+          {m.note ? <div className="text-[12px] italic text-[var(--dx-text-muted)]">{m.note}</div> : null}
+          {!m.reference_no && !m.note ? <span className="text-[var(--dx-text-faint)]">—</span> : null}
+        </div>
+      ),
+    },
+    {
+      key: "movement_date",
+      header: "Date",
+      align: "right",
+      accessor: (m) => m.movement_date || m.created_at,
+      render: (m) => <span className="text-[var(--dx-text-muted)]">{formatDateTime(m.movement_date || m.created_at)}</span>,
+    },
+  ];
 
-      {feedback && (
-        <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
-              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-              : "bg-rose-50 text-rose-700 border-rose-100"
-            }`}
-        >
-          {feedback.tone === "success" ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-          <span className="text-sm font-bold">{feedback.message}</span>
-        </div>
-      )}
+  const storeItems = items.filter((i) =>
+    !recordForm.store_id ? false : i.store_id === Number(recordForm.store_id),
+  );
+
+  return (
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Inventory" }, { label: "Movements" }]}
+        title="Stock Movements"
+        subtitle="Every receipt, issue, adjustment and transfer — your complete inventory ledger."
+        actions={
+          <>
+            <Link to="/inventory/stores" className="dx-btn dx-btn-sm"><Package className="h-4 w-4" /> Stores</Link>
+            <Link to="/inventory/items" className="dx-btn dx-btn-sm"><Boxes className="h-4 w-4" /> Items</Link>
+            <DxButton icon title="Refresh" onClick={load} isLoading={isLoading}><RotateCcw /></DxButton>
+            <DxButton leftIcon={<ArrowLeftRight className="h-4 w-4" />} onClick={openTransfer}>Transfer</DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={openRecord}>Record movement</DxButton>
+          </>
+        }
+      />
+
+      {feedback ? (
+        <DxMessage tone={feedback.tone === "success" ? "success" : "danger"}>{feedback.message}</DxMessage>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-4">
-        <StatCard icon={History} label="Total Movements" value={stats.total} tone="primary" />
-        <StatCard icon={TrendingUp} label="Inbound" value={stats.inbound} tone="emerald" />
-        <StatCard icon={TrendingDown} label="Outbound" value={stats.outbound} tone="amber" />
-        <StatCard icon={Sliders} label="Adjustments" value={stats.adjustments} tone="rose" />
+        <DxKpi icon={History} label="Total Movements" value={stats.total} tone="accent" />
+        <DxKpi icon={TrendingUp} label="Inbound" value={stats.inbound} tone="success" />
+        <DxKpi icon={TrendingDown} label="Outbound" value={stats.outbound} tone="warning" />
+        <DxKpi icon={Sliders} label="Adjustments" value={stats.adjustments} tone="neutral" />
       </div>
 
-      {/* Filters */}
-      <div className="glass-card rounded-[2rem] p-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center bg-white/40 backdrop-blur-md">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-secondary-400" />
-          <input
-            type="text"
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        <div className="w-full flex-1">
+          <DxInput
+            leftIcon={<Search className="h-3.5 w-3.5" />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by reference, note, item, SKU..."
-            className="w-full bg-white/50 border-none rounded-2xl pl-14 pr-6 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
+            placeholder="Search by reference, note, item, SKU…"
           />
         </div>
-        <div className="relative">
-          <Package className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-          <select
+        <div className="w-full md:w-52">
+          <DxSelect
             value={storeFilter}
             onChange={(e) => setStoreFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
-          >
-            <option value="">All Stores</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            aria-label="Filter by store"
+            options={[{ value: "", label: "All Stores" }, ...stores.map((s) => ({ value: String(s.id), label: s.name }))]}
+          />
         </div>
-        <div className="relative">
-          <Filter className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-          <select
+        <div className="w-full md:w-48">
+          <DxSelect
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
-          >
-            <option value="">All Types</option>
-            {MOVEMENT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t.replace("_", " ")}
-              </option>
-            ))}
-          </select>
+            aria-label="Filter by type"
+            options={[{ value: "", label: "All Types" }, ...MOVEMENT_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, " ") }))]}
+          />
         </div>
       </div>
 
-      {/* Table */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-secondary-900/5">
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Type</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Item</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Store</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Qty</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Balance</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Reference</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500 text-right">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-secondary-100/50">
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="animate-pulse">
-                    <td colSpan={7} className="px-8 py-6">
-                      <div className="h-14 bg-secondary-100/30 rounded-2xl" />
-                    </td>
-                  </tr>
-                ))
-              ) : error ? (
-                <tr>
-                  <td colSpan={7} className="px-8 py-20 text-center">
-                    <AlertCircle className="h-12 w-12 mx-auto text-rose-500/50 mb-4" />
-                    <p className="text-secondary-600 font-bold">{error}</p>
-                    <button onClick={load} className="btn-primary mt-4 py-3 px-8">
-                      Try Again
-                    </button>
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-8 py-32 text-center">
-                    <div className="h-20 w-20 bg-secondary-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
-                      <History className="h-10 w-10 text-secondary-200" />
-                    </div>
-                    <h4 className="text-xl font-bold text-secondary-900">No Movements</h4>
-                    <p className="text-sm text-secondary-500 mt-2">
-                      {movements.length === 0
-                        ? "Record the first stock movement to start the ledger."
-                        : "No movements match your filters."}
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((m) => {
-                  const Icon = movementIcon[m.movement_type] ?? History;
-                  const cls = movementToneStyles[m.movement_type] ?? movementToneStyles.ADJUSTMENT;
-                  const sItem = items.find((i) => i.id === m.stock_item_id);
-                  return (
-                    <tr key={m.id} className="hover:bg-primary-50/30 transition-all">
-                      <td className="px-8 py-6">
-                        <span
-                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${cls}`}
-                        >
-                          <Icon className="h-3 w-3" />
-                          {m.movement_type.replace("_", " ")}
-                        </span>
-                        <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase tracking-widest mt-1.5">
-                          MOV-{m.id}
-                        </p>
-                      </td>
-                      <td className="px-8 py-6">
-                        <p className="text-sm font-bold text-secondary-900 truncate max-w-xs">
-                          {sItem?.item_name ?? itemName(m.stock_item_id)}
-                        </p>
-                        {sItem?.sku && (
-                          <span className="inline-flex items-center gap-1 mt-1 bg-secondary-100 text-secondary-500 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold">
-                            <Hash className="h-2.5 w-2.5" />
-                            {sItem.sku}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-8 py-6">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-secondary-100 text-secondary-600 text-[10px] font-bold uppercase tracking-widest">
-                          <Package className="h-3 w-3" />
-                          {storeName(m.store_id)}
-                        </span>
-                      </td>
-                      <td className="px-8 py-6">
-                        <p className="text-base font-black text-secondary-900 font-mono">
-                          {["ISSUE", "TRANSFER_OUT", "WASTAGE"].includes(m.movement_type) ? "−" : "+"}
-                          {Math.abs(m.quantity)}
-                        </p>
-                      </td>
-                      <td className="px-8 py-6">
-                        <p className="text-sm font-bold text-secondary-700 font-mono">
-                          {m.balance_after ?? "—"}
-                        </p>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="space-y-1">
-                          {m.reference_no && (
-                            <p className="text-[11px] font-mono font-bold text-secondary-700">
-                              {m.reference_no}
-                            </p>
-                          )}
-                          {m.note && (
-                            <p className="text-[11px] text-secondary-500 italic max-w-xs truncate">
-                              {m.note}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-8 py-6 text-right">
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-secondary-500">
-                          <Clock className="h-3 w-3" />
-                          {formatDateTime(m.movement_date || m.created_at)}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Record Movement Modal */}
-      {recordOpen && (
-        <ModalShell
-          title="Record Stock Movement"
-          subtitle="Log A Receipt, Issue, Adjustment Or Wastage"
-          onClose={() => !recordSaving && setRecordOpen(false)}
-          icon={Plus}
-        >
-          {recordError && (
-            <div className="mb-5 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-              <AlertCircle className="h-5 w-5" />
-              <span className="text-sm font-bold">{recordError}</span>
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                Movement Type *
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {MOVEMENT_TYPES.map((t) => {
-                  const Icon = movementIcon[t] ?? Sliders;
-                  const isActive = recordForm.movement_type === t;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setRecordForm({ ...recordForm, movement_type: t })}
-                      className={`flex flex-col items-center gap-1 px-3 py-3 rounded-xl border-2 transition-all ${isActive
-                          ? "bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/20"
-                          : "bg-white border-secondary-400 text-secondary-500 hover:border-primary-300"
-                        }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span className="text-[9px] font-bold uppercase tracking-widest">
-                        {t.replace("_", " ")}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                Store *
-              </label>
-              <select
-                value={recordForm.store_id}
-                onChange={(e) =>
-                  setRecordForm({ ...recordForm, store_id: e.target.value, stock_item_id: "" })
-                }
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-              >
-                <option value="">Pick a store...</option>
-                {stores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                Stock Item *
-              </label>
-              <select
-                value={recordForm.stock_item_id}
-                onChange={(e) =>
-                  setRecordForm({ ...recordForm, stock_item_id: e.target.value })
-                }
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-                disabled={!recordForm.store_id}
-              >
-                <option value="">Pick an item...</option>
-                {items
-                  .filter((i) =>
-                    !recordForm.store_id ? false : i.store_id === Number(recordForm.store_id),
-                  )
-                  .map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.item_name} (qty {i.quantity_on_hand})
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-1">
-                <Sigma className="h-3 w-3" /> Quantity *
-              </label>
-              <input
-                type="number"
-                step="any"
-                value={recordForm.quantity}
-                onChange={(e) => setRecordForm({ ...recordForm, quantity: e.target.value })}
-                placeholder="50"
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                Reference No.
-              </label>
-              <input
-                type="text"
-                value={recordForm.reference_no}
-                onChange={(e) =>
-                  setRecordForm({ ...recordForm, reference_no: e.target.value })
-                }
-                placeholder="GRN-2026-04-001"
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                Performed By
-              </label>
-              <select
-                value={recordForm.performed_by_staff_id ?? ""}
-                onChange={(e) =>
-                  setRecordForm({
-                    ...recordForm,
-                    performed_by_staff_id: e.target.value ? Number(e.target.value) : null,
-                  })
-                }
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-              >
-                <option value="">Anonymous (system)</option>
-                {staffList.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {staffDisplayName(s)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-1">
-                <FileText className="h-3 w-3" /> Note
-              </label>
-              <textarea
-                value={recordForm.note}
-                onChange={(e) => setRecordForm({ ...recordForm, note: e.target.value })}
-                placeholder="Why this movement is being recorded..."
-                className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-              />
-            </div>
-          </div>
-
-          <div className="pt-6 flex gap-4">
-            <button
-              onClick={() => setRecordOpen(false)}
-              disabled={recordSaving}
-              className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleRecord}
-              disabled={recordSaving}
-              className="flex-[2] btn-primary py-4 rounded-2xl font-black tracking-tight shadow-xl shadow-primary-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              {recordSaving ? "Recording..." : "Record Movement"}
-            </button>
-          </div>
-        </ModalShell>
+      {error ? (
+        <DxMessage tone="danger" action={<DxButton size="sm" onClick={load}>Retry</DxButton>}>{error}</DxMessage>
+      ) : (
+        <DxPanel flush>
+          <DxGrid<StockMovement>
+            columns={columns}
+            data={filtered}
+            rowKey={(m) => m.id}
+            isLoading={isLoading}
+            empty={{
+              icon: History,
+              title: "No Movements",
+              description: movements.length === 0 ? "Record the first stock movement to start the ledger." : "No movements match your filters.",
+              action: <DxButton size="sm" variant="primary" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={openRecord}>Record movement</DxButton>,
+            }}
+          />
+        </DxPanel>
       )}
 
-      {/* Transfer Modal */}
-      {transferOpen && (
-        <ModalShell
-          title="Transfer Stock"
-          subtitle="Move A Batch Between Stores"
-          onClose={() => !transferSaving && setTransferOpen(false)}
-          icon={ArrowLeftRight}
-          tone="amber"
-        >
-          {transferError && (
-            <div className="mb-5 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-              <AlertCircle className="h-5 w-5" />
-              <span className="text-sm font-bold">{transferError}</span>
-            </div>
-          )}
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-1">
-                <ArrowUpFromLine className="h-3 w-3" /> Source Stock Item *
-              </label>
-              <select
-                value={transferForm.from_stock_item_id}
-                onChange={(e) =>
-                  setTransferForm({ ...transferForm, from_stock_item_id: e.target.value })
-                }
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-              >
-                <option value="">Pick the source item...</option>
-                {items.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.item_name} · {storeName(i.store_id)} (qty {i.quantity_on_hand})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-1">
-                <ArrowDownToLine className="h-3 w-3" /> Destination Store *
-              </label>
-              <select
-                value={transferForm.to_store_id}
-                onChange={(e) =>
-                  setTransferForm({ ...transferForm, to_store_id: e.target.value })
-                }
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-              >
-                <option value="">Pick the destination...</option>
-                {stores
-                  .filter((s) => {
-                    const from = items.find(
-                      (i) => i.id === Number(transferForm.from_stock_item_id),
-                    );
-                    return !from || s.id !== from.store_id;
-                  })
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-1">
-                <Sigma className="h-3 w-3" /> Quantity *
-              </label>
-              <input
-                type="number"
-                step="any"
-                value={transferForm.quantity}
-                onChange={(e) =>
-                  setTransferForm({ ...transferForm, quantity: e.target.value })
-                }
-                placeholder="20"
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                Performed By
-              </label>
-              <select
-                value={transferForm.performed_by_staff_id ?? ""}
-                onChange={(e) =>
-                  setTransferForm({
-                    ...transferForm,
-                    performed_by_staff_id: e.target.value ? Number(e.target.value) : null,
-                  })
-                }
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-              >
-                <option value="">Anonymous (system)</option>
-                {staffList.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {staffDisplayName(s)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-1">
-                <Truck className="h-3 w-3" /> Note
-              </label>
-              <textarea
-                value={transferForm.note}
-                onChange={(e) => setTransferForm({ ...transferForm, note: e.target.value })}
-                placeholder="Reason for transfer, vehicle/courier details..."
-                className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-              />
-            </div>
-          </div>
-
-          <div className="pt-6 flex gap-4">
-            <button
-              onClick={() => setTransferOpen(false)}
-              disabled={transferSaving}
-              className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleTransfer}
-              disabled={transferSaving}
-              className="flex-[2] py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black tracking-tight shadow-xl shadow-amber-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
-            >
-              <ArrowLeftRight className="h-4 w-4" />
-              {transferSaving ? "Transferring..." : "Transfer Stock"}
-            </button>
-          </div>
-        </ModalShell>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// Helpers
-// ============================================================
-
-type StatTone = "primary" | "emerald" | "amber" | "rose";
-const statToneStyles: Record<StatTone, string> = {
-  primary: "bg-primary-50 text-primary-600 border-primary-100",
-  emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  amber: "bg-amber-50 text-amber-600 border-amber-100",
-  rose: "bg-rose-50 text-rose-600 border-rose-100",
-};
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: typeof History;
-  label: string;
-  value: number;
-  tone: StatTone;
-}) {
-  return (
-    <div className={`glass-card rounded-[2rem] p-6 border ${statToneStyles[tone]} bg-white/60 backdrop-blur-md`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">{label}</span>
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="text-3xl font-black tracking-tight">{value}</div>
-    </div>
-  );
-}
-
-function ModalShell({
-  title,
-  subtitle,
-  onClose,
-  children,
-  icon: Icon,
-  tone = "primary",
-}: {
-  title: string;
-  subtitle: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  icon: typeof Plus;
-  tone?: "primary" | "amber";
-}) {
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] p-10 max-w-2xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"
-        >
-          <X className="h-5 w-5 text-secondary-400" />
-        </button>
-        <div className="flex items-center gap-5 mb-8">
-          <div
-            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${tone === "amber" ? "bg-amber-500 shadow-amber-500/20" : "bg-primary-600 shadow-primary-500/20"
-              }`}
-          >
-            <Icon className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-black font-display tracking-tight">{title}</h3>
-            <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-              {subtitle}
-            </p>
+      {/* Record Movement */}
+      <DxPopup
+        isOpen={recordOpen}
+        onClose={() => !recordSaving && setRecordOpen(false)}
+        title="Record Stock Movement"
+        size="lg"
+        locked={recordSaving}
+        footer={
+          <>
+            <DxButton onClick={() => setRecordOpen(false)} disabled={recordSaving}>Cancel</DxButton>
+            <DxButton variant="primary" onClick={handleRecord} isLoading={recordSaving} leftIcon={<Plus className="h-4 w-4" />}>Record movement</DxButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {recordError ? <DxMessage tone="danger">{recordError}</DxMessage> : null}
+          <div className="grid gap-4 md:grid-cols-2">
+            <DxSelect
+              label="Movement type"
+              required
+              fieldClassName="md:col-span-2"
+              value={recordForm.movement_type}
+              onChange={(e) => setRecordForm({ ...recordForm, movement_type: e.target.value })}
+              options={MOVEMENT_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, " ") }))}
+            />
+            <DxSelect
+              label="Store"
+              required
+              value={recordForm.store_id}
+              onChange={(e) => setRecordForm({ ...recordForm, store_id: e.target.value, stock_item_id: "" })}
+              placeholder="Pick a store…"
+              options={stores.map((s) => ({ value: String(s.id), label: s.name }))}
+            />
+            <DxSelect
+              label="Stock item"
+              required
+              value={recordForm.stock_item_id}
+              onChange={(e) => setRecordForm({ ...recordForm, stock_item_id: e.target.value })}
+              disabled={!recordForm.store_id}
+              placeholder={recordForm.store_id ? "Pick an item…" : "Pick a store first"}
+              options={storeItems.map((i) => ({ value: String(i.id), label: `${i.item_name} (qty ${i.quantity_on_hand})` }))}
+            />
+            <DxInput
+              label="Quantity"
+              required
+              type="number"
+              step="any"
+              mono
+              value={recordForm.quantity}
+              onChange={(e) => setRecordForm({ ...recordForm, quantity: e.target.value })}
+              placeholder="50"
+            />
+            <DxInput
+              label="Reference no."
+              mono
+              value={recordForm.reference_no}
+              onChange={(e) => setRecordForm({ ...recordForm, reference_no: e.target.value })}
+              placeholder="GRN-2026-04-001"
+            />
+            <DxSelect
+              label="Performed by"
+              fieldClassName="md:col-span-2"
+              value={recordForm.performed_by_staff_id ?? ""}
+              onChange={(e) => setRecordForm({ ...recordForm, performed_by_staff_id: e.target.value ? Number(e.target.value) : null })}
+              options={[{ value: "", label: "Anonymous (system)" }, ...staffList.map((s) => ({ value: String(s.id), label: staffDisplayName(s) }))]}
+            />
+            <DxTextarea
+              label="Note"
+              fieldClassName="md:col-span-2"
+              rows={3}
+              value={recordForm.note}
+              onChange={(e) => setRecordForm({ ...recordForm, note: e.target.value })}
+              placeholder="Why this movement is being recorded…"
+            />
           </div>
         </div>
-        {children}
-      </div>
-    </div>
+      </DxPopup>
+
+      {/* Transfer */}
+      <DxPopup
+        isOpen={transferOpen}
+        onClose={() => !transferSaving && setTransferOpen(false)}
+        title="Transfer Stock"
+        size="md"
+        locked={transferSaving}
+        footer={
+          <>
+            <DxButton onClick={() => setTransferOpen(false)} disabled={transferSaving}>Cancel</DxButton>
+            <DxButton variant="primary" onClick={handleTransfer} isLoading={transferSaving} leftIcon={<ArrowLeftRight className="h-4 w-4" />}>Transfer stock</DxButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {transferError ? <DxMessage tone="danger">{transferError}</DxMessage> : null}
+          <DxMessage tone="info">Move a batch from its current store to another. A transfer-out and a matching transfer-in are both recorded.</DxMessage>
+          <DxSelect
+            label="Source stock item"
+            required
+            value={transferForm.from_stock_item_id}
+            onChange={(e) => setTransferForm({ ...transferForm, from_stock_item_id: e.target.value })}
+            placeholder="Pick the source item…"
+            options={items.map((i) => ({ value: String(i.id), label: `${i.item_name} · ${storeName(i.store_id)} (qty ${i.quantity_on_hand})` }))}
+          />
+          <DxSelect
+            label="Destination store"
+            required
+            value={transferForm.to_store_id}
+            onChange={(e) => setTransferForm({ ...transferForm, to_store_id: e.target.value })}
+            placeholder="Pick the destination…"
+            options={stores
+              .filter((s) => {
+                const from = items.find((i) => i.id === Number(transferForm.from_stock_item_id));
+                return !from || s.id !== from.store_id;
+              })
+              .map((s) => ({ value: String(s.id), label: `${s.name} (${s.code})` }))}
+          />
+          <DxInput
+            label="Quantity"
+            required
+            type="number"
+            step="any"
+            mono
+            value={transferForm.quantity}
+            onChange={(e) => setTransferForm({ ...transferForm, quantity: e.target.value })}
+            placeholder="20"
+          />
+          <DxSelect
+            label="Performed by"
+            value={transferForm.performed_by_staff_id ?? ""}
+            onChange={(e) => setTransferForm({ ...transferForm, performed_by_staff_id: e.target.value ? Number(e.target.value) : null })}
+            options={[{ value: "", label: "Anonymous (system)" }, ...staffList.map((s) => ({ value: String(s.id), label: staffDisplayName(s) }))]}
+          />
+          <DxTextarea
+            label="Note"
+            rows={3}
+            value={transferForm.note}
+            onChange={(e) => setTransferForm({ ...transferForm, note: e.target.value })}
+            placeholder="Reason for transfer, vehicle/courier details…"
+          />
+        </div>
+      </DxPopup>
+    </DxPage>
   );
 }

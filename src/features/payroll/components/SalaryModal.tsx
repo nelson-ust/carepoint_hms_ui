@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Button } from "@/components/ui/Button";
+import { DxPopup, DxButton, DxInput, DxSelect } from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { useSetStaffSalary } from "../hooks/use-payroll";
 import type {
@@ -144,10 +141,10 @@ export function SalaryModal({ isOpen, onClose, onSaved, staff, grades, steps, al
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-bold uppercase tracking-widest text-secondary-500">{title}</p>
-          <Button size="sm" variant="ghost" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setList([...rows, { label: "", amount: "" }])}>
+          <p className="dx-field-label">{title}</p>
+          <DxButton size="sm" variant="accent-text" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setList([...rows, { label: "", amount: "" }])}>
             Add
-          </Button>
+          </DxButton>
         </div>
         <datalist id={listId}>
           {suggestions.map((s) => (
@@ -155,7 +152,7 @@ export function SalaryModal({ isOpen, onClose, onSaved, staff, grades, steps, al
           ))}
         </datalist>
         {rows.length === 0 ? (
-          <p className="text-xs text-secondary-400">None.</p>
+          <p className="text-[12px] text-[var(--dx-text-muted)]">None.</p>
         ) : (
           rows.map((r, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -164,18 +161,18 @@ export function SalaryModal({ isOpen, onClose, onSaved, staff, grades, steps, al
                 value={r.label}
                 onChange={(e) => setRow(rows, setList, i, "label", e.target.value)}
                 placeholder="Label"
-                className="input-field flex-1"
+                className="dx-editor flex-1"
               />
               <input
                 type="number"
                 value={r.amount}
                 onChange={(e) => setRow(rows, setList, i, "amount", e.target.value)}
                 placeholder="Amount"
-                className="input-field w-32"
+                className="dx-editor w-32"
               />
-              <button type="button" onClick={() => setList(rows.filter((_, x) => x !== i))} className="p-2 rounded-xl hover:bg-rose-50">
-                <Trash2 className="h-4 w-4 text-rose-400" />
-              </button>
+              <DxButton icon size="sm" variant="outline-danger" title="Remove" onClick={() => setList(rows.filter((_, x) => x !== i))}>
+                <Trash2 />
+              </DxButton>
             </div>
           ))
         )}
@@ -184,37 +181,38 @@ export function SalaryModal({ isOpen, onClose, onSaved, staff, grades, steps, al
   }
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={onClose}
       title={staff ? `Salary — ${staff.staff_name || staff.staff_no || "Staff"}` : "Salary"}
       size="lg"
+      locked={save.isPending}
       footer={
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose} disabled={save.isPending}>Cancel</Button>
-          <Button onClick={handleSave} isLoading={save.isPending}>Save salary</Button>
-        </div>
+        <>
+          <DxButton onClick={onClose} disabled={save.isPending}>Cancel</DxButton>
+          <DxButton variant="primary" onClick={handleSave} isLoading={save.isPending}>Save salary</DxButton>
+        </>
       }
     >
       <div className="space-y-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <DxSelect
             label="Grade (optional)"
             value={gradeId}
             onChange={(e) => { setGradeId(e.target.value); setStepId(""); }}
             options={[{ value: "", label: "— None —" }, ...grades.map((g) => ({ value: String(g.id), label: `${g.name} (${g.code})` }))]}
           />
-          <Select
+          <DxSelect
             label="Step (optional)"
             value={stepId}
             onChange={(e) => onPickStep(e.target.value)}
             disabled={!gradeId}
             options={[{ value: "", label: gradeId ? "— None —" : "Pick a grade first" }, ...stepsForGrade.map((s) => ({ value: String(s.id), label: `${s.code} · ${s.base_amount.toLocaleString()}` }))]}
           />
-          <Input label="Base salary (monthly)" type="number" min="0" value={baseAmount} onChange={(e) => setBaseAmount(e.target.value)} />
-          <Input label="Currency" value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} />
-          <Input label="Effective from" type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
-          <Input label="Annual rent (optional)" type="number" min={0} step="0.01" value={annualRent}
+          <DxInput label="Base salary (monthly)" type="number" min="0" value={baseAmount} onChange={(e) => setBaseAmount(e.target.value)} />
+          <DxInput label="Currency" value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} />
+          <DxInput label="Effective from" type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
+          <DxInput label="Annual rent (optional)" type="number" min={0} step="0.01" value={annualRent}
             onChange={(e) => setAnnualRent(e.target.value)}
             hint="Drives the rent relief in PAYE (20% of rent, capped at ₦500,000) under the 2025 Tax Act." />
         </div>
@@ -222,10 +220,10 @@ export function SalaryModal({ isOpen, onClose, onSaved, staff, grades, steps, al
         <RowEditor title="Allowances" rows={allowances} setList={setAllowances} suggestions={allowanceTypes} />
         <RowEditor title="Deductions (non-statutory)" rows={deductions} setList={setDeductions} suggestions={deductionTypes} />
 
-        <p className="text-[11px] text-secondary-400">
+        <p className="text-[11px] text-[var(--dx-text-muted)]">
           Statutory deductions (PAYE per the Nigeria Tax Act 2025, pension, NHF) are computed automatically at payroll run time. NHIS and life-insurance deductions added here are treated as tax reliefs.
         </p>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

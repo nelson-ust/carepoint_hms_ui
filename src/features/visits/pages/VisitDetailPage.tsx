@@ -59,7 +59,7 @@ import { DiagnosesPanel } from "@/features/diagnoses/components/DiagnosesPanel";
 import { BookCaseModal } from "@/features/surgery/components/BookCaseModal";
 import { getVitalSignsForVisit, recordVitalSign } from "@/features/vital-signs/api/vital-signs.api";
 import type { VitalSign } from "@/features/vital-signs/api/vital-signs.api";
-import { advanceVisit, deleteVisit, getServiceDeliveryPoints, getVisitDetails, updateVisit } from "../api/visits.api";
+import { advanceVisit, deleteVisit, disposeVisit, getServiceDeliveryPoints, getVisitDetails, updateVisit } from "../api/visits.api";
 import type { QueueTicket, Visit } from "../api/visits.api";
 import type { VisitStep } from "../api/visit-flows.api";
 import { VisitActivityTimeline } from "../components/VisitActivityTimeline";
@@ -153,6 +153,8 @@ export function VisitDetailPage() {
   const [isBookSurgeryOpen, setBookSurgeryOpen] = useState(false);
   const [isDeathOpen, setDeathOpen] = useState(false);
   const [deathForm, setDeathForm] = useState({ date_of_death: "", cause_of_death: "", place_of_death: "Hospital", notes: "", deposit: false, mortuary_unit_id: "" });
+  const [isDisposeOpen, setDisposeOpen] = useState(false);
+  const [disposeForm, setDisposeForm] = useState<{ disposition: string; target_service_delivery_point_id: string; note: string }>({ disposition: "DISCHARGED", target_service_delivery_point_id: "", note: "" });
 
   // ---------- Queries ----------
   const visitQuery = useQuery({
@@ -239,6 +241,30 @@ export function VisitDetailPage() {
       );
     },
     onError: (err) => toast.error("Could not advance the visit", apiErrorMessage(err)),
+  });
+
+  const disposeMutation = useMutation({
+    mutationFn: () =>
+      disposeVisit(id, {
+        disposition: disposeForm.disposition as "DISCHARGED" | "FOLLOW_UP" | "REFERRED" | "ADMITTED",
+        target_service_delivery_point_id: disposeForm.target_service_delivery_point_id
+          ? Number(disposeForm.target_service_delivery_point_id)
+          : undefined,
+        note: disposeForm.note || undefined,
+      }),
+    onSuccess: (res) => {
+      setDisposeOpen(false);
+      toast.success("Disposition applied", res.message);
+      const closed = res.disposition === "DISCHARGED" || res.disposition === "FOLLOW_UP";
+      if (closed) {
+        qc.invalidateQueries({ queryKey: ["visits"] });
+        navigate(routes.visits);
+      } else {
+        refreshVisit();
+        refetchAll();
+      }
+    },
+    onError: (err) => toast.error("Could not apply disposition", apiErrorMessage(err)),
   });
 
   const deleteMutation = useMutation({
@@ -392,7 +418,7 @@ export function VisitDetailPage() {
   const completed = String(visit.status).toUpperCase() === "COMPLETED";
   const deceased = String(visit.status).toUpperCase() === "DECEASED";
   const currentSdp = visit.current_service_delivery_point ?? visit.first_service_delivery_point;
-  const workstation = workstationPathFor(currentSdp?.service_point_type, visit.id);
+  const workstation = workstationPathFor(currentSdp?.service_point_type, visit.id, currentSdp?.code ?? currentSdp?.name);
   const code = visit.visit_code || `#${visit.id}`;
   const busy = advanceMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
@@ -558,9 +584,14 @@ export function VisitDetailPage() {
               </DxButton>
             ) : null}
             {!completed && !deceased ? (
-              <DxButton variant="outline-danger" leftIcon={<LogOut />} onClick={() => setPending("end")} disabled={busy}>
-                End visit
-              </DxButton>
+              <>
+                <DxButton variant="primary" leftIcon={<ClipboardList />} onClick={() => setDisposeOpen(true)} disabled={busy} title="Discharge, admit, refer to a specialist, or set a follow-up">
+                  Disposition
+                </DxButton>
+                <DxButton variant="outline-danger" leftIcon={<LogOut />} onClick={() => setPending("end")} disabled={busy}>
+                  End visit
+                </DxButton>
+              </>
             ) : null}
             <DxButton variant="text" icon title="Delete visit" className="text-[var(--dx-danger)]" onClick={() => setPending("delete")} disabled={busy}>
               <Trash2 />
@@ -736,6 +767,60 @@ export function VisitDetailPage() {
         confirmLabel={pending ? confirmCopy[pending].label : "Confirm"}
         tone={pending ? confirmCopy[pending].tone : "primary"}
       />
+
+      <DxPopup
+        isOpen={isDisposeOpen}
+        onClose={() => setDisposeOpen(false)}
+        title="Visit disposition"
+        locked={disposeMutation.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setDisposeOpen(false)} disabled={disposeMutation.isPending}>Cancel</DxButton>
+            <DxButton
+              variant="primary"
+              leftIcon={<ClipboardList />}
+              isLoading={disposeMutation.isPending}
+              disabled={disposeForm.disposition === "REFERRED" && !disposeForm.target_service_delivery_point_id}
+              onClick={() => disposeMutation.mutate()}
+            >
+              Apply disposition
+            </DxButton>
+          </>
+        }
+      >
+        <DxMessage tone="info" className="mb-3">
+          Close this encounter. <b>Discharge</b> and <b>follow-up</b> check the patient out; <b>refer</b> routes them to a specialist clinic; <b>admit</b> is allowed only after a doctor's admission recommendation or an emergency visit (bed allocation is completed in the Admissions module).
+        </DxMessage>
+        <DxForm cols={1}>
+          <DxSelect
+            label="Disposition"
+            value={disposeForm.disposition}
+            onChange={(e) => setDisposeForm((f) => ({ ...f, disposition: e.target.value, target_service_delivery_point_id: "" }))}
+            options={[
+              { value: "DISCHARGED", label: "Discharge (checkout)" },
+              { value: "FOLLOW_UP", label: "Discharge with follow-up review" },
+              { value: "REFERRED", label: "Refer to specialist clinic" },
+              { value: "ADMITTED", label: "Admit to ward" },
+            ]}
+          />
+          {disposeForm.disposition === "REFERRED" || disposeForm.disposition === "ADMITTED" ? (
+            <DxSelect
+              label={disposeForm.disposition === "REFERRED" ? "Specialist clinic" : "Ward (optional)"}
+              required={disposeForm.disposition === "REFERRED"}
+              placeholder="Select service point…"
+              value={disposeForm.target_service_delivery_point_id}
+              onChange={(e) => setDisposeForm((f) => ({ ...f, target_service_delivery_point_id: e.target.value }))}
+              options={(sdpQuery.data ?? [])
+                .filter((s) => {
+                  const t = String(s.service_point_type).toUpperCase();
+                  return disposeForm.disposition === "REFERRED" ? t === "CLINIC" : t === "WARD";
+                })
+                .map((s) => ({ value: String(s.id), label: `${s.name} (${s.code})` }))}
+            />
+          ) : null}
+          <DxTextarea label="Note" rows={2} value={disposeForm.note} onChange={(e) => setDisposeForm((f) => ({ ...f, note: e.target.value }))} placeholder="Optional — reason / instructions" />
+        </DxForm>
+      </DxPopup>
 
       <DxPopup
         isOpen={isDeathOpen}

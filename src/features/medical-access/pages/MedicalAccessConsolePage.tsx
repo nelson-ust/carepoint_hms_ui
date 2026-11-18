@@ -1,17 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Plus, RefreshCw, ShieldCheck, Check, X, Ban, FileText, Eye, Clock, ScrollText,
+  Plus, RotateCcw, ShieldCheck, Check, X, Ban, FileText, Eye, Clock, ScrollText,
+  Inbox, Send, CircleCheck, FileCheck,
 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
-import { Skeleton } from "@/components/ui/Skeleton";
+import {
+  DxPage, DxPageHeader, DxSegmented, DxGrid, DxKpi, DxBadge, DxButton, DxPopup,
+  DxInput, DxSelect, DxTextarea, DxCheckbox, DxMessage,
+  type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { medicalAccessApi, type AccessRequest, type AuditEvent, type MedicalRecord } from "../api/medicalAccess.api";
 import { RecordView } from "./RecordView";
@@ -23,13 +20,15 @@ function fmt(v?: string | null) {
     { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function statusVariant(s: string): any {
-  return s === "APPROVED" ? "success" : s === "PENDING" ? "warning"
-    : s === "FULFILLED" ? "info" : "destructive";
-}
-function decisionVariant(s: string): any {
-  return s === "APPROVED" ? "soft-success" : s === "DECLINED" ? "soft-danger" : "soft-warning";
-}
+const statusTone: Record<string, DxBadgeTone> = {
+  APPROVED: "success", PENDING: "warning", FULFILLED: "info",
+  DECLINED: "danger", EXPIRED: "neutral", CANCELLED: "neutral",
+};
+const decisionTone: Record<string, DxBadgeTone> = {
+  APPROVED: "success", DECLINED: "danger", PENDING: "warning",
+};
+
+const muted = "text-[var(--dx-text-muted)]";
 
 export function MedicalAccessConsolePage() {
   const toast = useToast();
@@ -67,132 +66,170 @@ export function MedicalAccessConsolePage() {
     onError: (e: any) => toast.error("Couldn't open records", medicalAccessApi.errMsg(e, "")),
   });
 
-  const items = list.data ?? [];
+  const items = useMemo(() => list.data ?? [], [list.data]);
+  const counts = useMemo(() => ({
+    total: items.length,
+    pending: items.filter((r) => r.status === "PENDING").length,
+    approved: items.filter((r) => r.status === "APPROVED").length,
+    fulfilled: items.filter((r) => r.status === "FULFILLED").length,
+  }), [items]);
+
+  const columns: DxGridColumn<AccessRequest>[] = [
+    {
+      key: "patient", header: "Patient / request",
+      render: (r) => (
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-semibold text-[var(--dx-text)]">{r.patient_display_name || r.patient_global_id}</div>
+          <div className="dx-mono text-[11px] text-[var(--dx-text-muted)]">{r.request_no}</div>
+          {r.reason ? <div className={`mt-0.5 max-w-[18rem] truncate text-[11.5px] italic ${muted}`}>“{r.reason}”</div> : null}
+        </div>
+      ),
+    },
+    { key: "status", header: "Status", align: "center", render: (r) => <DxBadge tone={statusTone[r.status] ?? "neutral"}>{r.status}</DxBadge> },
+    { key: "scope", header: "Scope", align: "center", render: (r) => <DxBadge tone="neutral">{r.scope.replace(/_/g, " ")}</DxBadge> },
+    {
+      key: "requester", header: tab === "incoming" ? "Requested by" : "Requested from",
+      render: (r) => (
+        <div className="min-w-0">
+          <div className="truncate text-[13px] text-[var(--dx-text)]">{r.requester_name}{r.requester_type === "DEVELOPER" ? " (developer)" : ""}</div>
+          <div className={`text-[11px] ${muted}`}>{fmt(r.requested_at)}</div>
+        </div>
+      ),
+    },
+    {
+      key: "consent", header: "Consent & link",
+      render: (r) => (
+        <div className="flex flex-wrap gap-1.5">
+          {r.requires_patient_approval ? <DxBadge tone={decisionTone[r.patient_decision] ?? "neutral"}>Patient: {r.patient_decision}</DxBadge> : null}
+          {r.requires_hospital_approval ? <DxBadge tone={decisionTone[r.hospital_decision] ?? "neutral"}>Hospital: {r.hospital_decision}</DxBadge> : null}
+          {r.status === "APPROVED" && r.link_expires_at ? <DxBadge tone="info"><Clock className="mr-1 inline h-3 w-3" />Expires {fmt(r.link_expires_at)}</DxBadge> : null}
+          {r.link_used_at ? <DxBadge tone="neutral">Link used</DxBadge> : null}
+          {r.decline_reason ? <span className="w-full text-[11px] text-[var(--dx-danger)]">Decline: {r.decline_reason}</span> : null}
+        </div>
+      ),
+    },
+    {
+      key: "actions", header: "", align: "right",
+      render: (r) => (
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {tab === "incoming" && r.status === "PENDING" && r.hospital_decision === "PENDING" ? (
+            <>
+              <DxButton size="sm" variant="primary" leftIcon={<Check className="h-3.5 w-3.5" />} onClick={() => { setReason(""); setDecideFor({ req: r, approve: true }); }}>Approve</DxButton>
+              <DxButton size="sm" variant="danger" leftIcon={<X className="h-3.5 w-3.5" />} onClick={() => { setReason(""); setDecideFor({ req: r, approve: false }); }}>Decline</DxButton>
+            </>
+          ) : null}
+          {tab === "outgoing" && r.status === "APPROVED" && !r.link_used_at ? (
+            <DxButton size="sm" variant="primary" leftIcon={<Eye className="h-3.5 w-3.5" />} isLoading={open.isPending} onClick={() => open.mutate(r)}>Open records</DxButton>
+          ) : null}
+          {tab === "outgoing" && (r.status === "PENDING" || r.status === "APPROVED") ? (
+            <DxButton size="sm" variant="outline-danger" leftIcon={<Ban className="h-3.5 w-3.5" />} onClick={() => cancel.mutate(r.id)}>Cancel</DxButton>
+          ) : null}
+          <DxButton size="sm" leftIcon={<ScrollText className="h-3.5 w-3.5" />} onClick={() => setAuditFor(r)}>Audit</DxButton>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader title="Medical Record Sharing" description="Request and authorize consent-gated access to patients' medical histories, with secure one-time links." />
-        <div className="flex gap-3">
-          <button onClick={() => list.refetch()} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400" title="Refresh">
-            <RefreshCw className={`h-4 w-4 ${list.isFetching ? "animate-spin" : ""}`} />
-          </button>
-          <Button leftIcon={<Plus className="h-5 w-5" />} onClick={() => setSubmitOpen(true)}>New request</Button>
-        </div>
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Medical access" }]}
+        title="Medical Record Sharing"
+        subtitle="Request and authorize consent-gated access to patients' medical histories, with secure one-time links."
+        actions={
+          <>
+            <DxButton icon title="Refresh" onClick={() => list.refetch()} isLoading={list.isFetching}><RotateCcw /></DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setSubmitOpen(true)}>New request</DxButton>
+          </>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <DxKpi label={tab === "incoming" ? "Incoming" : "Outgoing"} value={counts.total} icon={tab === "incoming" ? Inbox : Send} tone="accent" sub="requests in view" />
+        <DxKpi label="Pending" value={counts.pending} icon={Clock} tone={counts.pending > 0 ? "warning" : "neutral"} sub="awaiting a decision" />
+        <DxKpi label="Approved" value={counts.approved} icon={CircleCheck} tone="success" sub="link issued or ready" />
+        <DxKpi label="Fulfilled" value={counts.fulfilled} icon={FileCheck} tone="info" sub="records retrieved" />
       </div>
 
-      <div className="flex gap-2">
-        {(["incoming", "outgoing"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold ${tab === t ? "bg-primary-600 text-white" : "bg-secondary-100 text-secondary-600"}`}>
-            {t === "incoming" ? "Incoming (as primary hospital)" : "Outgoing (our requests)"}
-          </button>
-        ))}
-      </div>
+      <DxSegmented<"incoming" | "outgoing">
+        value={tab}
+        onChange={setTab}
+        ariaLabel="Request direction"
+        items={[
+          { key: "incoming", label: "Incoming (as primary hospital)", icon: <Inbox className="h-4 w-4" /> },
+          { key: "outgoing", label: "Outgoing (our requests)", icon: <Send className="h-4 w-4" /> },
+        ]}
+      />
 
-      {list.isLoading ? <Skeleton className="h-32 w-full" /> : items.length === 0 ? (
-        <Card className="p-10 text-center text-secondary-500">
-          <ShieldCheck className="h-8 w-8 mx-auto mb-3 opacity-40" />
-          {tab === "incoming" ? "No hospital has requested access to your patients' records yet."
-            : "You haven't requested any patient records from other hospitals yet."}
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {items.map((r) => (
-            <Card key={r.id} className="p-5">
-              <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-                <div className="space-y-2 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">{r.patient_display_name || r.patient_global_id}</span>
-                    <Badge variant={statusVariant(r.status)}>{r.status}</Badge>
-                    <Badge variant="secondary">{r.scope.replace(/_/g, " ")}</Badge>
-                    <span className="text-xs font-mono text-secondary-400">{r.request_no}</span>
-                  </div>
-                  <p className="text-sm text-secondary-500">
-                    {tab === "incoming" ? "Requested by " : "Requested from hospital · "}
-                    <strong>{r.requester_name}</strong>{r.requester_type === "DEVELOPER" ? " (developer)" : ""} · {fmt(r.requested_at)}
-                  </p>
-                  <p className="text-sm text-secondary-600 italic">“{r.reason}”</p>
-                  <div className="flex flex-wrap gap-2 text-[11px]">
-                    {r.requires_patient_approval && <Badge variant={decisionVariant(r.patient_decision)}>Patient: {r.patient_decision}</Badge>}
-                    {r.requires_hospital_approval && <Badge variant={decisionVariant(r.hospital_decision)}>Hospital: {r.hospital_decision}</Badge>}
-                    {r.status === "APPROVED" && r.link_expires_at && (
-                      <Badge variant="soft-info"><Clock className="h-3 w-3 mr-1 inline" />Link expires {fmt(r.link_expires_at)}</Badge>
-                    )}
-                    {r.link_used_at && <Badge variant="soft-info">Link used {fmt(r.link_used_at)}</Badge>}
-                  </div>
-                  {r.decline_reason && <p className="text-xs text-rose-600">Decline reason: {r.decline_reason}</p>}
-                </div>
+      <DxGrid
+        columns={columns}
+        data={items}
+        rowKey={(r) => r.id}
+        isLoading={list.isLoading}
+        empty={{
+          icon: ShieldCheck,
+          title: tab === "incoming" ? "No incoming access requests" : "No outgoing requests",
+          description: tab === "incoming"
+            ? "No hospital has requested access to your patients' records yet."
+            : "You haven't requested any patient records from other hospitals yet.",
+        }}
+      />
 
-                <div className="flex flex-wrap gap-2 shrink-0">
-                  {tab === "incoming" && r.status === "PENDING" && r.hospital_decision === "PENDING" && (
-                    <>
-                      <Button size="sm" leftIcon={<Check className="h-3.5 w-3.5" />} onClick={() => { setReason(""); setDecideFor({ req: r, approve: true }); }}>Approve</Button>
-                      <Button size="sm" variant="danger" leftIcon={<X className="h-3.5 w-3.5" />} onClick={() => { setReason(""); setDecideFor({ req: r, approve: false }); }}>Decline</Button>
-                    </>
-                  )}
-                  {tab === "outgoing" && r.status === "APPROVED" && !r.link_used_at && (
-                    <Button size="sm" leftIcon={<Eye className="h-3.5 w-3.5" />} isLoading={open.isPending} onClick={() => open.mutate(r)}>Open records</Button>
-                  )}
-                  {tab === "outgoing" && (r.status === "PENDING" || r.status === "APPROVED") && (
-                    <Button size="sm" variant="secondary" leftIcon={<Ban className="h-3.5 w-3.5" />} onClick={() => cancel.mutate(r.id)}>Cancel</Button>
-                  )}
-                  <Button size="sm" variant="secondary" leftIcon={<ScrollText className="h-3.5 w-3.5" />} onClick={() => setAuditFor(r)}>Audit</Button>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Submit modal */}
       <SubmitModal open={submitOpen} onClose={() => setSubmitOpen(false)}
         onDone={() => { setSubmitOpen(false); setTab("outgoing"); invalidate(); }} />
 
       {/* Decision modal */}
-      <Modal isOpen={!!decideFor} onClose={() => setDecideFor(null)} title={decideFor?.approve ? "Approve access" : "Decline access"}>
+      <DxPopup isOpen={!!decideFor} onClose={() => setDecideFor(null)} title={decideFor?.approve ? "Approve access" : "Decline access"} locked={decide.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setDecideFor(null)} disabled={decide.isPending}>Cancel</DxButton>
+            <DxButton isLoading={decide.isPending} variant={decideFor?.approve ? "primary" : "danger"} onClick={() => decide.mutate()}>
+              {decideFor?.approve ? "Approve" : "Decline"}
+            </DxButton>
+          </>
+        }>
         <div className="space-y-4">
-          <p className="text-sm text-secondary-600">
+          <DxMessage tone={decideFor?.approve ? "info" : "warning"}>
             {decideFor?.approve
               ? "Approving records your hospital's authorization. Once every required party approves, a secure one-time link is issued to the requester."
               : "Declining stops this request. No records will be shared."}
-          </p>
-          <Textarea label={decideFor?.approve ? "Note (optional)" : "Reason (optional)"} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
-          <div className="flex gap-3">
-            <Button isLoading={decide.isPending} variant={decideFor?.approve ? "primary" : "danger"} onClick={() => decide.mutate()}>
-              {decideFor?.approve ? "Approve" : "Decline"}
-            </Button>
-            <Button variant="secondary" onClick={() => setDecideFor(null)}>Cancel</Button>
-          </div>
+          </DxMessage>
+          <DxTextarea label={decideFor?.approve ? "Note (optional)" : "Reason (optional)"} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
         </div>
-      </Modal>
+      </DxPopup>
 
       {/* Audit modal */}
-      <Modal isOpen={!!auditFor} onClose={() => setAuditFor(null)} title={`Audit trail — ${auditFor?.request_no ?? ""}`} size="lg">
-        {audit.isLoading ? <Skeleton className="h-40 w-full" /> : (
-          <ol className="relative border-l border-secondary-200 ml-2 space-y-4">
+      <DxPopup isOpen={!!auditFor} onClose={() => setAuditFor(null)} title={`Audit trail — ${auditFor?.request_no ?? ""}`} size="lg">
+        {audit.isLoading ? (
+          <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="dx-skeleton h-10 w-full" />)}</div>
+        ) : (audit.data ?? []).length === 0 ? (
+          <p className={`py-10 text-center text-[13px] ${muted}`}>No audit events recorded yet.</p>
+        ) : (
+          <ol className="relative ml-2 space-y-4 border-l border-[var(--dx-border)]">
             {(audit.data ?? []).map((a: AuditEvent) => (
               <li key={a.id} className="ml-4">
-                <div className="absolute -left-1.5 h-3 w-3 rounded-full bg-primary-500" />
-                <p className="text-sm font-semibold">{a.event.replace(/_/g, " ")}</p>
-                <p className="text-xs text-secondary-500">
+                <div className="absolute -left-[5px] mt-1 h-2.5 w-2.5 rounded-full bg-[var(--dx-accent)]" />
+                <p className="text-[13px] font-semibold text-[var(--dx-text)]">{a.event.replace(/_/g, " ")}</p>
+                <p className={`text-[11.5px] ${muted}`}>
                   {a.actor_type}{a.actor_display ? ` · ${a.actor_display}` : ""} · {fmt(a.occurred_at)}
                 </p>
-                {a.detail && <p className="text-xs text-secondary-600 mt-0.5">{a.detail}</p>}
+                {a.detail ? <p className={`mt-0.5 text-[11.5px] ${muted}`}>{a.detail}</p> : null}
               </li>
             ))}
           </ol>
         )}
-      </Modal>
+      </DxPopup>
 
       {/* Record viewer modal */}
-      <Modal isOpen={!!record} onClose={() => setRecord(null)} title={`Records — ${record?.req.patient_display_name ?? ""}`} size="2xl">
-        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 mb-4 flex items-center gap-2">
-          <FileText className="h-4 w-4" /> One-time read-only access. This link is now spent and cannot be reopened.
+      <DxPopup isOpen={!!record} onClose={() => setRecord(null)} title={`Records — ${record?.req.patient_display_name ?? ""}`} size="xl">
+        <div className="space-y-4">
+          <DxMessage tone="warning" title="One-time read-only access">
+            This link is now spent and cannot be reopened.
+          </DxMessage>
+          {record ? <RecordView data={record.data} /> : null}
         </div>
-        {record && <RecordView data={record.data} />}
-      </Modal>
-    </div>
+      </DxPopup>
+    </DxPage>
   );
 }
 
@@ -216,34 +253,33 @@ function SubmitModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
   });
 
   return (
-    <Modal isOpen={open} onClose={onClose} title="Request patient medical history">
-      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); submit.mutate(); }}>
-        <Input label="Primary hospital code" required value={f.holding_tenant_code}
+    <DxPopup isOpen={open} onClose={onClose} title="Request patient medical history" locked={submit.isPending}
+      footer={
+        <>
+          <DxButton onClick={onClose} disabled={submit.isPending}>Cancel</DxButton>
+          <DxButton variant="primary" isLoading={submit.isPending}
+            disabled={!f.holding_tenant_code.trim() || !f.patient_global_id.trim() || !f.reason.trim()}
+            onClick={() => submit.mutate()}>Submit request</DxButton>
+        </>
+      }>
+      <div className="space-y-4">
+        <DxInput label="Primary hospital code" required value={f.holding_tenant_code}
           onChange={(e) => setF({ ...f, holding_tenant_code: e.target.value })} placeholder="e.g. STNICH" />
-        <Input label="Patient global ID" required value={f.patient_global_id}
-          onChange={(e) => setF({ ...f, patient_global_id: e.target.value })} placeholder="GPID-..." />
-        <Textarea label="Reason (continuity of care)" required rows={3} value={f.reason}
+        <DxInput label="Patient global ID" mono required value={f.patient_global_id}
+          onChange={(e) => setF({ ...f, patient_global_id: e.target.value })} placeholder="GPID-…" />
+        <DxTextarea label="Reason (continuity of care)" required rows={3} value={f.reason}
           onChange={(e) => setF({ ...f, reason: e.target.value })} />
         <div className="grid grid-cols-2 gap-3">
-          <Select label="Scope" value={f.scope} onChange={(e) => setF({ ...f, scope: e.target.value })}>
-            <option value="MEDICAL_HISTORY">Medical history</option>
-            <option value="BASELINE_DIAGNOSTICS">Baseline diagnostics</option>
-          </Select>
-          <Input label="Link expiry (hours)" type="number" min={1} max={168} value={f.link_expiry_hours}
+          <DxSelect label="Scope" value={f.scope} onChange={(e) => setF({ ...f, scope: e.target.value })}
+            options={[{ value: "MEDICAL_HISTORY", label: "Medical history" }, { value: "BASELINE_DIAGNOSTICS", label: "Baseline diagnostics" }]} />
+          <DxInput label="Link expiry (hours)" type="number" min={1} max={168} value={f.link_expiry_hours}
             onChange={(e) => setF({ ...f, link_expiry_hours: e.target.value })} />
         </div>
         <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={f.requires_patient_approval} onChange={(e) => setF({ ...f, requires_patient_approval: e.target.checked })} />
-            Require patient approval
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={f.requires_hospital_approval} onChange={(e) => setF({ ...f, requires_hospital_approval: e.target.checked })} />
-            Require primary-hospital approval
-          </label>
+          <DxCheckbox label="Require patient approval" checked={f.requires_patient_approval} onChange={(e) => setF({ ...f, requires_patient_approval: e.target.checked })} />
+          <DxCheckbox label="Require primary-hospital approval" checked={f.requires_hospital_approval} onChange={(e) => setF({ ...f, requires_hospital_approval: e.target.checked })} />
         </div>
-        <Button type="submit" isLoading={submit.isPending}>Submit request</Button>
-      </form>
-    </Modal>
+      </div>
+    </DxPopup>
   );
 }

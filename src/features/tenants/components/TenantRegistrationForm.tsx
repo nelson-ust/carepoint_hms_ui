@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Building2, Mail, Phone, User, Lock, Globe, MapPin, ChevronRight, CheckCircle2, Server, Cloud, HardDrive } from "lucide-react";
+import { Building2, Mail, Phone, User, Lock, Globe, MapPin, ChevronRight, CheckCircle2, Server, Cloud, HardDrive, Hospital, Stethoscope, Eye, Pill } from "lucide-react";
 import { registerTenant, listSubscriptionPlans } from "../api/tenants.api";
 import type { TenantRegistrationPayload, SubscriptionPlan } from "../api/tenants.api";
 import { useState, useEffect } from "react";
@@ -12,6 +12,7 @@ import { useState, useEffect } from "react";
 const registrationSchema = z.object({
   tenant_name: z.string().min(5, "Organization name must be at least 5 characters"),
   tenant_code: z.string().min(3, "Tenant code must be at least 3 characters").regex(/^[A-Z0-9]+$/, "Code must be uppercase alphanumeric"),
+  facility_profile: z.enum(["HOSPITAL", "DENTAL", "EYE", "PHARMACY"]),
   billing_email: z.string().email("Invalid email address"),
   billing_phone: z.string().min(10, "Invalid phone number"),
   billing_contact_name: z.string().min(3, "Contact name is required"),
@@ -41,6 +42,7 @@ export function TenantRegistrationForm() {
     defaultValues: {
       plan_code: "",
       deployment_model: "CLOUD_PLATFORM",
+      facility_profile: "HOSPITAL",
     },
   });
 
@@ -61,7 +63,7 @@ export function TenantRegistrationForm() {
 
   const nextStep = async () => {
     let fieldsToValidate: (keyof FormData)[] = [];
-    if (step === 1) fieldsToValidate = ["tenant_name", "tenant_code"];
+    if (step === 1) fieldsToValidate = ["tenant_name", "tenant_code", "facility_profile"];
     if (step === 2) fieldsToValidate = ["billing_contact_name", "billing_email", "billing_phone", "billing_address"];
     if (step === 3) fieldsToValidate = ["admin_first_name", "admin_last_name", "admin_email", "admin_username", "admin_password"];
     if (step === 4) fieldsToValidate = ["deployment_model"];
@@ -187,6 +189,44 @@ export function TenantRegistrationForm() {
                     <input {...register("tenant_code")} className="input-field border border-gray-400 pl-12" placeholder="e.g. STNICHOLAS" />
                   </div>
                   {errors.tenant_code && <p className="text-xs text-rose-500 mt-1">{errors.tenant_code.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Facility Type</label>
+                  <p className="text-xs text-slate-500">
+                    This decides which features your workspace is provisioned with. Only the Carepoint team can change it later.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {[
+                      { value: "HOSPITAL", label: "Integrated Hospital", desc: "Full multi-department hospital — every subscribed module.", icon: Hospital },
+                      { value: "DENTAL", label: "Dental Clinic", desc: "Standalone dental practice: charting, treatment plans, billing.", icon: Stethoscope },
+                      { value: "EYE", label: "Eye Clinic", desc: "Optometry / ophthalmology: refraction, dispensing, billing.", icon: Eye },
+                      { value: "PHARMACY", label: "Pharmaceutical Store", desc: "Retail / community pharmacy: dispensing, stock, billing.", icon: Pill },
+                    ].map((opt) => {
+                      const Icon = opt.icon;
+                      const selected = watch("facility_profile") === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setValue("facility_profile", opt.value as FormData["facility_profile"], { shouldValidate: true })}
+                          className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition-all ${
+                            selected
+                              ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 ring-2 ring-emerald-500/30"
+                              : "border-slate-200 dark:border-white/10 hover:border-emerald-400"
+                          }`}
+                        >
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${selected ? "bg-emerald-500/15 text-emerald-600" : "bg-slate-100 dark:bg-white/5 text-slate-500"}`}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold tracking-tight">{opt.label}</p>
+                            <p className="mt-0.5 text-[11.5px] text-slate-500">{opt.desc}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {errors.facility_profile && <p className="text-xs text-rose-500 mt-1">{errors.facility_profile.message}</p>}
                 </div>
               </div>
             </div>

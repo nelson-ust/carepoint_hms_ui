@@ -294,6 +294,8 @@ export type PortalCardTransaction = {
   payment_source?: string | null;
   payment_reference?: string | null;
   narration?: string | null;
+  /** For debits: the service(s) the money paid for. */
+  purpose?: string | null;
   balance_before: number | string;
   balance_after: number | string;
   facility_id: number;
@@ -302,6 +304,15 @@ export type PortalCardTransaction = {
   invoice_id?: number | null;
   visit_id?: number | null;
   payment_id?: number | null;
+};
+
+/** GET /portal/card/transactions → PortalCardStatementSchema. */
+export type PortalCardStatement = {
+  card_number?: string | null;
+  balance: number | string;
+  status?: string | null;
+  currency: string;
+  transactions: PortalCardTransaction[];
 };
 
 /** LabResultReadSchema. */
@@ -555,6 +566,26 @@ export async function resendPortalOtp(
 // =====================================================================
 // API — authenticated portal reads / actions
 // =====================================================================
+
+export async function downloadPortalCardStatement(): Promise<void> {
+  const response = await apiClient.get("/portal/card/statement", {
+    ...portalAuthOptions(),
+    responseType: "blob" as const,
+  });
+  const url = URL.createObjectURL(response.data as Blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "card-statement.pdf";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+export async function getPortalCardStatement(): Promise<PortalCardStatement> {
+  const { data } = await apiClient.get<PortalCardStatement>("/portal/card/transactions");
+  return data;
+}
 
 export async function getPortalDashboard(): Promise<PortalDashboard> {
   const response = await apiClient.get<PortalDashboard>(

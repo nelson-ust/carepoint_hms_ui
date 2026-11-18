@@ -19,10 +19,12 @@ import {
   Clock,
   CreditCard,
   Database,
+  Eye,
   FileText,
   Fingerprint,
   FlaskConical,
   Gift,
+  Glasses,
   Globe,
   HeartPulse,
   Hospital,
@@ -64,13 +66,15 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/lib/theme/ThemeProvider";
 import { routes } from "@/config/routes";
-import logo from "@/assets/logo.jpeg";
+import logo from "@/assets/logo.svg";
+import { Logo } from "@/components/branding/Logo";
 
 type IconType = typeof Activity;
 type SectionLink = { id: string; label: string };
 
 const NAV_LINKS: SectionLink[] = [
   { id: "home", label: "Home" },
+  { id: "clients", label: "Who It's For" },
   { id: "features", label: "Highlights" },
   { id: "catalog", label: "All Features" },
   { id: "journey", label: "Patient Journey" },
@@ -121,14 +125,8 @@ export function LandingPage() {
       {/* ============== STICKY NAV ============== */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/70 dark:bg-secondary-950/70 border-b border-secondary-400 dark:border-white/50">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 h-20 flex items-center justify-between">
-          <button onClick={() => handleAnchor("home")} className="flex items-center gap-3 group">
-            <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-primary-500/10 ring-4 ring-white/5 group-hover:scale-105 transition-transform overflow-hidden p-1">
-              <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
-            </div>
-            <div className="hidden sm:block text-left">
-              <p className="text-base font-black tracking-tight">Carepoint</p>
-              <p className="text-[9px] uppercase tracking-[0.25em] font-bold text-primary-600 dark:text-primary-400">HMS Suite</p>
-            </div>
+          <button onClick={() => handleAnchor("home")} className="group">
+            <Logo variant="inline" size={44} />
           </button>
 
           <nav className="hidden lg:flex items-center gap-1">
@@ -200,14 +198,15 @@ export function LandingPage() {
               <Zap className="h-3 w-3" /> Multi-Tenant Healthcare OS
             </span>
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-black font-display tracking-tight leading-[1.05]">
-              The hospital management<br />
-              system that{" "}
+              The healthcare platform<br />
+              that{" "}
               <span className="bg-gradient-to-r from-primary-500 via-primary-600 to-emerald-500 bg-clip-text text-transparent">actually flows.</span>
             </h1>
             <p className="text-base md:text-lg text-secondary-600 dark:text-secondary-300 max-w-2xl leading-relaxed">
-              Carepoint HMS streamlines every step of the clinical journey — from patient
-              registration and queue triage to consultations, diagnostics, pharmacy and
-              billing — across single clinics or multi-branch networks.
+              Carepoint runs the whole clinical journey — registration, triage, consultations,
+              diagnostics, pharmacy and billing — for integrated hospitals and standalone
+              dental, eye and pharmacy practices alike. Pick your facility type and your
+              workspace is provisioned with exactly the right features.
             </p>
             <div className="flex flex-wrap items-center gap-4 pt-2">
               <Link to={routes.tenantRegister} className="inline-flex items-center gap-2 px-7 py-4 rounded-2xl bg-primary-500 hover:bg-primary-600 text-white text-sm font-black uppercase tracking-widest shadow-2xl shadow-primary-500/30 transition-all hover:-translate-y-0.5">
@@ -251,6 +250,26 @@ export function LandingPage() {
           <div className="lg:col-span-5">
             <HeroIllustration />
           </div>
+        </div>
+      </section>
+
+      {/* ============== WHO IT'S FOR ============== */}
+      <section id="clients" className="relative py-20 md:py-28 bg-secondary-50/60 dark:bg-secondary-900/40 border-y border-secondary-400 dark:border-white/50">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <SectionHeader
+            tag="Who It's For"
+            title="One platform, tuned to your facility."
+            subtitle="Choose your facility type at registration and Carepoint provisions exactly the right workspace — a full multi-department hospital, or a focused clinic or pharmacy with only its features enabled."
+          />
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {targetClients.map((c) => (
+              <ClientCard key={c.name} client={c} />
+            ))}
+          </div>
+          <p className="mt-10 text-center text-sm text-secondary-500 dark:text-secondary-400 max-w-2xl mx-auto">
+            Starting as a clinic and growing into a hospital? Your facility type can be switched by the
+            Carepoint team, and the workspace reshapes itself — no migration, no data loss.
+          </p>
         </div>
       </section>
 
@@ -369,6 +388,7 @@ export function LandingPage() {
               <span>Carepoint HMS · © 2026</span>
             </div>
             <div className="flex items-center gap-5">
+              <a href="#clients" onClick={(e) => { e.preventDefault(); handleAnchor("clients"); }} className="hover:text-secondary-900 dark:hover:text-white">Who It's For</a>
               <a href="#features" onClick={(e) => { e.preventDefault(); handleAnchor("features"); }} className="hover:text-secondary-900 dark:hover:text-white">Highlights</a>
               <a href="#catalog" onClick={(e) => { e.preventDefault(); handleAnchor("catalog"); }} className="hover:text-secondary-900 dark:hover:text-white">All Features</a>
               <a href="#security" onClick={(e) => { e.preventDefault(); handleAnchor("security"); }} className="hover:text-secondary-900 dark:hover:text-white">Security</a>
@@ -420,6 +440,28 @@ function FeatureCard({ title, description, icon: Icon, tone }: FeatureItem) {
       </div>
       <h3 className="text-lg font-black font-display tracking-tight mb-2">{title}</h3>
       <p className="text-sm text-secondary-600 dark:text-secondary-400 leading-relaxed">{description}</p>
+    </div>
+  );
+}
+
+type ClientVertical = { name: string; tagline: string; icon: IconType; tone: Tone; highlights: string[] };
+
+function ClientCard({ client }: { client: ClientVertical }) {
+  const Icon = client.icon;
+  return (
+    <div className="group relative flex flex-col rounded-[2rem] p-7 bg-white dark:bg-secondary-900 border border-secondary-400 dark:border-white/50 hover:border-primary-500/30 hover:-translate-y-1 transition-all shadow-sm hover:shadow-xl hover:shadow-primary-500/5">
+      <div className={`h-14 w-14 rounded-2xl bg-gradient-to-br ${toneStyles[client.tone]} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform`}>
+        <Icon className="h-7 w-7" />
+      </div>
+      <h3 className="text-lg font-black font-display tracking-tight mb-1">{client.name}</h3>
+      <p className="text-sm text-secondary-600 dark:text-secondary-400 leading-relaxed mb-5">{client.tagline}</p>
+      <ul className="mt-auto space-y-2">
+        {client.highlights.map((h) => (
+          <li key={h} className="flex items-start gap-2 text-[13px] text-secondary-700 dark:text-secondary-300">
+            <CheckCircle2 className="h-4 w-4 text-primary-500 shrink-0 mt-0.5" /> {h}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -577,6 +619,37 @@ const features: FeatureItem[] = [
   { title: "Patient Portal", description: "A patient-facing self-service portal for appointments, medical records, secure messaging and online payments — extending care beyond the hospital walls.", icon: Smartphone, tone: "emerald" },
 ];
 
+const targetClients: ClientVertical[] = [
+  {
+    name: "Integrated Hospital",
+    tagline: "A full multi-department hospital — every module, one workspace.",
+    icon: Hospital,
+    tone: "primary",
+    highlights: ["OPD, wards & theatre", "Lab, radiology & pharmacy", "Billing, HMO & accounting", "HR, payroll & approvals"],
+  },
+  {
+    name: "Dental Clinic",
+    tagline: "A standalone dental practice, from charting to collection.",
+    icon: Stethoscope,
+    tone: "emerald",
+    highlights: ["Odontogram charting", "Procedure price list", "Treatment-plan billing", "Recall reminders"],
+  },
+  {
+    name: "Eye Clinic",
+    tagline: "Optometry & ophthalmology, from exam to dispensing.",
+    icon: Eye,
+    tone: "violet",
+    highlights: ["Refraction & IOP exams", "Spectacle & contact-lens Rx", "Optical dispensing & stock", "Review recalls"],
+  },
+  {
+    name: "Pharmaceutical Store",
+    tagline: "A retail / community pharmacy, over the counter.",
+    icon: Pill,
+    tone: "amber",
+    highlights: ["Walk-in point of sale", "Multi-store stock control", "Expiry & low-stock alerts", "Billing & insurance claims"],
+  },
+];
+
 const FEATURE_CATALOG: CatalogGroupT[] = [
   {
     title: "Clinical & Patient Care",
@@ -590,7 +663,7 @@ const FEATURE_CATALOG: CatalogGroupT[] = [
       { name: "Triage & Consultations", description: "Triage, vitals capture, SOAP consultations and diagnosis.", icon: Stethoscope },
       { name: "Clinical Templates", description: "Reusable clinical documentation templates for faster charting.", icon: FileText },
       { name: "Medication Adherence", description: "Dose schedules, alerts, refills and post-visit follow-ups.", icon: Timer },
-      { name: "Patient ID Cards", description: "Issue and manage patient identification / membership cards.", icon: CreditCard },
+      { name: "Membership Cards", description: "Issue and manage prepaid patient membership (wallet) cards.", icon: CreditCard },
       { name: "Loyalty Rewards", description: "Track and manage patient reward points.", icon: Gift },
       { name: "Patient Messages", description: "Secure messages sent in by patients from the portal.", icon: MessageSquare },
       { name: "Announcements", description: "Broadcast to one patient, a group, or every registered patient.", icon: Send },
@@ -606,6 +679,20 @@ const FEATURE_CATALOG: CatalogGroupT[] = [
       { name: "Radiology (RIS)", description: "Imaging requests, modality scheduling and structured reporting.", icon: Activity },
       { name: "Pharmacy", description: "Prescription verification, dispensing workflows and counselling.", icon: Pill },
       { name: "Drug Formulary", description: "Manage the drug formulary and drug categories.", icon: Boxes },
+    ],
+  },
+  {
+    title: "Specialty Clinics & Retail",
+    blurb: "Run a standalone dental, eye or pharmacy practice on the same backbone.",
+    items: [
+      { name: "Dental Clinic", description: "Odontogram charting, dental examinations and treatment plans.", icon: Stethoscope },
+      { name: "Dental Procedure Catalogue", description: "A dental price list that charted procedures and bills are drawn from.", icon: ClipboardList },
+      { name: "Treatment-Plan Billing", description: "Push a dental chart's procedures onto the visit charge sheet in one click.", icon: Receipt },
+      { name: "Clinic Recalls", description: "Preventive-care follow-ups — dental check-ups, scaling, IOP and eye reviews coming due.", icon: CalendarClock },
+      { name: "Eye Examinations", description: "Visual acuity, refraction, IOP and anterior / posterior segment findings.", icon: Eye },
+      { name: "Spectacle & Contact-Lens Rx", description: "Issue glasses and contact-lens prescriptions, recorded per eye.", icon: FileText },
+      { name: "Optical Dispensing", description: "Frames, lenses and coatings dispensed with inventory stock control and billing.", icon: Glasses },
+      { name: "Pharmacy Point of Sale", description: "Walk-in / OTC retail sales straight from stock, with receipts, change and voids.", icon: ShoppingCart },
     ],
   },
   {

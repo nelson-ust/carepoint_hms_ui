@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
+import {
+  DxPopup, DxButton, DxInput, DxSelect, DxTextarea, DxCheckbox,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import { searchPatients, type Patient } from "@/features/patients/api/patients.api";
@@ -26,7 +24,6 @@ export function BookCaseModal({
   isOpen: boolean;
   onClose: () => void;
   onBooked: (c: SurgicalCase) => void;
-  /** Pre-selected patient (e.g. booking from a visit). */
   presetPatient?: { id: number; label: string } | null;
   presetVisitId?: number | null;
 }) {
@@ -92,7 +89,6 @@ export function BookCaseModal({
     [procedures, procedureId],
   );
 
-  // Auto-fill end time from typical duration when a procedure + start are chosen.
   useEffect(() => {
     if (selectedProcedure?.typical_duration_minutes && scheduledStart && !scheduledEnd) {
       const start = new Date(scheduledStart);
@@ -136,170 +132,82 @@ export function BookCaseModal({
   };
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={onClose}
-      title="Book Surgical Case"
+      title="Book surgical case"
       size="lg"
+      locked={submitting}
       footer={
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose} disabled={submitting}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} isLoading={submitting} disabled={!canSubmit}>
-            Book case
-          </Button>
-        </div>
+        <>
+          <DxButton onClick={onClose} disabled={submitting}>Cancel</DxButton>
+          <DxButton variant="primary" onClick={handleSubmit} isLoading={submitting} disabled={!canSubmit}>Book case</DxButton>
+        </>
       }
     >
-      <div className="space-y-5">
+      <div className="space-y-4">
         {/* Patient */}
         {patient ? (
-          <div className="flex items-center justify-between rounded-2xl border border-secondary-200 bg-secondary-50 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+          <div className="flex items-center justify-between rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] px-4 py-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">Patient</p>
-              <p className="text-sm font-black text-secondary-900 dark:text-secondary-100">{patient.label}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Patient</p>
+              <p className="text-[13px] font-semibold text-[var(--dx-text)]">{patient.label}</p>
             </div>
-            {!presetPatient && (
-              <button
-                onClick={() => setPatient(null)}
-                className="rounded-lg p-2 text-secondary-400 hover:bg-secondary-100 dark:hover:bg-white/10"
-                title="Change patient"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+            {!presetPatient ? (
+              <DxButton icon size="sm" variant="text" title="Change patient" onClick={() => setPatient(null)}><X /></DxButton>
+            ) : null}
           </div>
         ) : (
-          <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-secondary-500">
-              Patient
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" />
-              <input
-                className="input-field pl-10"
-                placeholder="Search name, hospital number, phone…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                autoFocus
-              />
+          <div className="dx-field">
+            <label className="dx-field-label">Patient</label>
+            <div className="dx-editor-wrap">
+              <Search className="h-3.5 w-3.5" />
+              <input className="dx-editor" placeholder="Search name, hospital number, phone…" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
             </div>
-            {(searching || results.length > 0) && (
-              <div className="mt-2 max-h-52 space-y-1 overflow-y-auto rounded-2xl border border-secondary-200 p-1 dark:border-white/10">
+            {searching || results.length > 0 ? (
+              <div className="mt-2 max-h-52 space-y-1 overflow-y-auto rounded-md border border-[var(--dx-border)] p-1">
                 {searching ? (
-                  <p className="px-3 py-3 text-xs text-secondary-400">Searching…</p>
+                  <p className="px-3 py-3 text-[12px] text-[var(--dx-text-muted)]">Searching…</p>
                 ) : (
                   results.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() =>
-                        setPatient({
-                          id: p.id,
-                          label: `${p.first_name} ${p.last_name} · ${p.hospital_number}`,
-                        })
-                      }
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-secondary-50 dark:hover:bg-white/5"
-                    >
-                      <span className="font-bold text-secondary-900 dark:text-secondary-100">
-                        {p.first_name} {p.last_name}
-                      </span>
-                      <span className="font-mono text-[11px] text-secondary-400">{p.hospital_number}</span>
+                    <button key={p.id} onClick={() => setPatient({ id: p.id, label: `${p.first_name} ${p.last_name} · ${p.hospital_number}` })}
+                      className="flex w-full items-center justify-between rounded px-3 py-2 text-left hover:bg-[var(--dx-surface-alt)]">
+                      <span className="text-[13px] font-medium text-[var(--dx-text)]">{p.first_name} {p.last_name}</span>
+                      <span className="dx-mono text-[11px] text-[var(--dx-text-muted)]">{p.hospital_number}</span>
                     </button>
                   ))
                 )}
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
-        <Select
-          label="Procedure"
-          value={procedureId}
-          onChange={(e) => setProcedureId(e.target.value)}
+        <DxSelect label="Procedure" value={procedureId} onChange={(e) => setProcedureId(e.target.value)}
           placeholder={proceduresQuery.isLoading ? "Loading…" : "Select a procedure"}
-        >
-          {procedures.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} ({p.code})
-            </option>
-          ))}
-        </Select>
+          options={procedures.map((p) => ({ value: String(p.id), label: `${p.name} (${p.code})` }))} />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select
-            label="Operating theatre (optional)"
-            value={theatreId}
-            onChange={(e) => setTheatreId(e.target.value)}
-          >
-            <option value="">Unassigned</option>
-            {theatres.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.code})
-              </option>
-            ))}
-          </Select>
-          <div className="flex items-end">
-            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-secondary-200 px-4 py-3 dark:border-white/10">
-              <input
-                type="checkbox"
-                className="h-5 w-5 rounded accent-rose-600"
-                checked={emergency}
-                onChange={(e) => setEmergency(e.target.checked)}
-              />
-              <span className="text-sm font-bold text-secondary-900 dark:text-secondary-100">
-                Emergency case
-              </span>
-            </label>
+          <DxSelect label="Operating theatre (optional)" value={theatreId} onChange={(e) => setTheatreId(e.target.value)}
+            placeholder="Unassigned" options={theatres.map((t) => ({ value: String(t.id), label: `${t.name} (${t.code})` }))} />
+          <div className="flex items-end pb-1">
+            <DxCheckbox label="Emergency case" checked={emergency} onChange={(e) => setEmergency(e.target.checked)} />
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="Scheduled start"
-            type="datetime-local"
-            value={scheduledStart}
-            onChange={(e) => setScheduledStart(e.target.value)}
-          />
-          <Input
-            label="Scheduled end"
-            type="datetime-local"
-            value={scheduledEnd}
-            onChange={(e) => setScheduledEnd(e.target.value)}
-          />
+          <DxInput label="Scheduled start" type="datetime-local" value={scheduledStart} onChange={(e) => setScheduledStart(e.target.value)} />
+          <DxInput label="Scheduled end" type="datetime-local" value={scheduledEnd} onChange={(e) => setScheduledEnd(e.target.value)} />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select label="ASA class" value={asa} onChange={(e) => setAsa(e.target.value)}>
-            <option value="">Not assessed</option>
-            {ASA_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-          <Select
-            label="Anaesthesia (planned)"
-            value={anaesthesia}
-            onChange={(e) => setAnaesthesia(e.target.value)}
-          >
-            <option value="">Not set</option>
-            {ANAESTHESIA_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
+          <DxSelect label="ASA class" value={asa} onChange={(e) => setAsa(e.target.value)}
+            placeholder="Not assessed" options={ASA_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} />
+          <DxSelect label="Anaesthesia (planned)" value={anaesthesia} onChange={(e) => setAnaesthesia(e.target.value)}
+            placeholder="Not set" options={ANAESTHESIA_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} />
         </div>
 
-        <Textarea
-          label="Pre-op diagnosis (optional)"
-          rows={2}
-          value={diagnosis}
-          onChange={(e) => setDiagnosis(e.target.value)}
-          placeholder="Working diagnosis / indication for surgery"
-        />
+        <DxTextarea label="Pre-op diagnosis (optional)" rows={2} value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="Working diagnosis / indication for surgery" />
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

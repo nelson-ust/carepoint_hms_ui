@@ -1,125 +1,124 @@
-import { PageHeader } from "@/components/layout/PageHeader";
 import {
   CreditCard,
   Plus,
-  RefreshCw,
+  RotateCcw,
   Settings as SettingsIcon,
   ShieldCheck,
   Zap,
-  MoreHorizontal,
-  ChevronRight,
-  AlertCircle,
-  ExternalLink,
 } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxPanel, DxButton, DxBadge, type DxGridColumn, DxGrid,
+} from "@/components/dx";
 import { usePaymentGateways, useTestGateway } from "../hooks/use-patient-payment";
 
+type Gateway = {
+  id: number;
+  gateway_name: string;
+  is_active?: boolean;
+  config: { merchant_id?: string | null };
+};
+
 export function PaymentGatewaysPage() {
-  const { data, isLoading, refetch } = usePaymentGateways();
+  const { data, isLoading, refetch, isFetching } = usePaymentGateways();
   const testMutation = useTestGateway();
 
-  const gateways = data?.items || [];
+  const gateways: Gateway[] = (data?.items as Gateway[]) || [];
+
+  const columns: DxGridColumn<Gateway>[] = [
+    {
+      key: "gateway",
+      header: "Provider",
+      render: (gw) => (
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]">
+            <CreditCard className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-[var(--dx-text)]">{gw.gateway_name}</span>
+              {gw.is_active ? <DxBadge tone="success" dot>Live</DxBadge> : <DxBadge tone="neutral">Inactive</DxBadge>}
+            </div>
+            <div className="text-[11.5px] text-[var(--dx-text-muted)]">
+              Merchant ID: <span className="dx-mono">{gw.config?.merchant_id || "Not set"}</span>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      render: (gw) => (
+        <div className="flex items-center justify-end gap-1">
+          <DxButton
+            size="sm"
+            variant="default"
+            isLoading={testMutation.isPending && testMutation.variables === gw.id}
+            onClick={() => testMutation.mutate(gw.id)}
+          >
+            Test gateway
+          </DxButton>
+          <DxButton icon size="sm" variant="text" title="Configure">
+            <SettingsIcon className="h-4 w-4" />
+          </DxButton>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader
-          title="Payment Gateways"
-          description="Configure direct patient payment integrations via Paystack, Flutterwave, Stripe, or local banks."
-        />
-        <button className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
-          <Plus className="h-5 w-5" />
-          <span className="font-bold">Add Gateway</span>
-        </button>
-      </div>
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Billing" }, { label: "Payment Gateways" }]}
+        title="Payment Gateways"
+        subtitle="Configure direct patient payment integrations via Paystack, Flutterwave, Stripe, or local banks."
+        actions={
+          <>
+            <DxButton icon title="Refresh" onClick={() => refetch()} isLoading={isFetching}>
+              <RotateCcw />
+            </DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />}>
+              Add gateway
+            </DxButton>
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* Security Summary */}
-        <div className="lg:col-span-1 space-y-6">
-          <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40">
-            <div className="h-12 w-12 rounded-2xl bg-primary-500 text-white flex items-center justify-center mb-6 shadow-lg shadow-primary-500/20">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-1">
+          <DxPanel>
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]">
               <ShieldCheck className="h-6 w-6" />
             </div>
-            <h4 className="text-lg font-bold text-secondary-900 mb-2">Secure Transactions</h4>
-            <p className="text-sm text-secondary-500 leading-relaxed mb-6">
-              All patient payments are processed through secure 3D-Secure gateways.
-              Sensitive card data is never stored on hospital servers.
+            <h4 className="text-[15px] font-bold text-[var(--dx-text)]">Secure transactions</h4>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-[var(--dx-text-muted)]">
+              All patient payments are processed through secure 3D-Secure gateways. Sensitive card
+              data is never stored on hospital servers.
             </p>
-            <div className="flex items-center gap-2 text-[10px] font-bold text-secondary-400 uppercase tracking-widest">
-              PCI-DSS Compliant Infrastructure
-            </div>
-          </div>
+            <p className="mt-5 text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-faint)]">
+              PCI-DSS compliant infrastructure
+            </p>
+          </DxPanel>
         </div>
 
-        {/* Gateways List */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-secondary-900 flex items-center gap-2">
-              <Zap className="h-5 w-5 text-amber-500" />
-              Connected Providers
-            </h3>
-            <button onClick={() => refetch()} className="p-2 hover:bg-secondary-100 rounded-xl transition-all">
-              <RefreshCw className={`h-4 w-4 text-secondary-400 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {isLoading ? (
-              Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="h-32 bg-white/40 rounded-[2rem] animate-pulse" />
-              ))
-            ) : gateways.length > 0 ? (
-              gateways.map((gw) => (
-                <div
-                  key={gw.id}
-                  className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 hover:bg-white/60 transition-all group"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                    <div className="flex items-center gap-5">
-                      <div className="h-14 w-14 rounded-2xl bg-secondary-900 text-white flex items-center justify-center shadow-lg shadow-secondary-900/10">
-                        <CreditCard className="h-7 w-7" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-3">
-                          <h4 className="text-lg font-black text-secondary-900">{gw.gateway_name}</h4>
-                          {gw.is_active && (
-                            <span className="px-2 py-0.5 rounded-lg bg-emerald-500 text-white text-[10px] font-bold">
-                              LIVE
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-secondary-400 mt-1 font-medium italic">
-                          Merchant ID: {gw.config.merchant_id || 'Not Set'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => testMutation.mutate(gw.id)}
-                        disabled={testMutation.isPending}
-                        className="btn-secondary py-2 px-4 rounded-xl text-[10px] font-bold"
-                      >
-                        Test Gateway
-                      </button>
-                      <button className="p-3 hover:bg-secondary-100 rounded-2xl transition-all">
-                        <SettingsIcon className="h-5 w-5 text-secondary-400" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="py-24 text-center bg-white/20 rounded-[3rem] border-2 border-dashed border-secondary-400">
-                <CreditCard className="h-16 w-16 mx-auto text-secondary-100 mb-6" />
-                <h4 className="text-xl font-bold text-secondary-900">No Gateways Configured</h4>
-                <p className="text-secondary-500 mt-2 max-w-xs mx-auto">
-                  Enable direct patient payments by connecting your first gateway.
-                </p>
-              </div>
-            )}
-          </div>
+        <div className="lg:col-span-2">
+          <DxPanel title="Connected providers" icon={<Zap className="h-4 w-4 text-[var(--dx-accent)]" />} flush>
+            <DxGrid<Gateway>
+              borderless
+              columns={columns}
+              data={gateways}
+              rowKey={(gw) => gw.id}
+              isLoading={isLoading}
+              empty={{
+                icon: CreditCard,
+                title: "No gateways configured",
+                description: "Enable direct patient payments by connecting your first gateway.",
+              }}
+            />
+          </DxPanel>
         </div>
       </div>
-    </div>
+    </DxPage>
   );
 }

@@ -1,15 +1,10 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Layers, Pencil, Plus, Send, Trash2 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { SuiteEyebrow } from "@/components/layout/SuiteEyebrow";
-import { Card } from "@/components/ui/Card";
-import { Badge, type BadgeProps } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Modal } from "@/components/ui/Modal";
-import { Skeleton } from "@/components/ui/Skeleton";
+import {
+  DxPage, DxPageHeader, DxPanel, DxGrid, DxBadge, DxButton, DxInput, DxSelect, DxCheckbox, DxPopup,
+  type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import { PayrollTabs } from "../components/PayrollTabs";
@@ -37,11 +32,11 @@ const TYPE_LABEL: Record<PayrollComponentType, string> = {
   EMPLOYER_CONTRIBUTION: "Employer contribution",
 };
 
-const TYPE_VARIANT: Record<PayrollComponentType, BadgeProps["variant"]> = {
-  EARNING: "soft-success",
-  DEDUCTION: "soft-danger",
-  STATUTORY: "soft-info",
-  EMPLOYER_CONTRIBUTION: "soft-warning",
+const TYPE_TONE: Record<PayrollComponentType, DxBadgeTone> = {
+  EARNING: "success",
+  DEDUCTION: "danger",
+  STATUTORY: "info",
+  EMPLOYER_CONTRIBUTION: "warning",
 };
 
 const money = new Intl.NumberFormat(undefined, {
@@ -79,25 +74,6 @@ function toCompForm(c?: PayrollComponent | null): CompForm {
     is_active: c?.is_active ?? true,
     description: c?.description ?? "",
   };
-}
-
-function CheckRow({ label, hint, checked, onChange }: {
-  label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="flex items-start gap-2.5 cursor-pointer select-none">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 rounded border-secondary-300 accent-primary-600"
-      />
-      <span>
-        <span className="block text-sm font-semibold text-secondary-800 dark:text-secondary-100">{label}</span>
-        {hint && <span className="block text-[11px] text-secondary-400">{hint}</span>}
-      </span>
-    </label>
-  );
 }
 
 function ComponentModal({ component, isOpen, onClose }: {
@@ -150,56 +126,48 @@ function ComponentModal({ component, isOpen, onClose }: {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md"
+    <DxPopup
+      isOpen={isOpen} onClose={onClose} size="md"
       title={component ? `Edit — ${component.code}` : "New Pay Component"}
+      locked={save.isPending}
       footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" size="sm" onClick={onClose} disabled={save.isPending}>Cancel</Button>
-          <Button size="sm" onClick={submit} isLoading={save.isPending}>
-            {component ? "Save changes" : "Create component"}
-          </Button>
-        </div>
-      }>
+        <>
+          <DxButton onClick={onClose} disabled={save.isPending}>Cancel</DxButton>
+          <DxButton variant="primary" onClick={submit} isLoading={save.isPending}>{component ? "Save changes" : "Create component"}</DxButton>
+        </>
+      }
+    >
       <div className="space-y-4">
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Input label="Code" value={form.code} disabled={!!component?.is_statutory}
-            onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-            hint="Short unique code, e.g. HOUSING." />
-          <Input label="Name" value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-          <Select label="Type" value={form.component_type} disabled={!!component?.is_statutory}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <DxInput label="Code" value={form.code} disabled={!!component?.is_statutory}
+            onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} hint="Short unique code, e.g. HOUSING." />
+          <DxInput label="Name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+          <DxSelect label="Type" value={form.component_type} disabled={!!component?.is_statutory}
             onChange={(e) => setForm((f) => ({ ...f, component_type: e.target.value as PayrollComponentType }))}
             options={(Object.keys(TYPE_LABEL) as PayrollComponentType[])
               .filter((t) => component?.is_statutory || (t !== "STATUTORY" && t !== "EMPLOYER_CONTRIBUTION"))
               .map((t) => ({ value: t, label: TYPE_LABEL[t] }))}
             hint="Statutory components are system-calculated." />
-          <Input label="Default % of base" type="number" min="0" max="100" step="0.001"
-            value={form.default_percent}
-            onChange={(e) => setForm((f) => ({ ...f, default_percent: e.target.value }))}
-            hint="Leave empty for amount-based." />
-          <Input label="Default amount" type="number" min="0" step="0.01"
-            value={form.default_amount}
+          <DxInput label="Default % of base" type="number" min="0" max="100" step="0.001" value={form.default_percent}
+            onChange={(e) => setForm((f) => ({ ...f, default_percent: e.target.value }))} hint="Leave empty for amount-based." />
+          <DxInput label="Default amount" type="number" min="0" step="0.01" value={form.default_amount}
             onChange={(e) => setForm((f) => ({ ...f, default_amount: e.target.value }))} />
-          <Input label="Description" value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+          <DxInput label="Description" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
         </div>
-        <div className="space-y-2.5 rounded-2xl bg-secondary-50/70 p-4 dark:bg-white/5">
-          {form.component_type === "EARNING" && (
-            <CheckRow label="Taxable" checked={form.is_taxable}
-              hint="Included in the PAYE taxable base."
-              onChange={(v) => setForm((f) => ({ ...f, is_taxable: v }))} />
-          )}
-          {form.component_type === "DEDUCTION" && (
-            <CheckRow label="Tax relief" checked={form.is_tax_relief}
-              hint="Reduces the PAYE taxable base (e.g. NHIS, life insurance premiums)."
-              onChange={(v) => setForm((f) => ({ ...f, is_tax_relief: v }))} />
-          )}
-          <CheckRow label="Active" checked={form.is_active}
-            hint="Inactive components stay on history but can't be newly assigned."
-            onChange={(v) => setForm((f) => ({ ...f, is_active: v }))} />
+        <div className="space-y-2.5 rounded-md bg-[var(--dx-surface-sunken)] p-4">
+          {form.component_type === "EARNING" ? (
+            <DxCheckbox label="Taxable" description="Included in the PAYE taxable base." checked={form.is_taxable}
+              onChange={(e) => setForm((f) => ({ ...f, is_taxable: e.target.checked }))} />
+          ) : null}
+          {form.component_type === "DEDUCTION" ? (
+            <DxCheckbox label="Tax relief" description="Reduces the PAYE taxable base (e.g. NHIS, life insurance premiums)." checked={form.is_tax_relief}
+              onChange={(e) => setForm((f) => ({ ...f, is_tax_relief: e.target.checked }))} />
+          ) : null}
+          <DxCheckbox label="Active" description="Inactive components stay on history but can't be newly assigned." checked={form.is_active}
+            onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} />
         </div>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -293,74 +261,65 @@ function TemplateModal({ template, isOpen, onClose, components }: {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="lg"
+    <DxPopup
+      isOpen={isOpen} onClose={onClose} size="lg"
       title={template ? `Template — ${template.code}` : "New Pay Structure Template"}
+      locked={save.isPending}
       footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" size="sm" onClick={onClose} disabled={save.isPending}>Cancel</Button>
-          <Button size="sm" onClick={submit} isLoading={save.isPending}>Save template</Button>
-        </div>
-      }>
+        <>
+          <DxButton onClick={onClose} disabled={save.isPending}>Cancel</DxButton>
+          <DxButton variant="primary" onClick={submit} isLoading={save.isPending}>Save template</DxButton>
+        </>
+      }
+    >
       <div className="space-y-4">
-        <div className="grid sm:grid-cols-2 gap-3">
-          {!template && (
-            <Input label="Code" value={code} onChange={(e) => setCode(e.target.value)}
-              hint="Unique, e.g. NURSING-G7." />
-          )}
-          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} />
-          <Input label="Description" value={description}
-            onChange={(e) => setDescription(e.target.value)} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {!template ? (
+            <DxInput label="Code" value={code} onChange={(e) => setCode(e.target.value)} hint="Unique, e.g. NURSING-G7." />
+          ) : null}
+          <DxInput label="Name" value={name} onChange={(e) => setName(e.target.value)} />
+          <DxInput label="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-black uppercase tracking-widest text-secondary-500">Components</p>
-            <Button size="sm" variant="ghost" leftIcon={<Plus className="h-3.5 w-3.5" />}
+            <p className="dx-field-label">Components</p>
+            <DxButton size="sm" variant="accent-text" leftIcon={<Plus className="h-3.5 w-3.5" />}
               onClick={() => setRows((r) => [...r, { component_id: "", amount: "", percent: "" }])}>
               Add component
-            </Button>
+            </DxButton>
           </div>
           {rows.length === 0 ? (
-            <p className="text-xs text-secondary-400">
-              No components yet — add earnings (allowances) and deductions. A 'BASIC'
-              item with a fixed amount sets base pay when the template is applied.
+            <p className="text-[12px] text-[var(--dx-text-muted)]">
+              No components yet — add earnings (allowances) and deductions. A 'BASIC' item with a fixed amount sets base pay when the template is applied.
             </p>
           ) : rows.map((r, i) => {
             const comp = r.component_id ? byId.get(Number(r.component_id)) : undefined;
             return (
               <div key={i} className="flex items-center gap-2">
-                <select
-                  value={r.component_id}
-                  onChange={(e) => setRow(i, "component_id", e.target.value)}
-                  className="input-field flex-1"
-                >
+                <select value={r.component_id} onChange={(e) => setRow(i, "component_id", e.target.value)} className="dx-editor flex-1">
                   <option value="">Select component…</option>
                   {assignable.map((c) => (
-                    <option key={c.id} value={String(c.id)}>
-                      {c.name} ({TYPE_LABEL[c.component_type]})
-                    </option>
+                    <option key={c.id} value={String(c.id)}>{c.name} ({TYPE_LABEL[c.component_type]})</option>
                   ))}
                 </select>
                 <input type="number" min="0" placeholder="% of base" value={r.percent}
-                  onChange={(e) => setRow(i, "percent", e.target.value)}
-                  className="input-field w-28 text-right" />
+                  onChange={(e) => setRow(i, "percent", e.target.value)} className="dx-editor w-28 text-right" />
                 <input type="number" min="0" placeholder="Amount" value={r.amount}
                   onChange={(e) => setRow(i, "amount", e.target.value)}
-                  className={`input-field w-32 text-right font-semibold ${comp?.component_type === "DEDUCTION" ? "text-rose-500" : "text-emerald-600"}`} />
-                <button type="button" onClick={() => setRows(rows.filter((_, x) => x !== i))}
-                  className="rounded-xl p-2 hover:bg-rose-50" title="Remove">
-                  <Trash2 className="h-4 w-4 text-rose-400" />
-                </button>
+                  className="dx-editor w-32 text-right font-semibold"
+                  style={{ color: comp?.component_type === "DEDUCTION" ? "var(--dx-danger)" : "var(--dx-success)" }} />
+                <DxButton icon size="sm" variant="outline-danger" title="Remove" onClick={() => setRows(rows.filter((_, x) => x !== i))}>
+                  <Trash2 />
+                </DxButton>
               </div>
             );
           })}
-          <p className="text-[11px] text-secondary-400">
-            Percent items are computed on each staff member's base pay at application
-            time; amount items are fixed. Statutory items (PAYE, pension, NHF) are
-            always computed by the payroll engine and cannot be added here.
+          <p className="text-[11px] text-[var(--dx-text-muted)]">
+            Percent items are computed on each staff member's base pay at application time; amount items are fixed. Statutory items (PAYE, pension, NHF) are always computed by the payroll engine and cannot be added here.
           </p>
         </div>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -412,65 +371,53 @@ function ApplyModal({ template, isOpen, onClose }: {
   });
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md"
+    <DxPopup
+      isOpen={isOpen} onClose={onClose} size="md"
       title={template ? `Apply — ${template.name}` : "Apply template"}
+      locked={apply.isPending}
       footer={
         <div className="flex w-full items-center justify-between">
-          <p className="text-xs text-secondary-400">{selected.size} staff selected</p>
+          <p className="text-[12px] text-[var(--dx-text-muted)]">{selected.size} staff selected</p>
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={onClose} disabled={apply.isPending}>Cancel</Button>
-            <Button size="sm" onClick={() => apply.mutate()} isLoading={apply.isPending}
-              disabled={selected.size === 0}>
+            <DxButton onClick={onClose} disabled={apply.isPending}>Cancel</DxButton>
+            <DxButton variant="primary" onClick={() => apply.mutate()} isLoading={apply.isPending} disabled={selected.size === 0}>
               Apply to {selected.size || "…"} staff
-            </Button>
+            </DxButton>
           </div>
         </div>
-      }>
+      }
+    >
       <div className="space-y-3">
-        <p className="text-xs text-secondary-500">
-          Applying writes a fresh, versioned salary structure per selected staff
-          member from this template's components. Each staff member's current base
-          pay is carried forward unless the template includes a fixed BASIC amount.
+        <p className="text-[12px] text-[var(--dx-text-muted)]">
+          Applying writes a fresh, versioned salary structure per selected staff member from this template's components. Each staff member's current base pay is carried forward unless the template includes a fixed BASIC amount.
         </p>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Input label="Search staff" value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name or staff no…" />
-          <Input label="Effective from" type="date" value={effectiveFrom}
-            onChange={(e) => setEffectiveFrom(e.target.value)} hint="Defaults to today." />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <DxInput label="Search staff" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name or staff no…" />
+          <DxInput label="Effective from" type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} hint="Defaults to today." />
         </div>
-        <div className="max-h-72 overflow-y-auto rounded-2xl border border-secondary-100 dark:border-white/5 divide-y divide-secondary-100 dark:divide-white/5">
+        <div className="max-h-72 divide-y divide-[var(--dx-border)] overflow-y-auto rounded-md border border-[var(--dx-border)]">
           {staffQuery.isLoading ? (
-            <div className="p-4 space-y-2">
-              <Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-2/3" />
-            </div>
+            <div className="space-y-2 p-4"><div className="dx-skeleton h-5 w-full" /><div className="dx-skeleton h-5 w-2/3" /></div>
           ) : filtered.length === 0 ? (
-            <p className="p-4 text-xs text-secondary-400">No staff match.</p>
+            <p className="p-4 text-[12px] text-[var(--dx-text-muted)]">No staff match.</p>
           ) : filtered.map((s) => (
-            <label key={s.staff_profile_id}
-              className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-secondary-50/60 dark:hover:bg-white/5">
-              <input type="checkbox" checked={selected.has(s.staff_profile_id)}
-                onChange={() => toggle(s.staff_profile_id)}
-                className="h-4 w-4 rounded accent-primary-600" />
+            <label key={s.staff_profile_id} className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-[var(--dx-surface-sunken)]">
+              <input type="checkbox" checked={selected.has(s.staff_profile_id)} onChange={() => toggle(s.staff_profile_id)}
+                className="h-4 w-4 rounded" style={{ accentColor: "var(--dx-accent)" }} />
               <span className="flex-1">
-                <span className="block text-sm font-semibold text-secondary-800 dark:text-secondary-100">
-                  {s.staff_name || s.staff_no}
-                </span>
-                <span className="block text-[11px] text-secondary-400">
-                  {s.staff_no}{s.department_name ? ` · ${s.department_name}` : ""}
-                </span>
+                <span className="block text-[13px] font-semibold text-[var(--dx-text)]">{s.staff_name || s.staff_no}</span>
+                <span className="block text-[11px] text-[var(--dx-text-muted)]">{s.staff_no}{s.department_name ? ` · ${s.department_name}` : ""}</span>
               </span>
               {s.has_salary && s.base_salary_amount ? (
-                <span className="data-mono text-xs text-secondary-500">
-                  {money.format(Number(s.base_salary_amount))}
-                </span>
+                <span className="dx-mono text-[12px] text-[var(--dx-text-muted)]">{money.format(Number(s.base_salary_amount))}</span>
               ) : (
-                <Badge variant="soft-warning">No salary</Badge>
+                <DxBadge tone="warning">No salary</DxBadge>
               )}
             </label>
           ))}
         </div>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -505,155 +452,112 @@ export function PayrollComponentsPage() {
       .filter((g) => g.items.length > 0);
   }, [components]);
 
+  const catalogColumns: DxGridColumn<PayrollComponent>[] = [
+    { key: "code", header: "Code", render: (c) => <span className="dx-mono text-[12px] font-bold text-[var(--dx-text)]">{c.code}</span> },
+    {
+      key: "name", header: "Name", render: (c) => (
+        <div>
+          <span className="text-[13px] text-[var(--dx-text)]">{c.name}</span>
+          {c.description ? <span className="block text-[11px] text-[var(--dx-text-muted)]">{c.description}</span> : null}
+        </div>
+      ),
+    },
+    { key: "default", header: "Default", align: "right", render: (c) => <span className="dx-mono text-[12px] text-[var(--dx-text)]">{defaultValueLabel(c)}</span> },
+    {
+      key: "tax", header: "Tax", render: (c) => (
+        <>
+          {c.component_type === "EARNING" ? <DxBadge tone={c.is_taxable ? "warning" : "neutral"}>{c.is_taxable ? "Taxable" : "Tax-free"}</DxBadge> : null}
+          {c.component_type === "DEDUCTION" && c.is_tax_relief ? <DxBadge tone="info">Tax relief</DxBadge> : null}
+        </>
+      ),
+    },
+    {
+      key: "status", header: "Status", render: (c) => (
+        <span className="flex flex-wrap items-center gap-1">
+          <DxBadge tone={c.is_active ? "success" : "neutral"}>{c.is_active ? "ACTIVE" : "INACTIVE"}</DxBadge>
+          {c.is_statutory ? <DxBadge tone="neutral">System</DxBadge> : null}
+        </span>
+      ),
+    },
+    {
+      key: "action", header: "", align: "right",
+      render: (c) => <DxButton icon size="sm" variant="text" title="Edit component" onClick={() => { setEditComponent(c); setComponentModalOpen(true); }}><Pencil /></DxButton>,
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "HR & Payroll" }, { label: "Pay Components" }]}
         title="Pay Components"
-        eyebrow={<SuiteEyebrow label="HR & Payroll Suite" />}
-        description="The pay element catalog and reusable pay-structure templates."
+        subtitle="The pay element catalog and reusable pay-structure templates."
         actions={
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" leftIcon={<Layers className="h-3.5 w-3.5" />}
-              onClick={() => { setEditTemplate(null); setTemplateModalOpen(true); }}>
-              New Template
-            </Button>
-            <Button size="sm" leftIcon={<Plus className="h-3.5 w-3.5" />}
-              onClick={() => { setEditComponent(null); setComponentModalOpen(true); }}>
-              New Component
-            </Button>
-          </div>
+          <>
+            <DxButton leftIcon={<Layers className="h-4 w-4" />} onClick={() => { setEditTemplate(null); setTemplateModalOpen(true); }}>New template</DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setEditComponent(null); setComponentModalOpen(true); }}>New component</DxButton>
+          </>
         }
       />
       <PayrollTabs />
 
       {/* Templates */}
-      <Card className="p-6 space-y-4">
-        <p className="text-[11px] font-black uppercase tracking-widest text-secondary-500">
-          Pay structure templates
-        </p>
+      <DxPanel title="Pay structure templates" icon={<Layers className="h-4 w-4" />}>
         {templatesQuery.isLoading ? (
-          <div className="space-y-2"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="dx-skeleton h-28 w-full" />)}</div>
         ) : templates.length === 0 ? (
-          <p className="text-sm text-secondary-400">
-            No templates yet — create one to apply a standard pay structure to many staff at once.
-          </p>
+          <p className="text-[13px] text-[var(--dx-text-muted)]">No templates yet — create one to apply a standard pay structure to many staff at once.</p>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {templates.map((t) => (
-              <div key={t.id}
-                className="rounded-2xl border border-secondary-100 p-4 space-y-2 dark:border-white/5">
+              <div key={t.id} className="space-y-2 rounded-lg border border-[var(--dx-border)] bg-[var(--dx-surface)] p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-bold text-secondary-900 dark:text-white">{t.name}</p>
-                    <p className="data-mono text-[10px] text-secondary-400">{t.code}</p>
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-bold text-[var(--dx-text)]">{t.name}</p>
+                    <p className="dx-mono text-[10px] text-[var(--dx-text-muted)]">{t.code}</p>
                   </div>
-                  <Badge variant={t.is_active ? "soft-success" : "secondary"}>
-                    {t.is_active ? "ACTIVE" : "INACTIVE"}
-                  </Badge>
+                  <DxBadge tone={t.is_active ? "success" : "neutral"}>{t.is_active ? "ACTIVE" : "INACTIVE"}</DxBadge>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {t.items.map((i) => (
-                    <span key={i.id}
-                      className="rounded-lg bg-secondary-50 px-2 py-0.5 text-[10px] font-semibold text-secondary-600 dark:bg-white/10 dark:text-secondary-300">
+                    <span key={i.id} className="rounded-md bg-[var(--dx-surface-sunken)] px-2 py-0.5 text-[10px] font-semibold text-[var(--dx-text-muted)]">
                       {i.code}{i.percent ? ` ${Number(i.percent)}%` : i.amount ? ` ${money.format(Number(i.amount))}` : ""}
                     </span>
                   ))}
-                  {t.items.length === 0 && (
-                    <span className="text-[11px] text-secondary-400">No components yet.</span>
-                  )}
+                  {t.items.length === 0 ? <span className="text-[11px] text-[var(--dx-text-muted)]">No components yet.</span> : null}
                 </div>
                 <div className="flex gap-2 pt-1">
-                  <Button size="sm" variant="secondary" leftIcon={<Pencil className="h-3.5 w-3.5" />}
-                    onClick={() => { setEditTemplate(t); setTemplateModalOpen(true); }}>
-                    Edit
-                  </Button>
-                  <Button size="sm" leftIcon={<Send className="h-3.5 w-3.5" />}
-                    disabled={t.items.length === 0}
-                    onClick={() => setApplyTemplate(t)}>
-                    Apply to staff
-                  </Button>
+                  <DxButton size="sm" leftIcon={<Pencil className="h-3.5 w-3.5" />} onClick={() => { setEditTemplate(t); setTemplateModalOpen(true); }}>Edit</DxButton>
+                  <DxButton size="sm" variant="primary" leftIcon={<Send className="h-3.5 w-3.5" />} disabled={t.items.length === 0} onClick={() => setApplyTemplate(t)}>Apply to staff</DxButton>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </Card>
+      </DxPanel>
 
       {/* Component catalog */}
-      <Card className="p-6 space-y-5">
-        <p className="text-[11px] font-black uppercase tracking-widest text-secondary-500">
-          Component catalog
-        </p>
+      <DxPanel title="Component catalog" icon={<Plus className="h-4 w-4" />}>
         {componentsQuery.isLoading ? (
-          <div className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-2/3" /></div>
+          <div className="space-y-2"><div className="dx-skeleton h-10 w-full" /><div className="dx-skeleton h-10 w-full" /><div className="dx-skeleton h-10 w-2/3" /></div>
         ) : grouped.length === 0 ? (
-          <p className="text-sm text-secondary-400">
-            No components found — restart the backend so the catalog seeds, or create components manually.
-          </p>
-        ) : grouped.map((g) => (
-          <div key={g.type} className="space-y-2">
-            <Badge variant={TYPE_VARIANT[g.type]}>{TYPE_LABEL[g.type]}s</Badge>
-            <div className="overflow-x-auto rounded-2xl border border-secondary-100 dark:border-white/5">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-[10px] font-black uppercase tracking-widest text-secondary-400">
-                    <th className="px-4 py-2.5">Code</th>
-                    <th className="px-4 py-2.5">Name</th>
-                    <th className="px-4 py-2.5 text-right">Default</th>
-                    <th className="px-4 py-2.5">Tax</th>
-                    <th className="px-4 py-2.5">Status</th>
-                    <th className="px-4 py-2.5" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-secondary-100 dark:divide-white/5">
-                  {g.items.map((c) => (
-                    <tr key={c.id} className="hover:bg-secondary-50/60 dark:hover:bg-white/5">
-                      <td className="data-mono px-4 py-2.5 text-xs font-bold">{c.code}</td>
-                      <td className="px-4 py-2.5">
-                        {c.name}
-                        {c.description && (
-                          <span className="block text-[11px] text-secondary-400">{c.description}</span>
-                        )}
-                      </td>
-                      <td className="data-mono px-4 py-2.5 text-right text-xs">{defaultValueLabel(c)}</td>
-                      <td className="px-4 py-2.5">
-                        {c.component_type === "EARNING" && (
-                          <Badge variant={c.is_taxable ? "soft-warning" : "secondary"}>
-                            {c.is_taxable ? "Taxable" : "Tax-free"}
-                          </Badge>
-                        )}
-                        {c.component_type === "DEDUCTION" && c.is_tax_relief && (
-                          <Badge variant="soft-info">Tax relief</Badge>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <Badge variant={c.is_active ? "soft-success" : "secondary"}>
-                          {c.is_active ? "ACTIVE" : "INACTIVE"}
-                        </Badge>
-                        {c.is_statutory && <Badge variant="outline">System</Badge>}
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <button type="button" title="Edit component"
-                          onClick={() => { setEditComponent(c); setComponentModalOpen(true); }}
-                          className="rounded-lg p-2 text-secondary-400 hover:bg-primary-500/10 hover:text-primary-600">
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <p className="text-[13px] text-[var(--dx-text-muted)]">No components found — restart the backend so the catalog seeds, or create components manually.</p>
+        ) : (
+          <div className="space-y-5">
+            {grouped.map((g) => (
+              <div key={g.type} className="space-y-2">
+                <DxBadge tone={TYPE_TONE[g.type]}>{TYPE_LABEL[g.type]}s</DxBadge>
+                <div className="overflow-hidden rounded-md border border-[var(--dx-border)]">
+                  <DxGrid<PayrollComponent> columns={catalogColumns} data={g.items} rowKey={(c) => c.id} />
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </Card>
+        )}
+      </DxPanel>
 
-      <ComponentModal component={editComponent} isOpen={componentModalOpen}
-        onClose={() => setComponentModalOpen(false)} />
-      <TemplateModal template={editTemplate} isOpen={templateModalOpen}
-        onClose={() => setTemplateModalOpen(false)} components={components} />
-      <ApplyModal template={applyTemplate} isOpen={applyTemplate !== null}
-        onClose={() => setApplyTemplate(null)} />
-    </div>
+      <ComponentModal component={editComponent} isOpen={componentModalOpen} onClose={() => setComponentModalOpen(false)} />
+      <TemplateModal template={editTemplate} isOpen={templateModalOpen} onClose={() => setTemplateModalOpen(false)} components={components} />
+      <ApplyModal template={applyTemplate} isOpen={applyTemplate !== null} onClose={() => setApplyTemplate(null)} />
+    </DxPage>
   );
 }

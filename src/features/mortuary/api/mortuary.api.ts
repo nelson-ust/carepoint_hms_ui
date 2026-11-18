@@ -4,6 +4,8 @@ import type { PaginatedResponse } from "@/features/visits/api/visits.api";
 // ---------- Types ----------
 
 export type MortuaryUnitType = "COLD_CHAMBER" | "FREEZER" | "SHELF" | "OTHER";
+export type MortuaryRatePeriod = "DAILY" | "MONTHLY";
+export type MortuaryBillingCadence = "ONE_OFF" | "DAILY" | "MONTHLY";
 export type MortuaryUnitStatus = "AVAILABLE" | "PARTIAL" | "FULL" | "OUT_OF_SERVICE";
 export type DeceasedSource = "IN_HOSPITAL" | "BROUGHT_IN";
 export type DeceasedStatus = "REGISTERED" | "IN_STORAGE" | "RELEASED" | "TRANSFERRED";
@@ -17,6 +19,10 @@ export type MortuaryUnit = {
   status: MortuaryUnitStatus;
   location?: string | null;
   temperature_c?: number | null;
+  rate: number;
+  rate_period: MortuaryRatePeriod;
+  account_code?: string | null;
+  account_id?: number | null;
   notes?: string | null;
   occupied: number;
   available_slots: number;
@@ -82,9 +88,31 @@ export type CreateUnitPayload = {
   capacity: number;
   location?: string;
   temperature_c?: number;
+  rate?: number;
+  rate_period?: MortuaryRatePeriod;
+  account_code?: string;
   notes?: string;
 };
 export type UpdateUnitPayload = Partial<Omit<CreateUnitPayload, "code">> & { status?: MortuaryUnitStatus };
+
+export type MortuaryAccount = {
+  id: number;
+  code: string;
+  name: string;
+  account_type: string;
+  is_postable: boolean;
+};
+
+export type UnitRateHistory = {
+  id: number;
+  mortuary_unit_id: number;
+  rate: number;
+  rate_period: MortuaryRatePeriod;
+  account_code: string | null;
+  changed_by: string | null;
+  note: string | null;
+  effective_from: string;
+};
 
 export type RegisterDeceasedPayload = {
   source: DeceasedSource;
@@ -189,12 +217,31 @@ export type Viewing = {
   relationship_to_deceased?: string | null; contact?: string | null;
   viewed_at?: string | null; authorized_by?: string | null; notes?: string | null;
 };
+export type MortuaryChargeType =
+  | "STORAGE" | "EMBALMING" | "AUTOPSY" | "BODY_PREP" | "DRESSING" | "PRESERVATION"
+  | "COFFIN" | "HEARSE" | "PENALTY" | "DOCUMENTATION" | "MORTUARY_FEE" | "OTHER";
+
 export type Charge = {
   id: number; deceased_record_id: number;
-  charge_type: "STORAGE" | "EMBALMING" | "AUTOPSY" | "BODY_PREP" | "MORTUARY_FEE" | "OTHER";
+  charge_type: MortuaryChargeType;
   status: "PENDING" | "PAID" | "WAIVED"; description?: string | null;
   quantity: number; unit_amount: number; amount: number; charged_at?: string | null;
+  account_id?: number | null; account_code?: string | null; fee_schedule_id?: number | null;
+  billing_cadence?: MortuaryBillingCadence;
   notes?: string | null; deceased_name?: string | null; tag_number?: string | null;
+};
+
+export type MortuaryFee = {
+  id: number; code: string; name: string; charge_type: MortuaryChargeType;
+  unit_price: number; is_daily: boolean; billing_cadence: MortuaryBillingCadence; account_id?: number | null;
+  account_code?: string | null; is_active: boolean; description?: string | null;
+  created_at?: string | null;
+};
+
+export type MortuaryFeePayload = {
+  code?: string; name?: string; charge_type?: string; unit_price?: number;
+  is_daily?: boolean; billing_cadence?: string; account_code?: string; account_id?: number; is_active?: boolean;
+  description?: string;
 };
 export type Certificate = {
   id: number; deceased_record_id: number; certificate_number: string;
@@ -257,6 +304,10 @@ export const mortuaryApi = {
   updateUnit: (id: number, payload: UpdateUnitPayload) =>
     apiClient.put<{ success: boolean; message: string; unit: MortuaryUnit }>(`/mortuary/units/${id}`, payload).then((res) => res.data),
   deleteUnit: (id: number) => apiClient.delete(`/mortuary/units/${id}`).then((res) => res.data),
+  getUnitRateHistory: (id: number) =>
+    apiClient.get<{ items: UnitRateHistory[] }>(`/mortuary/units/${id}/rate-history`).then((res) => res.data.items),
+  listAccounts: () =>
+    apiClient.get<{ items: MortuaryAccount[] }>("/mortuary/accounts").then((res) => res.data.items),
 
   // Deceased records
   listDeceased: (
@@ -332,6 +383,20 @@ export const mortuaryApi = {
     }),
   addPayment: (recordId: number, payload: { amount: number; method: string; reference?: string; payer_name?: string; notes?: string }) =>
     apiClient.post<{ data: MortuaryPayment2 }>(`/mortuary/deceased/${recordId}/payments`, payload).then((res) => res.data),
-  accrueStorage: (recordId: number, daily_rate: number) =>
+  accrueStorage: (recordId: number, daily_rate?: number) =>
     apiClient.post<{ data: Charge }>(`/mortuary/deceased/${recordId}/accrue-storage`, { daily_rate }).then((res) => res.data),
+
+  // Fee schedule (price list) — every costing points at a chart-of-accounts code
+  listFees: (activeOnly = false) =>
+    apiClient
+      .get<PaginatedResponse<MortuaryFee>>("/mortuary/fee-schedule", { params: { active_only: activeOnly } })
+      .then((res) => res.data),
+  createFee: (payload: MortuaryFeePayload) =>
+    apiClient.post<{ data: MortuaryFee }>("/mortuary/fee-schedule", payload).then((res) => res.data),
+  updateFee: (feeId: number, payload: MortuaryFeePayload) =>
+    apiClient.put<{ data: MortuaryFee }>(`/mortuary/fee-schedule/${feeId}`, payload).then((res) => res.data),
+  deleteFee: (feeId: number) =>
+    apiClient.delete<{ success: boolean }>(`/mortuary/fee-schedule/${feeId}`).then((res) => res.data),
+  seedDefaultFees: () =>
+    apiClient.post<{ success: boolean; message: string }>("/mortuary/fee-schedule/seed-defaults").then((res) => res.data),
 };

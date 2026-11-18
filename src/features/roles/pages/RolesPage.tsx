@@ -13,19 +13,20 @@ import {
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxBadge,
+  DxButton,
+  DxInput,
+  DxTextarea,
+  DxCheckbox,
+  DxPopup,
+  DxMessage,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Input } from "@/components/ui/Input";
-import { Modal } from "@/components/ui/Modal";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { Textarea } from "@/components/ui/Textarea";
 import { useDisclosure } from "@/hooks/useDisclosure";
-import { cn } from "@/lib/utils/cn";
 
 import { getApiErrorMessage, isSystemRole } from "../api/roles.api";
 import type { PermissionGroup, Role, RoleListItem } from "../api/roles.api";
@@ -38,6 +39,35 @@ import {
   useSaveRolePermissions,
   useUpdateRole,
 } from "../hooks/use-roles";
+
+// =====================================================================
+// Shared empty / error block
+// =====================================================================
+
+function EmptyBlock({
+  icon: Icon,
+  title,
+  description,
+  action,
+}: {
+  icon: React.ElementType;
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="py-14 text-center">
+      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]">
+        <Icon className="h-8 w-8 text-[var(--dx-text-faint)]" />
+      </div>
+      <h4 className="text-[16px] font-bold text-[var(--dx-text)]">{title}</h4>
+      {description ? (
+        <p className="mx-auto mt-1 max-w-sm text-[13px] text-[var(--dx-text-muted)]">{description}</p>
+      ) : null}
+      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
+    </div>
+  );
+}
 
 // =====================================================================
 // Role form (create / edit)
@@ -119,39 +149,47 @@ function RoleFormModal({
   const isBusy = createRole.isPending || updateRole.isPending;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? "Edit Role" : "Create Role"} size="md">
-      <form onSubmit={onSubmit} className="space-y-5">
-        <Input
+    <DxPopup
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEdit ? "Edit Role" : "Create Role"}
+      size="md"
+      locked={isBusy}
+      footer={
+        <>
+          <DxButton type="button" onClick={onClose} disabled={isBusy}>
+            Cancel
+          </DxButton>
+          <DxButton type="submit" variant="primary" isLoading={isBusy} leftIcon={<Save className="h-4 w-4" />} onClick={onSubmit}>
+            {isEdit ? "Save Changes" : "Create Role"}
+          </DxButton>
+        </>
+      }
+    >
+      <form onSubmit={onSubmit} className="space-y-4">
+        <DxInput
           label="Role Name"
           placeholder="e.g. Triage Nurse"
           error={errors.name?.message}
           {...register("name")}
         />
-        <Input
+        <DxInput
           label="Role Code"
+          mono
           placeholder="e.g. TRIAGE_NURSE"
           hint="Stored uppercase — used as the stable identifier."
-          className="data-mono uppercase"
           error={errors.code?.message}
           {...register("code")}
         />
-        <Textarea
+        <DxTextarea
           label="Description"
           placeholder="What can members of this role do?"
           rows={3}
           error={errors.description?.message}
           {...register("description")}
         />
-        <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={isBusy}>
-            Cancel
-          </Button>
-          <Button type="submit" size="sm" isLoading={isBusy} leftIcon={<Save className="h-4 w-4" />}>
-            {isEdit ? "Save Changes" : "Create Role"}
-          </Button>
-        </div>
       </form>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -172,36 +210,33 @@ function RoleListCard({
     <button
       type="button"
       onClick={onSelect}
-      className={cn(
-        "glass-card w-full p-5 text-left transition-all duration-200",
-        isSelected
-          ? "border-primary-500/60 ring-2 ring-primary-500/40 shadow-glow-sm"
-          : "hover:border-primary-500/30"
-      )}
+      className="w-full rounded-lg border bg-[var(--dx-surface)] p-5 text-left transition-colors"
+      style={{
+        borderColor: isSelected ? "var(--dx-accent)" : "var(--dx-border)",
+        boxShadow: isSelected ? "inset 0 0 0 1px var(--dx-accent)" : undefined,
+      }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-display text-base font-bold text-secondary-900 dark:text-secondary-100">
-            {role.name}
-          </p>
-          <p className="data-mono mt-0.5 text-[11px] uppercase tracking-wider text-secondary-400 dark:text-secondary-500">
+          <p className="truncate text-[15px] font-bold text-[var(--dx-text)]">{role.name}</p>
+          <p className="dx-mono mt-0.5 text-[11px] uppercase tracking-wider text-[var(--dx-text-muted)]">
             {role.code}
           </p>
         </div>
-        {isSystemRole(role) ? <Badge variant="soft-info">System</Badge> : null}
+        {isSystemRole(role) ? <DxBadge tone="info">System</DxBadge> : null}
       </div>
       {role.description ? (
-        <p className="mt-2 line-clamp-2 text-xs font-medium text-secondary-500 dark:text-secondary-400">
+        <p className="mt-2 line-clamp-2 text-[12px] font-medium text-[var(--dx-text-muted)]">
           {role.description}
         </p>
       ) : null}
-      <div className="mt-4 flex items-center gap-4 border-t border-secondary-100 pt-3 text-xs font-semibold text-secondary-500 dark:border-white/5 dark:text-secondary-400">
+      <div className="mt-4 flex items-center gap-4 border-t border-[var(--dx-border)] pt-3 text-[12px] font-semibold text-[var(--dx-text-muted)]">
         <span className="inline-flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5 text-primary-500" aria-hidden />
+          <Users className="h-3.5 w-3.5 text-[var(--dx-accent)]" aria-hidden />
           {role.user_count} member{role.user_count === 1 ? "" : "s"}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <KeyRound className="h-3.5 w-3.5 text-primary-500" aria-hidden />
+          <KeyRound className="h-3.5 w-3.5 text-[var(--dx-accent)]" aria-hidden />
           {role.permission_count} permission{role.permission_count === 1 ? "" : "s"}
         </span>
       </div>
@@ -229,49 +264,45 @@ function PermissionModuleGroup({
   const allChecked = checkedCount === ids.length && ids.length > 0;
 
   return (
-    <div className="rounded-2xl border border-secondary-100 p-4 dark:border-white/10">
+    <div className="rounded-lg border border-[var(--dx-border)] p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-black uppercase tracking-widest text-secondary-500 dark:text-secondary-400">
+          <span className="text-[12px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
             {group.module}
           </span>
-          <Badge variant={checkedCount > 0 ? "soft-success" : "secondary"}>
+          <DxBadge tone={checkedCount > 0 ? "success" : "neutral"}>
             {checkedCount}/{ids.length}
-          </Badge>
+          </DxBadge>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => onToggleAll(ids, !allChecked)}>
+        <DxButton variant="text" size="sm" onClick={() => onToggleAll(ids, !allChecked)}>
           {allChecked ? "Clear all" : "Select all"}
-        </Button>
+        </DxButton>
       </div>
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {group.permissions.map((permission) => {
           const checked = checkedIds.has(permission.id);
           return (
-            <label
+            <div
               key={permission.id}
-              className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 transition-colors",
-                checked
-                  ? "border-primary-500/40 bg-primary-500/5"
-                  : "border-secondary-100 hover:border-primary-500/20 dark:border-white/10"
-              )}
-              title={permission.description ?? undefined}
+              className="min-w-0 overflow-hidden rounded-md border px-3 py-2.5 transition-colors"
+              style={{
+                borderColor: checked ? "var(--dx-accent)" : "var(--dx-border)",
+                background: checked ? "var(--dx-accent-soft)" : undefined,
+              }}
+              title={permission.description ?? permission.name}
             >
-              <input
-                type="checkbox"
+              <DxCheckbox
+                className="!flex w-full min-w-0 items-start"
                 checked={checked}
                 onChange={() => onToggle(permission.id)}
-                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded accent-primary-500"
+                label={<span className="block truncate text-[13px] font-semibold text-[var(--dx-text)]">{permission.name}</span>}
+                description={
+                  <span className="dx-mono block truncate text-[10px] uppercase tracking-wider text-[var(--dx-text-muted)]">
+                    {permission.code}
+                  </span>
+                }
               />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-secondary-900 dark:text-secondary-100">
-                  {permission.name}
-                </span>
-                <span className="data-mono block truncate text-[10px] uppercase tracking-wider text-secondary-400 dark:text-secondary-500">
-                  {permission.code}
-                </span>
-              </span>
-            </label>
+            </div>
           );
         })}
       </div>
@@ -349,85 +380,78 @@ function RoleDetailPanel({ roleId, onDeleted }: { roleId: number; onDeleted: () 
 
   if (roleQuery.isLoading) {
     return (
-      <Card className="space-y-4">
-        <Skeleton className="h-8 w-1/3" />
-        <Skeleton className="h-4 w-2/3" />
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-40 w-full" />
-      </Card>
+      <DxPanel>
+        <div className="space-y-4">
+          <div className="dx-skeleton h-8 w-1/3" />
+          <div className="dx-skeleton h-4 w-2/3" />
+          <div className="dx-skeleton h-40 w-full" />
+          <div className="dx-skeleton h-40 w-full" />
+        </div>
+      </DxPanel>
     );
   }
 
   if (roleQuery.isError || !role) {
     return (
-      <Card>
-        <EmptyState
+      <DxPanel>
+        <EmptyBlock
           icon={Shield}
           title="Unable to load role"
-          description={getApiErrorMessage(
-            roleQuery.error,
-            "The role details could not be fetched."
-          )}
+          description={getApiErrorMessage(roleQuery.error, "The role details could not be fetched.")}
           action={
-            <Button variant="secondary" size="sm" onClick={() => roleQuery.refetch()}>
+            <DxButton size="sm" onClick={() => roleQuery.refetch()}>
               Retry
-            </Button>
+            </DxButton>
           }
         />
-      </Card>
+      </DxPanel>
     );
   }
 
   const systemRole = isSystemRole(role);
 
   return (
-    <Card>
-      <CardHeader
-        title={
-          <span className="inline-flex items-center gap-3">
-            {role.name}
-            {systemRole ? <Badge variant="soft-info">System</Badge> : null}
-          </span>
-        }
-        description={
-          <span>
-            <span className="data-mono text-xs uppercase tracking-wider">{role.code}</span>
-            {role.description ? <span> — {role.description}</span> : null}
-          </span>
-        }
-        actions={
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              leftIcon={<Pencil className="h-4 w-4" />}
-              onClick={editModal.open}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              leftIcon={<Trash2 className="h-4 w-4" />}
-              onClick={deleteDialog.open}
-              disabled={systemRole}
-              title={systemRole ? "System roles cannot be deleted." : undefined}
-            >
-              Delete
-            </Button>
-          </>
-        }
-      />
-
+    <DxPanel
+      title={
+        <span className="inline-flex items-center gap-3">
+          {role.name}
+          {systemRole ? <DxBadge tone="info">System</DxBadge> : null}
+        </span>
+      }
+      description={
+        <span>
+          <span className="dx-mono text-[12px] uppercase tracking-wider">{role.code}</span>
+          {role.description ? <span> — {role.description}</span> : null}
+        </span>
+      }
+      actions={
+        <>
+          <DxButton size="sm" leftIcon={<Pencil className="h-4 w-4" />} onClick={editModal.open}>
+            Edit
+          </DxButton>
+          <DxButton
+            variant="danger"
+            size="sm"
+            leftIcon={<Trash2 className="h-4 w-4" />}
+            onClick={deleteDialog.open}
+            disabled={systemRole}
+            title={systemRole ? "System roles cannot be deleted." : undefined}
+          >
+            Delete
+          </DxButton>
+        </>
+      }
+    >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-primary-500" aria-hidden />
-          <span className="text-sm font-semibold text-secondary-600 dark:text-secondary-400">
+          <ShieldCheck className="h-4 w-4 text-[var(--dx-accent)]" aria-hidden />
+          <span className="text-[13px] font-semibold text-[var(--dx-text-muted)]">
             {checkedIds.size} permission{checkedIds.size === 1 ? "" : "s"} selected
           </span>
-          {isDirty ? <Badge variant="soft-warning">Unsaved changes</Badge> : null}
+          {isDirty ? <DxBadge tone="warning" dot>Unsaved changes</DxBadge> : null}
         </div>
-        <Button
+        <DxButton
+          variant="primary"
           size="sm"
           leftIcon={<Save className="h-4 w-4" />}
           onClick={handleSave}
@@ -435,31 +459,28 @@ function RoleDetailPanel({ roleId, onDeleted }: { roleId: number; onDeleted: () 
           isLoading={savePermissions.isPending}
         >
           Save Permissions
-        </Button>
+        </DxButton>
       </div>
 
       {catalogQuery.isLoading ? (
         <div className="space-y-4">
-          <Skeleton className="h-36 w-full" />
-          <Skeleton className="h-36 w-full" />
-          <Skeleton className="h-36 w-full" />
+          <div className="dx-skeleton h-36 w-full" />
+          <div className="dx-skeleton h-36 w-full" />
+          <div className="dx-skeleton h-36 w-full" />
         </div>
       ) : catalogQuery.isError ? (
-        <EmptyState
+        <EmptyBlock
           icon={KeyRound}
           title="Unable to load permissions"
-          description={getApiErrorMessage(
-            catalogQuery.error,
-            "The permission catalog could not be fetched."
-          )}
+          description={getApiErrorMessage(catalogQuery.error, "The permission catalog could not be fetched.")}
           action={
-            <Button variant="secondary" size="sm" onClick={() => catalogQuery.refetch()}>
+            <DxButton size="sm" onClick={() => catalogQuery.refetch()}>
               Retry
-            </Button>
+            </DxButton>
           }
         />
       ) : (catalogQuery.data?.groups.length ?? 0) === 0 ? (
-        <EmptyState
+        <EmptyBlock
           icon={KeyRound}
           title="No permissions defined"
           description="Seed the permission catalog on the backend to start assigning access."
@@ -480,16 +501,42 @@ function RoleDetailPanel({ roleId, onDeleted }: { roleId: number; onDeleted: () 
 
       <RoleFormModal isOpen={editModal.isOpen} onClose={editModal.close} role={role} />
 
-      <ConfirmDialog
+      {/* Delete confirm */}
+      <DxPopup
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
-        onConfirm={handleDelete}
         title="Delete Role"
-        description={`This will remove the "${role.name}" role. Roles that are still assigned to users cannot be deleted.`}
-        confirmLabel="Delete Role"
-        tone="danger"
-      />
-    </Card>
+        size="sm"
+        locked={deleteRole.isPending}
+        footer={
+          <>
+            <DxButton onClick={deleteDialog.close} disabled={deleteRole.isPending}>
+              Cancel
+            </DxButton>
+            <DxButton
+              variant="danger"
+              isLoading={deleteRole.isPending}
+              leftIcon={<Trash2 className="h-4 w-4" />}
+              onClick={async () => {
+                try {
+                  await handleDelete();
+                  deleteDialog.close();
+                } catch {
+                  /* toast already surfaced the error */
+                }
+              }}
+            >
+              Delete Role
+            </DxButton>
+          </>
+        }
+      >
+        <DxMessage tone="danger">
+          This will remove the "{role.name}" role. Roles that are still assigned to users cannot be
+          deleted.
+        </DxMessage>
+      </DxPopup>
+    </DxPanel>
   );
 }
 
@@ -512,14 +559,15 @@ export function RolesPage() {
   }, [roles, selectedRoleId]);
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Administration" }, { label: "Roles & Permissions" }]}
         title="Roles & Permissions"
-        description="Define access roles and fine-tune what each role can see and do."
+        subtitle="Define access roles and fine-tune what each role can see and do."
         actions={
-          <Button leftIcon={<Plus className="h-4 w-4" />} onClick={createModal.open}>
-            New Role
-          </Button>
+          <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={createModal.open}>
+            New role
+          </DxButton>
         }
       />
 
@@ -528,43 +576,36 @@ export function RolesPage() {
         <div className="space-y-4 lg:col-span-1">
           {rolesQuery.isLoading ? (
             <>
-              <Skeleton className="h-36 w-full rounded-[2rem]" />
-              <Skeleton className="h-36 w-full rounded-[2rem]" />
-              <Skeleton className="h-36 w-full rounded-[2rem]" />
+              <div className="dx-skeleton h-36 w-full" />
+              <div className="dx-skeleton h-36 w-full" />
+              <div className="dx-skeleton h-36 w-full" />
             </>
           ) : rolesQuery.isError ? (
-            <Card>
-              <EmptyState
+            <DxPanel>
+              <EmptyBlock
                 icon={Shield}
                 title="Unable to load roles"
-                description={getApiErrorMessage(
-                  rolesQuery.error,
-                  "The roles list could not be fetched."
-                )}
+                description={getApiErrorMessage(rolesQuery.error, "The roles list could not be fetched.")}
                 action={
-                  <Button variant="secondary" size="sm" onClick={() => rolesQuery.refetch()}>
+                  <DxButton size="sm" onClick={() => rolesQuery.refetch()}>
                     Retry
-                  </Button>
+                  </DxButton>
                 }
               />
-            </Card>
+            </DxPanel>
           ) : roles.length === 0 ? (
-            <Card>
-              <EmptyState
+            <DxPanel>
+              <EmptyBlock
                 icon={Shield}
                 title="No roles yet"
                 description="Create your first role to start granting access."
                 action={
-                  <Button
-                    size="sm"
-                    leftIcon={<Plus className="h-4 w-4" />}
-                    onClick={createModal.open}
-                  >
+                  <DxButton size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={createModal.open}>
                     New Role
-                  </Button>
+                  </DxButton>
                 }
               />
-            </Card>
+            </DxPanel>
           ) : (
             roles.map((role) => (
               <RoleListCard
@@ -582,15 +623,15 @@ export function RolesPage() {
           {selectedRoleId != null ? (
             <RoleDetailPanel roleId={selectedRoleId} onDeleted={() => setSelectedRoleId(null)} />
           ) : !rolesQuery.isLoading ? (
-            <Card>
-              <EmptyState
+            <DxPanel>
+              <EmptyBlock
                 icon={ShieldCheck}
                 title="Select a role"
                 description="Pick a role on the left to review and edit its permission matrix."
               />
-            </Card>
+            </DxPanel>
           ) : (
-            <Skeleton className="h-96 w-full rounded-[2rem]" />
+            <div className="dx-skeleton h-96 w-full" />
           )}
         </div>
       </div>
@@ -600,7 +641,7 @@ export function RolesPage() {
         onClose={createModal.close}
         onCreated={(roleId) => setSelectedRoleId(roleId)}
       />
-    </div>
+    </DxPage>
   );
 }
 

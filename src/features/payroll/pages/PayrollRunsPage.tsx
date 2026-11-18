@@ -10,19 +10,11 @@ import { FileDown, FileText, Gift, ListTree,
   Users,
   Wallet,
 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { SuiteEyebrow } from "@/components/layout/SuiteEyebrow";
-import { Card } from "@/components/ui/Card";
-import { Badge, type BadgeProps } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Modal } from "@/components/ui/Modal";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
+import {
+  DxPage, DxPageHeader, DxPanel, DxKpi, DxGrid, DxBadge, DxButton, DxInput, DxSelect, DxPopup, DxMessage,
+  type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
-import { MetricCard } from "@/components/charts/MetricCard";
 import { useDisclosure } from "@/hooks/useDisclosure";
 import { useStaffNameMap } from "@/features/staff/hooks/use-staff";
 import {
@@ -60,20 +52,20 @@ function fmtDate(value?: string | null): string {
     : d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const statusVariant: Record<PayrollRunStatus, BadgeProps["variant"]> = {
-  DRAFT: "secondary",
-  CALCULATED: "soft-info",
-  APPROVED: "soft-success",
-  PAID: "soft-success",
-  LOCKED: "soft-warning",
-  CANCELLED: "soft-danger",
+const statusTone: Record<PayrollRunStatus, DxBadgeTone> = {
+  DRAFT: "neutral",
+  CALCULATED: "info",
+  APPROVED: "success",
+  PAID: "success",
+  LOCKED: "warning",
+  CANCELLED: "danger",
 };
 
-const lineStatusVariant: Record<string, BadgeProps["variant"]> = {
-  PENDING: "soft-warning",
-  APPROVED: "soft-info",
-  PAID: "soft-success",
-  ERROR: "soft-danger",
+const lineStatusTone: Record<string, DxBadgeTone> = {
+  PENDING: "warning",
+  APPROVED: "info",
+  PAID: "success",
+  ERROR: "danger",
 };
 
 type RunVerb = "calculate" | "submit" | "lock" | "pay";
@@ -150,6 +142,7 @@ export function PayrollRunsPage() {
   const submitMutation = useSubmitPayrollForApproval();
   const lockMutation = useLockPayrollRun();
   const payMutation = usePayPayrollRun();
+  const actionBusy = calculateMutation.isPending || submitMutation.isPending || payMutation.isPending || lockMutation.isPending;
 
   const confirmCopy: Record<RunVerb, { title: string; description: string; success: string }> = {
     calculate: {
@@ -200,19 +193,19 @@ export function PayrollRunsPage() {
         "Payroll action failed",
         apiErrorMessage(err, "The server rejected the request. Please try again."),
       );
+    } finally {
+      setPendingAction(null);
     }
   };
 
-  const columns: DataTableColumn<PayrollRun>[] = [
+  const columns: DxGridColumn<PayrollRun>[] = [
     {
       key: "code",
       header: "Run",
       render: (run) => (
         <div>
-          <span className="data-mono text-sm font-bold text-secondary-900">{run.code}</span>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-            #{run.id}
-          </p>
+          <span className="dx-mono text-[13px] font-bold text-[var(--dx-text)]">{run.code}</span>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">#{run.id}</p>
         </div>
       ),
     },
@@ -221,10 +214,8 @@ export function PayrollRunsPage() {
       header: "Period",
       render: (run) => (
         <div className="flex items-center gap-2">
-          <CalendarRange className="h-4 w-4 text-secondary-400" aria-hidden />
-          <span className="text-sm font-medium text-secondary-700">
-            {fmtDate(run.period_start)} — {fmtDate(run.period_end)}
-          </span>
+          <CalendarRange className="h-4 w-4 text-[var(--dx-text-muted)]" aria-hidden />
+          <span className="text-[13px] font-medium text-[var(--dx-text)]">{fmtDate(run.period_start)} — {fmtDate(run.period_end)}</span>
         </div>
       ),
     },
@@ -233,140 +224,71 @@ export function PayrollRunsPage() {
       header: "Account",
       render: (run) =>
         run.account_code ? (
-          <span
-            className="data-mono text-xs font-bold text-secondary-700"
-            title={run.account_name ?? undefined}
-          >
-            {run.account_code}
-          </span>
+          <span className="dx-mono text-[12px] font-bold text-[var(--dx-text)]" title={run.account_name ?? undefined}>{run.account_code}</span>
         ) : (
-          <span className="text-xs text-secondary-300">—</span>
+          <span className="text-[12px] text-[var(--dx-text-faint)]">—</span>
         ),
     },
-    {
-      key: "total_gross",
-      header: "Gross",
-      align: "right",
-      render: (run) => <span className="data-mono text-sm">{fmtMoney(run.total_gross)}</span>,
-    },
-    {
-      key: "total_deductions",
-      header: "Deductions",
-      align: "right",
-      render: (run) => (
-        <span className="data-mono text-sm text-rose-500">-{fmtMoney(run.total_deductions)}</span>
-      ),
-    },
-    {
-      key: "total_net",
-      header: "Net Pay",
-      align: "right",
-      render: (run) => (
-        <span className="data-mono text-sm font-bold text-secondary-900">
-          {fmtMoney(run.total_net)}
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      render: (run) => (
-        <Badge variant={statusVariant[run.status] ?? "secondary"}>{run.status}</Badge>
-      ),
-    },
+    { key: "total_gross", header: "Gross", align: "right", render: (run) => <span className="dx-mono text-[13px]">{fmtMoney(run.total_gross)}</span> },
+    { key: "total_deductions", header: "Deductions", align: "right", render: (run) => <span className="dx-mono text-[13px]" style={{ color: "var(--dx-danger)" }}>-{fmtMoney(run.total_deductions)}</span> },
+    { key: "total_net", header: "Net Pay", align: "right", render: (run) => <span className="dx-mono text-[13px] font-bold text-[var(--dx-text)]">{fmtMoney(run.total_net)}</span> },
+    { key: "status", header: "Status", render: (run) => <DxBadge tone={statusTone[run.status] ?? "neutral"}>{run.status}</DxBadge> },
     {
       key: "actions",
       header: "",
       align: "right",
       render: (run) => {
         const action = nextAction(run);
-        if (!action) return <span className="text-xs text-secondary-400">—</span>;
+        if (!action) return <span className="text-[12px] text-[var(--dx-text-muted)]">—</span>;
         return (
-          <Button
-            variant={action.verb === "lock" ? "secondary" : "primary"}
+          <DxButton
+            variant={action.verb === "lock" ? "default" : "primary"}
             size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              setPendingAction({ run, verb: action.verb });
-            }}
+            onClick={(e) => { e.stopPropagation(); setPendingAction({ run, verb: action.verb }); }}
             leftIcon={
-              action.verb === "calculate" ? (
-                <Wallet className="h-3.5 w-3.5" />
-              ) : action.verb === "submit" ? (
-                <CheckCircle2 className="h-3.5 w-3.5" />
-              ) : action.verb === "pay" ? (
-                <Banknote className="h-3.5 w-3.5" />
-              ) : (
-                <Lock className="h-3.5 w-3.5" />
-              )
+              action.verb === "calculate" ? <Wallet className="h-3.5 w-3.5" />
+                : action.verb === "submit" ? <CheckCircle2 className="h-3.5 w-3.5" />
+                  : action.verb === "pay" ? <Banknote className="h-3.5 w-3.5" />
+                    : <Lock className="h-3.5 w-3.5" />
             }
           >
             {action.label}
-          </Button>
+          </DxButton>
         );
       },
     },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "HR & Payroll" }, { label: "Payroll Runs" }]}
         title="Payroll Runs"
-        eyebrow={<SuiteEyebrow label="HR & Payroll Suite" />}
-        description="Create, calculate, approve, pay and lock payroll cycles across the organization."
-        actions={
-          <Button leftIcon={<Plus className="h-4 w-4" />} onClick={newRunModal.open}>
-            New Payroll Run
-          </Button>
-        }
+        subtitle="Create, calculate, approve, pay and lock payroll cycles across the organization."
+        actions={<DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={newRunModal.open}>New payroll run</DxButton>}
       />
       <PayrollTabs />
 
       {/* KPI tiles */}
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Last Run Net Total"
-          value={lastRun ? fmtMoney(lastRun.total_net) : "—"}
-          icon={Banknote}
-          tone="primary"
-          isLoading={allRunsQuery.isLoading}
-        />
-        <MetricCard
-          label="Staff Paid (Last Run)"
-          value={staffPaid ?? "—"}
-          icon={Users}
-          tone="cyan"
-          isLoading={allRunsQuery.isLoading || lastRunLinesQuery.isLoading}
-        />
-        <MetricCard
-          label="Pending Approvals"
-          value={pendingApprovals}
-          icon={ShieldCheck}
-          tone="amber"
-          isLoading={allRunsQuery.isLoading}
-        />
-        <MetricCard
-          label="Total Payroll Runs"
-          value={allRuns.length}
-          icon={CalendarRange}
-          tone="violet"
-          isLoading={allRunsQuery.isLoading}
-        />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DxKpi label="Last Run Net Total" value={lastRun ? fmtMoney(lastRun.total_net) : "—"} icon={Banknote} tone="accent" isLoading={allRunsQuery.isLoading} />
+        <DxKpi label="Staff Paid (Last Run)" value={staffPaid ?? "—"} icon={Users} tone="info" isLoading={allRunsQuery.isLoading || lastRunLinesQuery.isLoading} />
+        <DxKpi label="Pending Approvals" value={pendingApprovals} icon={ShieldCheck} tone="warning" isLoading={allRunsQuery.isLoading} />
+        <DxKpi label="Total Payroll Runs" value={allRuns.length} icon={CalendarRange} tone="neutral" isLoading={allRunsQuery.isLoading} />
       </div>
 
       {/* Runs table */}
-      <Card padding="none">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
-          <h3 className="font-display text-lg font-bold text-secondary-900">Payroll History</h3>
-          <Select
-            aria-label="Filter by status"
-            options={STATUS_OPTIONS}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-44 py-2.5"
-          />
-        </div>
-        <DataTable
+      <DxPanel
+        title="Payroll History"
+        icon={<Banknote className="h-4 w-4" />}
+        flush
+        actions={
+          <div className="w-44">
+            <DxSelect aria-label="Filter by status" options={STATUS_OPTIONS} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} editorSize="sm" />
+          </div>
+        }
+      >
+        <DxGrid
           columns={columns}
           data={runs}
           rowKey={(run) => run.id}
@@ -378,18 +300,10 @@ export function PayrollRunsPage() {
             icon: Wallet,
             title: "No payroll runs yet",
             description: "Create a payroll run to begin processing staff salaries for a period.",
-            action: (
-              <Button
-                size="sm"
-                leftIcon={<Plus className="h-3.5 w-3.5" />}
-                onClick={newRunModal.open}
-              >
-                New Payroll Run
-              </Button>
-            ),
+            action: <DxButton size="sm" variant="primary" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={newRunModal.open}>New payroll run</DxButton>,
           }}
         />
-      </Card>
+      </DxPanel>
 
       {/* Run detail modal */}
       <RunDetailModal
@@ -407,18 +321,28 @@ export function PayrollRunsPage() {
       />
 
       {/* Process / approve / lock confirmation */}
-      <ConfirmDialog
+      <DxPopup
         isOpen={pendingAction !== null}
         onClose={() => setPendingAction(null)}
-        onConfirm={handleConfirmAction}
         title={pendingAction ? confirmCopy[pendingAction.verb].title : ""}
-        description={pendingAction ? confirmCopy[pendingAction.verb].description : undefined}
-        confirmLabel={
-          pendingAction ? nextAction(pendingAction.run)?.label ?? "Confirm" : "Confirm"
+        size="sm"
+        locked={actionBusy}
+        footer={
+          <>
+            <DxButton onClick={() => setPendingAction(null)} disabled={actionBusy}>Cancel</DxButton>
+            <DxButton
+              variant={pendingAction?.verb === "lock" ? "danger" : "primary"}
+              isLoading={actionBusy}
+              onClick={handleConfirmAction}
+            >
+              {pendingAction ? nextAction(pendingAction.run)?.label ?? "Confirm" : "Confirm"}
+            </DxButton>
+          </>
         }
-        tone={pendingAction?.verb === "lock" ? "danger" : "primary"}
-      />
-    </div>
+      >
+        {pendingAction ? <p className="text-[13px] text-[var(--dx-text-muted)]">{confirmCopy[pendingAction.verb].description}</p> : null}
+      </DxPopup>
+    </DxPage>
   );
 }
 
@@ -440,45 +364,25 @@ function RunDetailModal({
   const advanceTotal = lines.reduce((sum, l) => sum + lineAdvanceRecovery(l), 0);
   const [breakdownLine, setBreakdownLine] = useState<PayrollLine | null>(null);
 
-  const lineColumns: DataTableColumn<PayrollLine>[] = [
+  const lineColumns: DxGridColumn<PayrollLine>[] = [
     {
       key: "staff",
       header: "Staff Member",
       render: (line) => (
         <div>
-          <p className="text-sm font-bold text-secondary-900">
-            {nameMap.get(line.staff_profile_id) ?? `Staff #${line.staff_profile_id}`}
-          </p>
-          <p className="data-mono text-[10px] text-secondary-400">SP-{line.staff_profile_id}</p>
+          <p className="text-[13px] font-semibold text-[var(--dx-text)]">{nameMap.get(line.staff_profile_id) ?? `Staff #${line.staff_profile_id}`}</p>
+          <p className="dx-mono text-[10px] text-[var(--dx-text-muted)]">SP-{line.staff_profile_id}</p>
         </div>
       ),
     },
+    { key: "base_salary", header: "Base", align: "right", render: (line) => <span className="dx-mono text-[13px]">{fmtMoney(line.base_salary)}</span> },
     {
-      key: "base_salary",
-      header: "Base",
-      align: "right",
-      render: (line) => <span className="data-mono text-sm">{fmtMoney(line.base_salary)}</span>,
+      key: "total_allowances", header: "Allowances + OT", align: "right",
+      render: (line) => <span className="dx-mono text-[13px]">{fmtMoney(line.total_allowances + line.overtime_amount + line.bonus_amount)}</span>,
     },
+    { key: "gross_pay", header: "Gross", align: "right", render: (line) => <span className="dx-mono text-[13px]">{fmtMoney(line.gross_pay)}</span> },
     {
-      key: "total_allowances",
-      header: "Allowances + OT",
-      align: "right",
-      render: (line) => (
-        <span className="data-mono text-sm">
-          {fmtMoney(line.total_allowances + line.overtime_amount + line.bonus_amount)}
-        </span>
-      ),
-    },
-    {
-      key: "gross_pay",
-      header: "Gross",
-      align: "right",
-      render: (line) => <span className="data-mono text-sm">{fmtMoney(line.gross_pay)}</span>,
-    },
-    {
-      key: "total_deductions",
-      header: "Deductions",
-      align: "right",
+      key: "total_deductions", header: "Deductions", align: "right",
       render: (line) => {
         const advance = lineAdvanceRecovery(line);
         const loan = lineLoanRepayment(line);
@@ -492,157 +396,82 @@ function RunDetailModal({
         ].filter(Boolean);
         return (
           <div title={parts.join(" · ")}>
-            <span className="data-mono text-sm text-rose-500">
-              -{fmtMoney(line.total_deductions)}
-            </span>
-            {advance > 0 && (
-              <p className="data-mono text-[10px] font-semibold text-amber-600">
-                incl. salary advance -{fmtMoney(advance)}
-              </p>
-            )}
+            <span className="dx-mono text-[13px]" style={{ color: "var(--dx-danger)" }}>-{fmtMoney(line.total_deductions)}</span>
+            {advance > 0 ? <p className="dx-mono text-[10px] font-semibold" style={{ color: "var(--dx-warning)" }}>incl. salary advance -{fmtMoney(advance)}</p> : null}
           </div>
         );
       },
     },
+    { key: "net_pay", header: "Net Pay", align: "right", render: (line) => <span className="dx-mono text-[13px] font-bold text-[var(--dx-text)]">{fmtMoney(line.net_pay)}</span> },
     {
-      key: "net_pay",
-      header: "Net Pay",
-      align: "right",
-      render: (line) => (
-        <span className="data-mono text-sm font-bold text-secondary-900">
-          {fmtMoney(line.net_pay)}
-        </span>
-      ),
-    },
-    {
-      key: "payslip",
-      header: "",
-      align: "right",
+      key: "payslip", header: "", align: "right",
       render: (line) => (
         <div className="flex items-center justify-end gap-1">
-          <button
-            type="button"
-            title="View component breakdown"
-            onClick={() => setBreakdownLine(line)}
-            className="p-2 rounded-lg text-secondary-400 hover:text-primary-600 hover:bg-primary-500/10"
-          >
-            <ListTree className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            title="Download payslip PDF"
-            onClick={() => payrollExports.payslip(line.id)}
-            className="p-2 rounded-lg text-secondary-400 hover:text-primary-600 hover:bg-primary-500/10"
-          >
-            <FileText className="h-4 w-4" />
-          </button>
+          <DxButton icon size="sm" variant="text" title="View component breakdown" onClick={() => setBreakdownLine(line)}><ListTree /></DxButton>
+          <DxButton icon size="sm" variant="text" title="Download payslip PDF" onClick={() => payrollExports.payslip(line.id)}><FileText /></DxButton>
         </div>
       ),
     },
-    {
-      key: "status",
-      header: "Status",
-      render: (line) => (
-        <Badge variant={lineStatusVariant[line.status] ?? "secondary"}>{line.status}</Badge>
-      ),
-    },
+    { key: "status", header: "Status", render: (line) => <DxBadge tone={lineStatusTone[line.status] ?? "neutral"}>{line.status}</DxBadge> },
   ];
 
   const action = run ? nextAction(run) : null;
 
   return (
-    <Modal
+    <DxPopup
       isOpen={run !== null}
       onClose={onClose}
       title={run ? `Payroll Run ${run.code}` : "Payroll Run"}
-      size="2xl"
+      size="xl"
       footer={
         run && action ? (
-          <div className="flex justify-end gap-2">
-            {run.status === "CALCULATED" && (
-              <Button size="sm" variant="secondary" onClick={() => onAction(run, "calculate")}>
-                Recalculate
-              </Button>
-            )}
-            <Button
+          <>
+            {run.status === "CALCULATED" ? <DxButton size="sm" onClick={() => onAction(run, "calculate")}>Recalculate</DxButton> : null}
+            <DxButton
               size="sm"
               variant={action.verb === "lock" ? "danger" : "primary"}
               onClick={() => onAction(run, action.verb)}
-              leftIcon={
-                action.verb === "lock" ? (
-                  <Lock className="h-3.5 w-3.5" />
-                ) : action.verb === "pay" ? (
-                  <Banknote className="h-3.5 w-3.5" />
-                ) : (
-                  <Wallet className="h-3.5 w-3.5" />
-                )
-              }
+              leftIcon={action.verb === "lock" ? <Lock className="h-3.5 w-3.5" /> : action.verb === "pay" ? <Banknote className="h-3.5 w-3.5" /> : <Wallet className="h-3.5 w-3.5" />}
             >
               {action.label}
-            </Button>
-          </div>
+            </DxButton>
+          </>
         ) : undefined
       }
     >
       {run ? (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <SummaryStat
-              label="Period"
-              value={`${fmtDate(run.period_start)} — ${fmtDate(run.period_end)}`}
-            />
+            <SummaryStat label="Period" value={`${fmtDate(run.period_start)} — ${fmtDate(run.period_end)}`} />
             <SummaryStat label="Gross" value={fmtMoney(run.total_gross)} mono />
             <SummaryStat label="Deductions" value={`-${fmtMoney(run.total_deductions)}`} mono />
             <SummaryStat label="Net" value={fmtMoney(run.total_net)} mono />
-            {advanceTotal > 0 && (
-              <SummaryStat
-                label="Salary advances recovered"
-                value={`-${fmtMoney(advanceTotal)}`}
-                mono
-              />
-            )}
+            {advanceTotal > 0 ? <SummaryStat label="Salary advances recovered" value={`-${fmtMoney(advanceTotal)}`} mono /> : null}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Badge variant={statusVariant[run.status] ?? "secondary"}>{run.status}</Badge>
+            <DxBadge tone={statusTone[run.status] ?? "neutral"}>{run.status}</DxBadge>
             {run.account_code ? (
-              <span className="text-xs font-medium text-secondary-400">
-                Posting account{" "}
-                <span className="data-mono font-bold text-secondary-600">{run.account_code}</span>
-                {run.account_name ? ` — ${run.account_name}` : ""}
+              <span className="text-[12px] font-medium text-[var(--dx-text-muted)]">
+                Posting account <span className="dx-mono font-bold text-[var(--dx-text)]">{run.account_code}</span>{run.account_name ? ` — ${run.account_name}` : ""}
               </span>
             ) : null}
-            {run.calculated_at ? (
-              <span className="text-xs font-medium text-secondary-400">
-                Calculated {fmtDate(run.calculated_at)}
-              </span>
-            ) : null}
-            {run.approved_at ? (
-              <span className="text-xs font-medium text-secondary-400">
-                Approved {fmtDate(run.approved_at)}
-              </span>
-            ) : null}
+            {run.calculated_at ? <span className="text-[12px] font-medium text-[var(--dx-text-muted)]">Calculated {fmtDate(run.calculated_at)}</span> : null}
+            {run.approved_at ? <span className="text-[12px] font-medium text-[var(--dx-text-muted)]">Approved {fmtDate(run.approved_at)}</span> : null}
           </div>
-          {(run.status === "APPROVED" || run.status === "PAID" || run.status === "LOCKED") && (
+          {(run.status === "APPROVED" || run.status === "PAID" || run.status === "LOCKED") ? (
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" leftIcon={<FileDown className="h-3.5 w-3.5" />}
-                onClick={() => payrollExports.bankSchedule(run.id, run.code)}>Bank schedule</Button>
-              <Button size="sm" variant="secondary" leftIcon={<FileDown className="h-3.5 w-3.5" />}
-                onClick={() => payrollExports.paye(run.id, run.code)}>PAYE schedule</Button>
-              <Button size="sm" variant="secondary" leftIcon={<FileDown className="h-3.5 w-3.5" />}
-                onClick={() => payrollExports.pension(run.id, run.code)}>Pension schedule</Button>
-              <Button size="sm" variant="secondary" leftIcon={<FileDown className="h-3.5 w-3.5" />}
-                onClick={() => payrollExports.nhf(run.id, run.code)}>NHF schedule</Button>
-              <Button size="sm" variant="secondary" leftIcon={<FileDown className="h-3.5 w-3.5" />}
-                onClick={() => payrollExports.nsitf(run.id, run.code)}>NSITF schedule</Button>
+              <DxButton size="sm" leftIcon={<FileDown className="h-3.5 w-3.5" />} onClick={() => payrollExports.bankSchedule(run.id, run.code)}>Bank schedule</DxButton>
+              <DxButton size="sm" leftIcon={<FileDown className="h-3.5 w-3.5" />} onClick={() => payrollExports.paye(run.id, run.code)}>PAYE schedule</DxButton>
+              <DxButton size="sm" leftIcon={<FileDown className="h-3.5 w-3.5" />} onClick={() => payrollExports.pension(run.id, run.code)}>Pension schedule</DxButton>
+              <DxButton size="sm" leftIcon={<FileDown className="h-3.5 w-3.5" />} onClick={() => payrollExports.nhf(run.id, run.code)}>NHF schedule</DxButton>
+              <DxButton size="sm" leftIcon={<FileDown className="h-3.5 w-3.5" />} onClick={() => payrollExports.nsitf(run.id, run.code)}>NSITF schedule</DxButton>
             </div>
-          )}
+          ) : null}
 
-          {(run.status === "DRAFT" || run.status === "CALCULATED") && (
-            <OneOffsPanel run={run} nameMap={nameMap} />
-          )}
+          {(run.status === "DRAFT" || run.status === "CALCULATED") ? <OneOffsPanel run={run} nameMap={nameMap} /> : null}
 
-          <div className="overflow-hidden rounded-3xl border border-secondary-100 dark:border-white/5">
-            <DataTable
+          <div className="overflow-hidden rounded-md border border-[var(--dx-border)]">
+            <DxGrid
               columns={lineColumns}
               data={lines}
               rowKey={(line) => line.id}
@@ -662,31 +491,27 @@ function RunDetailModal({
           </div>
         </div>
       ) : (
-        <Skeleton className="h-40 w-full" />
+        <div className="dx-skeleton h-40 w-full" />
       )}
       <LineComponentsModal
         line={breakdownLine}
-        staffName={
-          breakdownLine
-            ? nameMap.get(breakdownLine.staff_profile_id) ?? `Staff #${breakdownLine.staff_profile_id}`
-            : ""
-        }
+        staffName={breakdownLine ? nameMap.get(breakdownLine.staff_profile_id) ?? `Staff #${breakdownLine.staff_profile_id}` : ""}
         onClose={() => setBreakdownLine(null)}
       />
-    </Modal>
+    </DxPopup>
   );
 }
 
 const COMPONENT_TYPE_META: Record<
   PayrollComponentType,
-  { label: string; accent: string; sign: string }
+  { label: string; color: string; sign: string }
 > = {
-  EARNING: { label: "Earnings", accent: "text-emerald-600", sign: "+" },
-  DEDUCTION: { label: "Deductions", accent: "text-rose-500", sign: "-" },
-  STATUTORY: { label: "Statutory deductions", accent: "text-rose-500", sign: "-" },
+  EARNING: { label: "Earnings", color: "var(--dx-success)", sign: "+" },
+  DEDUCTION: { label: "Deductions", color: "var(--dx-danger)", sign: "-" },
+  STATUTORY: { label: "Statutory deductions", color: "var(--dx-danger)", sign: "-" },
   EMPLOYER_CONTRIBUTION: {
     label: "Employer contributions (not deducted)",
-    accent: "text-secondary-500",
+    color: "var(--dx-text-muted)",
     sign: "",
   },
 };
@@ -713,23 +538,16 @@ function LineComponentsModal({
     .filter((g) => g.items.length > 0);
 
   return (
-    <Modal
-      isOpen={line !== null}
-      onClose={onClose}
-      title={`Payslip breakdown — ${staffName}`}
-      size="md"
-    >
+    <DxPopup isOpen={line !== null} onClose={onClose} title={`Payslip breakdown — ${staffName}`} size="md">
       {componentsQuery.isLoading ? (
         <div className="space-y-2">
-          <Skeleton className="h-6 w-full" />
-          <Skeleton className="h-6 w-3/4" />
-          <Skeleton className="h-6 w-2/3" />
+          <div className="dx-skeleton h-6 w-full" />
+          <div className="dx-skeleton h-6 w-3/4" />
+          <div className="dx-skeleton h-6 w-2/3" />
         </div>
       ) : comps.length === 0 ? (
-        <p className="text-sm text-secondary-400">
-          No component breakdown recorded for this line — recalculate the run to
-          generate it (runs calculated before the component model was added
-          don't have one).
+        <p className="text-[13px] text-[var(--dx-text-muted)]">
+          No component breakdown recorded for this line — recalculate the run to generate it (runs calculated before the component model was added don't have one).
         </p>
       ) : (
         <div className="space-y-5">
@@ -738,52 +556,34 @@ function LineComponentsModal({
             const subtotal = g.items.reduce((t, c) => t + Number(c.amount || 0), 0);
             return (
               <div key={g.type} className="space-y-1.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-secondary-400">
-                  {meta.label}
-                </p>
-                <div className="rounded-2xl border border-secondary-100 divide-y divide-secondary-100 dark:border-white/5 dark:divide-white/5">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">{meta.label}</p>
+                <div className="divide-y divide-[var(--dx-border)] rounded-md border border-[var(--dx-border)]">
                   {g.items.map((c) => (
                     <div key={c.id} className="flex items-center justify-between px-4 py-2">
-                      <span className="text-sm text-secondary-700 dark:text-secondary-200">
+                      <span className="text-[13px] text-[var(--dx-text)]">
                         {c.name}
-                        {g.type === "EARNING" && !c.is_taxable && (
-                          <span className="ml-2 text-[10px] font-semibold text-secondary-400">
-                            TAX-FREE
-                          </span>
-                        )}
+                        {g.type === "EARNING" && !c.is_taxable ? <span className="ml-2 text-[10px] font-semibold text-[var(--dx-text-muted)]">TAX-FREE</span> : null}
                       </span>
-                      <span className={`data-mono text-sm font-semibold ${meta.accent}`}>
-                        {meta.sign}
-                        {fmtMoney(Number(c.amount || 0))}
-                      </span>
+                      <span className="dx-mono text-[13px] font-semibold" style={{ color: meta.color }}>{meta.sign}{fmtMoney(Number(c.amount || 0))}</span>
                     </div>
                   ))}
-                  <div className="flex items-center justify-between px-4 py-2 bg-secondary-50/60 dark:bg-white/5">
-                    <span className="text-xs font-bold uppercase tracking-wider text-secondary-500">
-                      Subtotal
-                    </span>
-                    <span className={`data-mono text-sm font-black ${meta.accent}`}>
-                      {meta.sign}
-                      {fmtMoney(subtotal)}
-                    </span>
+                  <div className="flex items-center justify-between bg-[var(--dx-surface-sunken)] px-4 py-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--dx-text-muted)]">Subtotal</span>
+                    <span className="dx-mono text-[13px] font-bold" style={{ color: meta.color }}>{meta.sign}{fmtMoney(subtotal)}</span>
                   </div>
                 </div>
               </div>
             );
           })}
-          {line && (
-            <div className="flex items-center justify-between rounded-2xl bg-emerald-50 px-4 py-3 dark:bg-emerald-500/10">
-              <span className="text-xs font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
-                Net pay
-              </span>
-              <span className="data-mono text-base font-black text-emerald-700 dark:text-emerald-400">
-                {fmtMoney(line.net_pay)}
-              </span>
+          {line ? (
+            <div className="flex items-center justify-between rounded-md px-4 py-3" style={{ background: "var(--dx-success-soft)" }}>
+              <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--dx-success)" }}>Net pay</span>
+              <span className="dx-mono text-[16px] font-bold" style={{ color: "var(--dx-success)" }}>{fmtMoney(line.net_pay)}</span>
             </div>
-          )}
+          ) : null}
         </div>
       )}
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -797,19 +597,9 @@ function SummaryStat({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-2xl bg-secondary-500/5 px-4 py-3 dark:bg-white/5">
-      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-secondary-400">
-        {label}
-      </p>
-      <p
-        className={
-          mono
-            ? "data-mono mt-1 text-sm font-bold text-secondary-900"
-            : "mt-1 text-sm font-bold text-secondary-900"
-        }
-      >
-        {value}
-      </p>
+    <div className="rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--dx-text-muted)]">{label}</p>
+      <p className={(mono ? "dx-mono " : "") + "mt-1 text-[13px] font-bold text-[var(--dx-text)]"}>{value}</p>
     </div>
   );
 }
@@ -905,29 +695,21 @@ function NewRunModal({
   };
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={onClose}
       title="New Payroll Run"
       size="md"
+      locked={createMutation.isPending}
       footer={
-        <div className="flex justify-end gap-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onClose}
-            disabled={createMutation.isPending}
-          >
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleSubmit} isLoading={createMutation.isPending}>
-            Create Draft Run
-          </Button>
-        </div>
+        <>
+          <DxButton onClick={onClose} disabled={createMutation.isPending}>Cancel</DxButton>
+          <DxButton variant="primary" onClick={handleSubmit} isLoading={createMutation.isPending}>Create draft run</DxButton>
+        </>
       }
     >
       <div className="space-y-5">
-        <Input
+        <DxInput
           label="Run Code"
           value={code}
           onChange={(e) => setCode(e.target.value)}
@@ -935,54 +717,32 @@ function NewRunModal({
           error={formError && !code.trim() ? formError : undefined}
         />
         <div className="grid gap-5 sm:grid-cols-2">
-          <Input
-            label="Period Start"
-            type="date"
-            value={periodStart}
-            onChange={(e) => setPeriodStart(e.target.value)}
-          />
-          <Input
-            label="Period End"
-            type="date"
-            value={periodEnd}
-            onChange={(e) => setPeriodEnd(e.target.value)}
-          />
+          <DxInput label="Period Start" type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
+          <DxInput label="Period End" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
         </div>
         <div>
-          <Select
+          <DxSelect
             label="Posting account"
             value={accountId}
             onChange={(e) => setAccountId(e.target.value)}
             disabled={accountsQuery.isLoading}
             options={[
-              {
-                value: "",
-                label: accountsQuery.isLoading
-                  ? "Loading accounts…"
-                  : "— Select posting account —",
-              },
+              { value: "", label: accountsQuery.isLoading ? "Loading accounts…" : "— Select posting account —" },
               ...accounts.map((a) => ({ value: String(a.id), label: `${a.code} — ${a.name}` })),
             ]}
           />
           {!accountsQuery.isLoading && accounts.length === 0 ? (
-            <p className="mt-1 text-[11px] font-semibold text-amber-600">
-              No accounts found. Add them under Billing → Chart of Accounts first.
-            </p>
+            <p className="mt-1 text-[11px] font-semibold" style={{ color: "var(--dx-warning)" }}>No accounts found. Add them under Billing → Chart of Accounts first.</p>
           ) : (
-            <p className="mt-1 text-[11px] text-secondary-400">
-              The chart-of-accounts code this payroll run will be posted to.
-            </p>
+            <p className="mt-1 text-[11px] text-[var(--dx-text-muted)]">The chart-of-accounts code this payroll run will be posted to.</p>
           )}
         </div>
-        {formError && code.trim() ? (
-          <p className="text-xs font-bold text-rose-500">{formError}</p>
-        ) : null}
-        <p className="text-xs font-medium leading-relaxed text-secondary-400">
-          The run is created in DRAFT. Use "Process Payroll" to calculate payslip lines, then
-          approve and lock the run once payments are made.
+        {formError && code.trim() ? <p className="text-[12px] font-semibold" style={{ color: "var(--dx-danger)" }}>{formError}</p> : null}
+        <p className="text-[12px] font-medium leading-relaxed text-[var(--dx-text-muted)]">
+          The run is created in DRAFT. Use "Process Payroll" to calculate payslip lines, then approve and lock the run once payments are made.
         </p>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -1015,47 +775,43 @@ function OneOffsPanel({ run, nameMap }: { run: PayrollRun; nameMap: Map<number, 
   });
 
   return (
-    <div className="rounded-3xl border border-secondary-100 p-4 space-y-3 dark:border-white/5">
-      <p className="text-xs font-black uppercase tracking-widest text-secondary-400 flex items-center gap-2">
-        <Gift className="h-3.5 w-3.5" /> One-off earnings & deductions
+    <div className="space-y-3 rounded-md border border-[var(--dx-border)] p-4">
+      <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
+        <Gift className="h-3.5 w-3.5" /> One-off earnings &amp; deductions
         <span className="font-medium normal-case tracking-normal">— bonus, arrears, 13th month; recalculate after changes</span>
       </p>
       <div className="grid gap-2 sm:grid-cols-5">
-        <select className="input-field text-sm" value={staffId} onChange={(e) => setStaffId(e.target.value)}>
+        <select className="dx-editor dx-editor-sm" value={staffId} onChange={(e) => setStaffId(e.target.value)}>
           <option value="">Staff…</option>
           {staffOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select>
-        <select className="input-field text-sm" value={kind} onChange={(e) => setKind(e.target.value)}>
+        <select className="dx-editor dx-editor-sm" value={kind} onChange={(e) => setKind(e.target.value)}>
           <option value="BONUS">Bonus</option>
           <option value="ARREARS">Arrears</option>
           <option value="THIRTEENTH_MONTH">13th month</option>
           <option value="OTHER_EARNING">Other earning</option>
           <option value="OTHER_DEDUCTION">Other deduction</option>
         </select>
-        <input className="input-field text-sm" type="number" min={0.01} step="0.01" placeholder="Amount"
-          value={amount} onChange={(e) => setAmount(e.target.value)} />
-        <input className="input-field text-sm" placeholder="Note (optional)"
-          value={note} onChange={(e) => setNote(e.target.value)} />
-        <Button size="sm" disabled={!staffId || !amount || add.isPending}
-          onClick={() => add.mutate()}>Add</Button>
+        <input className="dx-editor dx-editor-sm" type="number" min={0.01} step="0.01" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <input className="dx-editor dx-editor-sm" placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+        <DxButton size="sm" variant="primary" disabled={!staffId || !amount || add.isPending} onClick={() => add.mutate()}>Add</DxButton>
       </div>
-      {(oneOffs.data ?? []).length > 0 && (
-        <div className="divide-y divide-secondary-100 dark:divide-white/5">
+      {(oneOffs.data ?? []).length > 0 ? (
+        <div className="divide-y divide-[var(--dx-border)]">
           {(oneOffs.data ?? []).map((oo) => (
-            <div key={oo.id} className="flex items-center justify-between py-2 text-sm">
-              <span>
+            <div key={oo.id} className="flex items-center justify-between py-2 text-[13px]">
+              <span className="text-[var(--dx-text)]">
                 <span className="font-bold">{nameMap.get(oo.staff_profile_id) ?? oo.staff_no}</span>
                 {" · "}{oo.kind.replace(/_/g, " ")}{oo.note ? ` — ${oo.note}` : ""}
               </span>
               <span className="flex items-center gap-3">
-                <span className="data-mono font-bold">{fmtMoney(Number(oo.amount))}</span>
-                <button type="button" className="text-rose-500 text-xs font-bold"
-                  onClick={() => remove.mutate(oo.id)}>Remove</button>
+                <span className="dx-mono font-bold text-[var(--dx-text)]">{fmtMoney(Number(oo.amount))}</span>
+                <button type="button" className="text-[12px] font-bold" style={{ color: "var(--dx-danger)" }} onClick={() => remove.mutate(oo.id)}>Remove</button>
               </span>
             </div>
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

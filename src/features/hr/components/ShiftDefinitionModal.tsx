@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
+import { DxPopup, DxButton, DxInput, DxSelect, DxTextarea } from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import {
@@ -131,94 +127,45 @@ export function ShiftDefinitionModal({
   };
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={onClose}
       title={isEdit ? "Edit Shift" : "New Shift"}
       size="lg"
+      locked={isSubmitting}
       footer={
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} isLoading={isSubmitting}>
-            {isEdit ? "Save changes" : "Create shift"}
-          </Button>
-        </div>
+        <>
+          <DxButton onClick={onClose} disabled={isSubmitting}>Cancel</DxButton>
+          <DxButton variant="primary" onClick={handleSubmit} isLoading={isSubmitting}>{isEdit ? "Save changes" : "Create shift"}</DxButton>
+        </>
       }
     >
       <div className="space-y-5">
-        <p className="rounded-2xl bg-secondary-50 px-4 py-3 text-xs font-semibold text-secondary-500 dark:bg-white/5">
-          Scope: <span className="text-secondary-900 dark:text-secondary-100">{scopeLabel}</span>
+        <p className="rounded-md bg-[var(--dx-surface-sunken)] px-4 py-3 text-[12px] font-semibold text-[var(--dx-text-muted)]">
+          Scope: <span className="text-[var(--dx-text)]">{scopeLabel}</span>
         </p>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="Shift name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Morning Shift"
-          />
-          <Input
-            label="Code"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="e.g. MORN"
-            disabled={isEdit}
-            hint={isEdit ? "Code can't be changed" : "Short unique label"}
-          />
+          <DxInput label="Shift name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Morning Shift" />
+          <DxInput label="Code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="e.g. MORN" disabled={isEdit} hint={isEdit ? "Code can't be changed" : "Short unique label"} />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select
-            label="Shift type"
-            value={shiftType}
-            onChange={(e) => setShiftType(e.target.value as StaffShiftType)}
-            options={SHIFT_TYPES}
-          />
+          <DxSelect label="Shift type" value={shiftType} onChange={(e) => setShiftType(e.target.value as StaffShiftType)} options={SHIFT_TYPES} />
           <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-secondary-500">
-              Colour
-            </label>
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="h-11 w-full cursor-pointer rounded-2xl border border-secondary-200 bg-white p-1 dark:border-white/10 dark:bg-white/5"
-            />
+            <span className="dx-field-label">Colour</span>
+            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="mt-1 h-10 w-full cursor-pointer rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface)] p-1" />
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <Input
-            label="Start time"
-            type="time"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-          />
-          <Input
-            label="End time"
-            type="time"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-          />
-          <Input
-            label="Break (min)"
-            type="number"
-            min={0}
-            value={breakMinutes}
-            onChange={(e) => setBreakMinutes(e.target.value)}
-          />
+          <DxInput label="Start time" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+          <DxInput label="End time" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+          <DxInput label="Break (min)" type="number" min={0} value={breakMinutes} onChange={(e) => setBreakMinutes(e.target.value)} />
         </div>
 
-        <Textarea
-          label="Notes (optional)"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Anything the team should know about this shift"
-          rows={2}
-        />
+        <DxTextarea label="Notes (optional)" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Anything the team should know about this shift" rows={2} />
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

@@ -1,14 +1,9 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Search, Users, Wallet } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { SuiteEyebrow } from "@/components/layout/SuiteEyebrow";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { MetricCard } from "@/components/charts/MetricCard";
+import {
+  DxPage, DxPageHeader, DxPanel, DxKpi, DxGrid, DxBadge, DxButton, DxInput, DxMessage,
+  type DxGridColumn,
+} from "@/components/dx";
 import { PayrollTabs } from "../components/PayrollTabs";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import { SalaryModal } from "../components/SalaryModal";
@@ -46,105 +41,81 @@ export function SalaryMappingPage() {
     );
   }, [staffRows, search]);
 
+  const columns: DxGridColumn<StaffSalaryRow>[] = [
+    {
+      key: "staff", header: "Staff", render: (r) => (
+        <div>
+          <div className="text-[13px] font-semibold text-[var(--dx-text)]">{r.staff_name || `Staff #${r.staff_profile_id}`}</div>
+          <div className="text-[11px] text-[var(--dx-text-muted)]">{r.staff_no || "—"}</div>
+        </div>
+      ),
+    },
+    { key: "title", header: "Title", render: (r) => <span className="text-[13px] text-[var(--dx-text-muted)]">{r.job_title || "—"}</span> },
+    {
+      key: "base", header: "Base salary", align: "right",
+      render: (r) => <span className="dx-mono text-[13px] font-semibold text-[var(--dx-text)]">{r.has_salary && r.base_amount > 0 ? `${r.currency} ${money.format(r.base_amount)}` : "—"}</span>,
+    },
+    {
+      key: "status", header: "Status",
+      render: (r) => (r.has_salary && r.base_amount > 0) ? <DxBadge tone="success">Mapped</DxBadge> : <DxBadge tone="warning">Not mapped</DxBadge>,
+    },
+    {
+      key: "action", header: "", align: "right",
+      render: (r) => {
+        const isMapped = r.has_salary && r.base_amount > 0;
+        return <DxButton size="sm" variant={isMapped ? "text" : "primary"} onClick={() => setEditing(r)}>{isMapped ? "Update" : "Set salary"}</DxButton>;
+      },
+    },
+  ];
+
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "HR & Payroll" }, { label: "Salary Mapping" }]}
         title="Salary Mapping"
-        eyebrow={<SuiteEyebrow label="HR & Payroll Suite" />}
-        description="Assign a base salary, grade/step, allowances and deductions to each staff member so payroll runs can compute pay."
+        subtitle="Assign a base salary, grade/step, allowances and deductions to each staff member so payroll runs can compute pay."
       />
       <PayrollTabs />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <MetricCard label="Staff" value={String(staffRows.length)} icon={Users} tone="primary" isLoading={isLoading} />
-        <MetricCard label="Salary mapped" value={String(mapped)} icon={CheckCircle2} tone="cyan" isLoading={isLoading} />
-        <MetricCard label="Not mapped" value={String(unmapped)} icon={AlertTriangle} tone="amber" isLoading={isLoading} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <DxKpi label="Staff" value={String(staffRows.length)} icon={Users} tone="accent" isLoading={isLoading} />
+        <DxKpi label="Salary mapped" value={String(mapped)} icon={CheckCircle2} tone="success" isLoading={isLoading} />
+        <DxKpi label="Not mapped" value={String(unmapped)} icon={AlertTriangle} tone="warning" isLoading={isLoading} />
       </div>
 
-      {unmapped > 0 && !isLoading && (
-        <div className="p-5 rounded-2xl bg-amber-50 border border-amber-100 text-amber-700 flex items-center gap-3">
-          <AlertTriangle className="h-5 w-5 shrink-0" />
-          <p className="text-sm font-semibold">
-            {unmapped} staff member{unmapped === 1 ? "" : "s"} have no salary mapped — they will be paid ₦0 until you set one.
-          </p>
-        </div>
-      )}
+      {unmapped > 0 && !isLoading ? (
+        <DxMessage tone="warning">
+          {unmapped} staff member{unmapped === 1 ? "" : "s"} have no salary mapped — they will be paid ₦0 until you set one.
+        </DxMessage>
+      ) : null}
 
-      <Card variant="panel" className="p-6">
+      <DxPanel>
         <div className="mb-4 max-w-sm">
-          <Input
-            placeholder="Search staff by name, number, or title…"
-            leftIcon={<Search className="h-4 w-4" />}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <DxInput placeholder="Search staff by name, number, or title…" leftIcon={<Search className="h-3.5 w-3.5" />} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
         {isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
-          </div>
+          <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="dx-skeleton h-14 w-full" />)}</div>
         ) : isError ? (
-          <EmptyState
-            icon={AlertTriangle}
-            title="Couldn't load staff salaries"
-            description={apiErrorMessage(error, "The server rejected the request. Check that you're signed in with an HR/payroll role and try again.")}
-            action={<Button size="sm" variant="secondary" onClick={() => refetch()}>Retry</Button>}
-          />
+          <DxMessage tone="danger" action={<DxButton size="sm" onClick={() => refetch()}>Retry</DxButton>}>
+            {apiErrorMessage(error, "The server rejected the request. Check that you're signed in with an HR/payroll role and try again.")}
+          </DxMessage>
         ) : staffRows.length === 0 ? (
-          <EmptyState
-            icon={Users}
-            title="No staff profiles yet"
-            description="Salary mapping lists every staff member with a staff profile. Onboard your staff first, then return here to set their pay."
-            action={
-              <Button size="sm" onClick={() => { window.location.href = "/staff"; }}>
-                Go to Staff Management
-              </Button>
-            }
-          />
-        ) : filtered.length === 0 ? (
-          <EmptyState icon={Wallet} title="No matches" description="No staff match your search — clear it to see everyone." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[10px] font-black uppercase tracking-widest text-secondary-400 border-b border-secondary-100">
-                  <th className="py-3 pr-4">Staff</th>
-                  <th className="py-3 pr-4">Title</th>
-                  <th className="py-3 pr-4 text-right">Base salary</th>
-                  <th className="py-3 pr-4">Status</th>
-                  <th className="py-3 pr-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((r) => {
-                  const isMapped = r.has_salary && r.base_amount > 0;
-                  return (
-                    <tr key={r.staff_profile_id} className="border-b border-secondary-100/60 hover:bg-white/50">
-                      <td className="py-3 pr-4">
-                        <div className="font-bold text-secondary-900">{r.staff_name || `Staff #${r.staff_profile_id}`}</div>
-                        <div className="text-[11px] text-secondary-400">{r.staff_no || "—"}</div>
-                      </td>
-                      <td className="py-3 pr-4 text-secondary-500">{r.job_title || "—"}</td>
-                      <td className="py-3 pr-4 text-right font-bold text-secondary-900">
-                        {isMapped ? `${r.currency} ${money.format(r.base_amount)}` : "—"}
-                      </td>
-                      <td className="py-3 pr-4">
-                        {isMapped ? <Badge variant="soft-success">Mapped</Badge> : <Badge variant="soft-warning">Not mapped</Badge>}
-                      </td>
-                      <td className="py-3 pr-4 text-right">
-                        <Button size="sm" variant={isMapped ? "ghost" : "primary"} onClick={() => setEditing(r)}>
-                          {isMapped ? "Update" : "Set salary"}
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="py-14 text-center">
+            <Users className="mx-auto mb-3 h-10 w-10 text-[var(--dx-text-faint)]" />
+            <h4 className="text-[15px] font-bold text-[var(--dx-text)]">No staff profiles yet</h4>
+            <p className="mx-auto mt-1 max-w-md text-[13px] text-[var(--dx-text-muted)]">Salary mapping lists every staff member with a staff profile. Onboard your staff first, then return here to set their pay.</p>
+            <DxButton className="mx-auto mt-4" variant="primary" onClick={() => { window.location.href = "/staff"; }}>Go to Staff Management</DxButton>
           </div>
+        ) : (
+          <DxGrid<StaffSalaryRow>
+            columns={columns}
+            data={filtered}
+            rowKey={(r) => r.staff_profile_id}
+            empty={{ icon: Wallet, title: "No matches", description: "No staff match your search — clear it to see everyone." }}
+          />
         )}
-      </Card>
+      </DxPanel>
 
       <SalaryModal
         isOpen={!!editing}
@@ -156,6 +127,6 @@ export function SalaryMappingPage() {
         allowanceTypes={config?.allowanceTypes ?? []}
         deductionTypes={config?.deductionTypes ?? []}
       />
-    </div>
+    </DxPage>
   );
 }

@@ -41,6 +41,71 @@ export type EyeExam = {
 export type EyeStats = {
   exams_total: number; exams_open: number;
   prescriptions_total: number; raised_iop_flagged: number;
+  contact_lens_rx_total?: number; optical_orders_open?: number; recalls_due?: number;
+  optical_products?: number; optical_low_stock?: number;
+};
+
+export type ContactLensPrescription = {
+  id: number; patient_id: number; exam_id?: number | null;
+  prescriber?: string | null; prescriber_staff_id?: number | null; prescribed_date?: string | null;
+  modality?: string | null;
+  od_sphere?: string | null; od_cyl?: string | null; od_axis?: number | null; od_add?: string | null;
+  od_base_curve?: string | null; od_diameter?: string | null; od_brand?: string | null;
+  os_sphere?: string | null; os_cyl?: string | null; os_axis?: number | null; os_add?: string | null;
+  os_base_curve?: string | null; os_diameter?: string | null; os_brand?: string | null;
+  notes?: string | null; created_at?: string | null;
+};
+
+export type OpticalItemType = "FRAME" | "LENS" | "COATING" | "SERVICE" | "OTHER";
+export type OpticalOrderStatus = "PENDING" | "ORDERED" | "READY" | "COLLECTED" | "CANCELLED";
+
+export type OpticalOrderItem = {
+  id: number; item_type: OpticalItemType;
+  optical_product_id?: number | null; stock_item_id?: number | null;
+  item_name: string; quantity: string; unit_price: string; line_total: string;
+};
+
+export type OpticalOrder = {
+  id: number; order_no: string; patient_id: number; exam_id?: number | null;
+  spectacle_prescription_id?: number | null; visit_id?: number | null;
+  dispensed_by?: string | null; dispensed_by_staff_id?: number | null;
+  status: OpticalOrderStatus; subtotal?: string | null; discount_amount?: string | null;
+  total_amount?: string | null; note?: string | null;
+  ordered_at?: string | null; ready_at?: string | null; collected_at?: string | null;
+  billed_at?: string | null; is_billed?: boolean; created_at?: string | null;
+  patient: PatientBrief; items: OpticalOrderItem[];
+};
+
+export type OpticalProductCategory =
+  | "FRAME" | "LENS" | "CONTACT_LENS" | "SOLUTION" | "ACCESSORY" | "OTHER";
+
+export type OpticalProduct = {
+  id: number; category: OpticalProductCategory; name: string;
+  brand?: string | null; sku?: string | null; spec?: string | null;
+  unit_cost?: string | null; sell_price: string; quantity_on_hand: string;
+  reorder_level?: string | null; is_active: boolean; note?: string | null;
+  is_low_stock?: boolean;
+};
+
+export type EyeFlowStage = {
+  order: number; label: string; required: boolean; eye_specific: boolean;
+  service_delivery_point_id?: number | null; service_delivery_point?: string | null;
+  code?: string | null; type?: string | null; configured: boolean;
+};
+
+export type EyeFlow = {
+  template_code: string; template_name: string; template_id?: number | null;
+  seeded: boolean; is_default: boolean; from_template?: boolean; stages: EyeFlowStage[];
+};
+
+export type EyeRecallStatus = "DUE" | "SCHEDULED" | "COMPLETED" | "CANCELLED";
+
+export type EyeRecall = {
+  id: number; patient_id: number; exam_id?: number | null;
+  recall_type?: string | null; due_date: string; interval_months?: number | null;
+  status: EyeRecallStatus; note?: string | null;
+  created_by?: string | null; completed_at?: string | null; is_overdue?: boolean;
+  patient: PatientBrief;
 };
 
 const g = <T,>(u: string, params?: Record<string, unknown>) =>
@@ -64,7 +129,55 @@ export const eyeApi = {
   worklist: (limit = 50) =>
     g<{ success: boolean; items: EyeExam[] }>("/eye-clinic/worklist", { limit }).then((d) => d.items),
   stats: () => g<{ success: boolean; data: EyeStats }>("/eye-clinic/stats").then((d) => d.data),
+
+  // ---- Contact-lens prescriptions ----
+  listContactLens: (params?: { patient_id?: number; skip?: number; limit?: number }) =>
+    g<PaginatedResponse<ContactLensPrescription>>("/eye-clinic/contact-lens", params),
+  createContactLens: (body: Record<string, unknown>) =>
+    post<{ success: boolean; data: ContactLensPrescription }>("/eye-clinic/contact-lens", body).then((d) => d.data),
+
+  // ---- Optical dispensing orders ----
+  listOrders: (params?: { patient_id?: number; status?: string; skip?: number; limit?: number }) =>
+    g<PaginatedResponse<OpticalOrder>>("/eye-clinic/optical-orders", params),
+  getOrder: (id: number) =>
+    g<{ success: boolean; data: OpticalOrder }>(`/eye-clinic/optical-orders/${id}`).then((d) => d.data),
+  createOrder: (body: Record<string, unknown>) =>
+    post<{ success: boolean; data: OpticalOrder }>("/eye-clinic/optical-orders", body).then((d) => d.data),
+  setOrderStatus: (id: number, status: string) =>
+    patch<{ success: boolean; data: OpticalOrder }>(`/eye-clinic/optical-orders/${id}/status`, { status }).then((d) => d.data),
+  billOrder: (id: number) =>
+    post<{ success: boolean; message: string; data: { order: OpticalOrder; billing: Record<string, unknown> } }>(`/eye-clinic/optical-orders/${id}/bill`),
+
+  // ---- Optical inventory (frames, lenses, products) ----
+  listProducts: (params?: { search?: string; category?: string; active_only?: boolean; low_stock?: boolean; skip?: number; limit?: number }) =>
+    g<PaginatedResponse<OpticalProduct>>("/eye-clinic/optical-products", params),
+  createProduct: (body: Record<string, unknown>) =>
+    post<{ success: boolean; data: OpticalProduct }>("/eye-clinic/optical-products", body).then((d) => d.data),
+  updateProduct: (id: number, body: Record<string, unknown>) =>
+    patch<{ success: boolean; data: OpticalProduct }>(`/eye-clinic/optical-products/${id}`, body).then((d) => d.data),
+  adjustProductStock: (id: number, delta: number, note?: string) =>
+    post<{ success: boolean; data: OpticalProduct }>(`/eye-clinic/optical-products/${id}/stock`, { delta, note }).then((d) => d.data),
+  deleteProduct: (id: number) =>
+    apiClient.delete<{ success: boolean }>(`/eye-clinic/optical-products/${id}`).then((r) => r.data),
+
+  // ---- Eye Clinic flow (dedicated pathway) ----
+  getFlow: () =>
+    g<{ success: boolean; data: EyeFlow }>("/eye-clinic/flow").then((d) => d.data),
+  seedFlow: () =>
+    post<{ success: boolean; message: string; data: Record<string, unknown> }>("/eye-clinic/seed-flow"),
+
+  // ---- Recalls ----
+  listRecalls: (params?: { patient_id?: number; status?: string; due_before?: string; skip?: number; limit?: number }) =>
+    g<PaginatedResponse<EyeRecall>>("/eye-clinic/recalls", params),
+  createRecall: (body: Record<string, unknown>) =>
+    post<{ success: boolean; data: EyeRecall }>("/eye-clinic/recalls", body).then((d) => d.data),
+  updateRecall: (id: number, body: Record<string, unknown>) =>
+    patch<{ success: boolean; data: EyeRecall }>(`/eye-clinic/recalls/${id}`, body).then((d) => d.data),
 };
+
+export const OPTICAL_ITEM_TYPES: OpticalItemType[] = ["FRAME", "LENS", "COATING", "SERVICE", "OTHER"];
+export const OPTICAL_CATEGORIES: OpticalProductCategory[] = ["FRAME", "LENS", "CONTACT_LENS", "SOLUTION", "ACCESSORY", "OTHER"];
+export const CONTACT_LENS_MODALITIES = ["DAILY", "BIWEEKLY", "MONTHLY", "QUARTERLY", "ANNUAL", "RGP", "OTHER"];
 
 export const LENS_TYPES: { value: SpectacleLensType; label: string }[] = [
   { value: "SINGLE_VISION", label: "Single vision" },

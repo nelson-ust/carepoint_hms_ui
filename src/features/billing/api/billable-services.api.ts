@@ -17,7 +17,7 @@ export type BillableServiceCreatePayload = {
   name: string;
   category?: string;
   default_price: number;
-  account_id: number;
+  account_id?: number;
   description?: string;
 };
 
@@ -65,6 +65,11 @@ export const billableServicesApi = {
   mappingHealth: () =>
     apiClient
       .get<BillingMappingHealth>("/billing/services/mapping-health")
+      .then((res) => res.data),
+
+  backfillAccounts: () =>
+    apiClient
+      .post<{ success: boolean; scanned: number; mapped: number }>("/billing/services/backfill-accounts")
       .then((res) => res.data),
 };
 

@@ -8,18 +8,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CheckCircle2, Clock, Ticket, TrendingUp, UserX } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Badge, type BadgeProps } from "@/components/ui/Badge";
-import { Input } from "@/components/ui/Input";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { MetricCard } from "@/components/charts/MetricCard";
+import { CalendarClock, CheckCircle2, Clock, RotateCcw, Ticket, TrendingUp, UserX } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxSegmented, DxKpi, DxPanel, DxGrid, DxBadge, DxButton,
+  DxInput, DxMessage, DxStatusBar, DxStatusItem,
+  type DxGridColumn,
+} from "@/components/dx";
 import { useChartTheme } from "@/components/charts/chart-theme";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
-import { cn } from "@/lib/utils/cn";
 import { useQueueStats } from "../hooks/use-queue";
 import type { ServicePointQueueStats } from "../api/queues.api";
 
@@ -91,11 +86,11 @@ function percentLabel(rate?: number | null): string {
   return `${(rate * 100).toFixed(1)}%`;
 }
 
-function noShowBadgeVariant(rate?: number | null): BadgeProps["variant"] {
-  if (rate == null) return "secondary";
-  if (rate >= 0.25) return "soft-danger";
-  if (rate >= 0.1) return "soft-warning";
-  return "soft-success";
+function noShowTone(rate?: number | null): "neutral" | "danger" | "warning" | "success" {
+  if (rate == null) return "neutral";
+  if (rate >= 0.25) return "danger";
+  if (rate >= 0.1) return "warning";
+  return "success";
 }
 
 function windowLabel(dateFrom?: string, dateTo?: string): string {
@@ -112,6 +107,7 @@ function windowLabel(dateFrom?: string, dateTo?: string): string {
 
 export function QueueAnalyticsPage() {
   const chart = useChartTheme();
+  const axisTick = { fill: chart.tick.fill, fontSize: chart.tick.fontSize, fontWeight: chart.tick.fontWeight };
   const [range, setRange] = useState<RangeKey>("today");
   const [customFrom, setCustomFrom] = useState(() => toDateInputValue(addDays(new Date(), -6)));
   const [customTo, setCustomTo] = useState(() => toDateInputValue(new Date()));
@@ -140,232 +136,137 @@ export function QueueAnalyticsPage() {
     [servicePoints],
   );
 
-  const columns: DataTableColumn<ServicePointQueueStats>[] = [
+  const columns: DxGridColumn<ServicePointQueueStats>[] = [
     {
       key: "service_point",
-      header: "Service Point",
+      header: "Service point",
       render: (sp) => (
         <div className="min-w-0">
-          <p className="truncate font-semibold text-secondary-900">
-            {sp.service_delivery_point_name}
-          </p>
-          {sp.service_delivery_point_code ? (
-            <p className="data-mono text-xs text-secondary-400">{sp.service_delivery_point_code}</p>
-          ) : null}
+          <p className="truncate text-[13px] font-semibold text-[var(--dx-text)]">{sp.service_delivery_point_name}</p>
+          {sp.service_delivery_point_code ? <p className="dx-mono text-[11px] text-[var(--dx-text-muted)]">{sp.service_delivery_point_code}</p> : null}
         </div>
       ),
     },
     {
       key: "live",
-      header: "Live Depth",
+      header: "Live depth",
       align: "center",
       render: (sp) => (
         <div>
-          <span className="data-mono font-bold text-secondary-900">
-            {sp.waiting_now + sp.called_now + sp.serving_now}
-          </span>
-          <p className="text-[10px] font-medium text-secondary-400">
-            {sp.waiting_now}W · {sp.called_now}C · {sp.serving_now}S
-          </p>
+          <span className="dx-mono text-[13px] font-bold text-[var(--dx-text)]">{sp.waiting_now + sp.called_now + sp.serving_now}</span>
+          <p className="text-[10px] font-medium text-[var(--dx-text-muted)]">{sp.waiting_now}W · {sp.called_now}C · {sp.serving_now}S</p>
         </div>
       ),
     },
-    { key: "issued", header: "Issued", align: "center", render: (sp) => <span className="data-mono">{sp.issued}</span> },
-    { key: "served", header: "Served", align: "center", render: (sp) => <span className="data-mono">{sp.served}</span> },
-    { key: "missed", header: "Missed", align: "center", render: (sp) => <span className="data-mono">{sp.missed}</span> },
-    { key: "cancelled", header: "Cancelled", align: "center", render: (sp) => <span className="data-mono">{sp.cancelled}</span> },
+    { key: "issued", header: "Issued", align: "center", accessor: (sp) => sp.issued, render: (sp) => <span className="dx-mono text-[13px] text-[var(--dx-text)]">{sp.issued}</span> },
+    { key: "served", header: "Served", align: "center", accessor: (sp) => sp.served, render: (sp) => <span className="dx-mono text-[13px] text-[var(--dx-text)]">{sp.served}</span> },
+    { key: "missed", header: "Missed", align: "center", accessor: (sp) => sp.missed, render: (sp) => <span className="dx-mono text-[13px] text-[var(--dx-text)]">{sp.missed}</span> },
+    { key: "cancelled", header: "Cancelled", align: "center", accessor: (sp) => sp.cancelled, render: (sp) => <span className="dx-mono text-[13px] text-[var(--dx-text)]">{sp.cancelled}</span> },
+    { key: "avg_wait", header: "Avg wait", align: "right", accessor: (sp) => sp.avg_wait_minutes ?? 0, render: (sp) => <span className="dx-mono text-[12px] text-[var(--dx-text-muted)]">{minutesLabel(sp.avg_wait_minutes)}</span> },
+    { key: "avg_service", header: "Avg service", align: "right", accessor: (sp) => sp.avg_service_minutes ?? 0, render: (sp) => <span className="dx-mono text-[12px] text-[var(--dx-text-muted)]">{minutesLabel(sp.avg_service_minutes)}</span> },
     {
-      key: "avg_wait",
-      header: "Avg Wait",
-      align: "right",
-      render: (sp) => <span className="data-mono text-xs">{minutesLabel(sp.avg_wait_minutes)}</span>,
-    },
-    {
-      key: "avg_service",
-      header: "Avg Service",
-      align: "right",
-      render: (sp) => <span className="data-mono text-xs">{minutesLabel(sp.avg_service_minutes)}</span>,
-    },
-    {
-      key: "no_show",
-      header: "No-show",
-      align: "right",
-      render: (sp) => (
-        <Badge variant={noShowBadgeVariant(sp.no_show_rate)}>{percentLabel(sp.no_show_rate)}</Badge>
-      ),
+      key: "no_show", header: "No-show", align: "right", accessor: (sp) => sp.no_show_rate ?? 0,
+      render: (sp) => <DxBadge tone={noShowTone(sp.no_show_rate)}>{percentLabel(sp.no_show_rate)}</DxBadge>,
     },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Queues" }, { label: "Analytics" }]}
         title="Queue Analytics"
-        description="Throughput, wait times and no-show rates per service delivery point."
+        subtitle="Throughput, wait times and no-show rates per service delivery point."
+        actions={<DxButton icon title="Refresh" onClick={() => statsQuery.refetch()} isLoading={statsQuery.isFetching}><RotateCcw /></DxButton>}
       />
 
       {/* Range picker */}
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="inline-flex overflow-hidden rounded-2xl border border-secondary-200 dark:border-white/10">
-          {RANGE_OPTIONS.map((opt) => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => setRange(opt.key)}
-              className={cn(
-                "px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors",
-                range === opt.key
-                  ? "bg-primary-500 text-white shadow-glow-sm"
-                  : "text-secondary-500 hover:bg-secondary-500/5 dark:hover:bg-white/5",
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        {range === "custom" && (
+      <div className="flex flex-wrap items-end gap-3">
+        <DxSegmented<RangeKey>
+          value={range}
+          onChange={setRange}
+          ariaLabel="Date range"
+          items={RANGE_OPTIONS.map((o) => ({ key: o.key, label: o.label }))}
+        />
+        {range === "custom" ? (
           <div className="flex items-end gap-3">
-            <Input
-              label="From"
-              type="date"
-              value={customFrom}
-              max={customTo || undefined}
-              onChange={(e) => setCustomFrom(e.target.value)}
-              className="w-44 py-2.5"
-            />
-            <Input
-              label="To"
-              type="date"
-              value={customTo}
-              min={customFrom || undefined}
-              onChange={(e) => setCustomTo(e.target.value)}
-              className="w-44 py-2.5"
-            />
+            <div className="w-40"><DxInput label="From" type="date" value={customFrom} max={customTo || undefined} onChange={(e) => setCustomFrom(e.target.value)} /></div>
+            <div className="w-40"><DxInput label="To" type="date" value={customTo} min={customFrom || undefined} onChange={(e) => setCustomTo(e.target.value)} /></div>
           </div>
-        )}
-        {stats ? (
-          <span className="data-mono pb-2 text-xs text-secondary-400">
-            {windowLabel(stats.date_from, stats.date_to)}
-          </span>
         ) : null}
       </div>
 
+      {stats ? (
+        <DxStatusBar>
+          <DxStatusItem icon={<CalendarClock className="h-3.5 w-3.5" />}>{windowLabel(stats.date_from, stats.date_to)}</DxStatusItem>
+          <DxStatusItem icon={<Ticket className="h-3.5 w-3.5" />}>{totals?.issued ?? 0} issued · {totals?.served ?? 0} served</DxStatusItem>
+        </DxStatusBar>
+      ) : null}
+
       {/* Totals */}
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Tickets Issued"
-          value={totals?.issued ?? 0}
-          icon={Ticket}
-          tone="primary"
-          isLoading={statsQuery.isLoading}
-        />
-        <MetricCard
-          label="Served"
-          value={totals?.served ?? 0}
-          icon={CheckCircle2}
-          tone="cyan"
-          isLoading={statsQuery.isLoading}
-        />
-        <MetricCard
-          label="Avg Wait"
-          value={minutesLabel(totals?.avg_wait_minutes)}
-          icon={Clock}
-          tone="amber"
-          isLoading={statsQuery.isLoading}
-        />
-        <MetricCard
-          label="No-show Rate"
-          value={percentLabel(totals?.no_show_rate)}
-          icon={UserX}
-          tone="rose"
-          isLoading={statsQuery.isLoading}
-        />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <DxKpi label="Tickets issued" value={totals?.issued ?? 0} icon={Ticket} tone="accent" isLoading={statsQuery.isLoading} />
+        <DxKpi label="Served" value={totals?.served ?? 0} icon={CheckCircle2} tone="success" isLoading={statsQuery.isLoading} />
+        <DxKpi label="Avg wait" value={minutesLabel(totals?.avg_wait_minutes)} icon={Clock} tone="warning" isLoading={statsQuery.isLoading} />
+        <DxKpi label="No-show rate" value={percentLabel(totals?.no_show_rate)} icon={UserX} tone={noShowTone(totals?.no_show_rate)} isLoading={statsQuery.isLoading} />
       </div>
 
       {errorMessage ? (
-        <Card>
-          <EmptyState
-            icon={TrendingUp}
-            title="Statistics unavailable"
-            description={errorMessage}
-            action={
-              <Button variant="secondary" size="sm" onClick={() => statsQuery.refetch()}>
-                Retry
-              </Button>
-            }
-          />
-        </Card>
+        <DxPanel title="Statistics unavailable" icon={<TrendingUp className="h-4 w-4" />}>
+          <div className="py-10 text-center">
+            <p className="text-[13px] text-[var(--dx-text-muted)]">{errorMessage}</p>
+            <DxButton className="mx-auto mt-4" size="sm" onClick={() => statsQuery.refetch()}>Retry</DxButton>
+          </div>
+        </DxPanel>
       ) : (
         <>
           {/* Charts */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader
-                title="Served per Service Point"
-                description="Tickets completed within the selected window."
-              />
-              <ChartBody
-                isLoading={statsQuery.isLoading}
-                isEmpty={chartData.length === 0}
-                emptyText="No queue activity in this window."
-              >
+          <div className="grid gap-4 lg:grid-cols-2">
+            <DxPanel title="Served per service point" icon={<CheckCircle2 className="h-4 w-4" />} description="Tickets completed within the selected window.">
+              <ChartBody isLoading={statsQuery.isLoading} isEmpty={chartData.length === 0} emptyText="No queue activity in this window.">
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={chartData} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
                     <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tick={chart.tick} axisLine={false} tickLine={false} interval={0} />
-                    <YAxis tick={chart.tick} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <XAxis dataKey="name" tick={axisTick} axisLine={false} tickLine={false} interval={0} />
+                    <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} width={32} />
                     <Tooltip cursor={chart.cursor} contentStyle={chart.tooltip} />
-                    <Bar dataKey="served" name="Served" fill={chart.series[0]} radius={[8, 8, 0, 0]} barSize={28} />
+                    <Bar dataKey="served" name="Served" fill={chart.series[0]} radius={[6, 6, 0, 0]} barSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartBody>
-            </Card>
+            </DxPanel>
 
-            <Card>
-              <CardHeader
-                title="Average Wait per Service Point"
-                description="Mean minutes from ticket issue to service start."
-              />
-              <ChartBody
-                isLoading={statsQuery.isLoading}
-                isEmpty={chartData.length === 0}
-                emptyText="No wait-time data in this window."
-              >
+            <DxPanel title="Average wait per service point" icon={<Clock className="h-4 w-4" />} description="Mean minutes from ticket issue to service start.">
+              <ChartBody isLoading={statsQuery.isLoading} isEmpty={chartData.length === 0} emptyText="No wait-time data in this window.">
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={chartData} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
                     <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tick={chart.tick} axisLine={false} tickLine={false} interval={0} />
-                    <YAxis tick={chart.tick} axisLine={false} tickLine={false} unit="m" />
+                    <XAxis dataKey="name" tick={axisTick} axisLine={false} tickLine={false} interval={0} />
+                    <YAxis tick={axisTick} axisLine={false} tickLine={false} unit="m" width={40} />
                     <Tooltip cursor={chart.cursor} contentStyle={chart.tooltip} />
-                    <Bar dataKey="avg_wait" name="Avg wait (min)" fill={chart.series[3]} radius={[8, 8, 0, 0]} barSize={28} />
+                    <Bar dataKey="avg_wait" name="Avg wait (min)" fill={chart.series[3]} radius={[6, 6, 0, 0]} barSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartBody>
-            </Card>
+            </DxPanel>
           </div>
 
           {/* Per-SDP breakdown */}
-          <Card padding="none">
-            <CardHeader
-              title="Service Point Breakdown"
-              description="Live queue depth alongside window throughput."
-              className="px-6 pt-6"
-            />
-            <DataTable
+          <DxPanel title="Service point breakdown" icon={<TrendingUp className="h-4 w-4" />} description="Live queue depth alongside window throughput." flush>
+            <DxGrid
               columns={columns}
               data={servicePoints}
               rowKey={(sp) => sp.service_delivery_point_id}
               isLoading={statsQuery.isLoading}
-              error={null}
               empty={{
                 icon: TrendingUp,
                 title: "No statistics yet",
                 description: "Queue activity in the selected window will appear here.",
               }}
             />
-          </Card>
+          </DxPanel>
         </>
       )}
-    </div>
+    </DxPage>
   );
 }
 
@@ -380,11 +281,11 @@ function ChartBody({
   emptyText: string;
   children: React.ReactNode;
 }) {
-  if (isLoading) return <Skeleton className="h-[280px] w-full rounded-2xl" />;
+  if (isLoading) return <div className="dx-skeleton h-[280px] w-full" />;
   if (isEmpty) {
     return (
       <div className="flex h-[280px] items-center justify-center">
-        <p className="text-sm font-medium text-secondary-400">{emptyText}</p>
+        <p className="text-[13px] font-medium text-[var(--dx-text-muted)]">{emptyText}</p>
       </div>
     );
   }

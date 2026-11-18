@@ -2,17 +2,12 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, isValid } from "date-fns";
-import { HomeIcon, Plus, RefreshCw, MapPin } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
-import { Modal } from "@/components/ui/Modal";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
-import { Pagination } from "@/components/data-table/Pagination";
+import { HomeIcon, Plus, RotateCcw, MapPin } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxPanel, DxGrid, DxPager, DxBadge, DxButton, DxPopup,
+  DxInput, DxSelect, DxTextarea, DxStatusBar, DxStatusItem,
+  type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { PatientPicker } from "@/components/forms/pickers";
 import type { EntityOption } from "@/components/forms/EntityPicker";
@@ -21,7 +16,6 @@ import { routes } from "@/config/routes";
 import { StaffPicker } from "../components/StaffPicker";
 import {
   homeVisitsApi,
-  homeVisitStatusVariant,
   labelize,
   HOME_VISIT_STATUS_OPTIONS,
   HOME_VISIT_TYPE_OPTIONS,
@@ -36,6 +30,26 @@ function fmt(v?: string | null): string {
   if (!v) return "—";
   const d = new Date(v);
   return isValid(d) ? format(d, "MMM d, yyyy • h:mm a") : "—";
+}
+
+function statusTone(status?: string | null): DxBadgeTone {
+  switch (status) {
+    case "COMPLETED":
+      return "success";
+    case "REQUESTED":
+    case "APPROVED":
+    case "ASSIGNED":
+      return "info";
+    case "EN_ROUTE":
+    case "ARRIVED":
+    case "IN_PROGRESS":
+      return "warning";
+    case "CANCELLED":
+    case "MISSED":
+      return "danger";
+    default:
+      return "neutral";
+  }
 }
 
 export function HomeVisitsPage() {
@@ -56,43 +70,43 @@ export function HomeVisitsPage() {
   const items = query.data?.items ?? [];
   const total = query.data?.total ?? 0;
 
-  const columns: DataTableColumn<HomeVisit>[] = useMemo(
+  const columns: DxGridColumn<HomeVisit>[] = useMemo(
     () => [
       {
         key: "visit_code",
         header: "Visit",
         render: (r) => (
-          <div>
-            <div className="font-semibold text-secondary-900 dark:text-white">{r.visit_code}</div>
-            <div className="text-xs text-secondary-500">{labelize(r.visit_type)}</div>
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-semibold text-[var(--dx-text)]">{r.visit_code}</div>
+            <div className="text-[11px] text-[var(--dx-text-muted)]">{labelize(r.visit_type)}</div>
           </div>
         ),
       },
       {
         key: "patient",
         header: "Patient",
-        render: (r) => r.patient_name || `#${r.patient_id}`,
+        render: (r) => <span className="text-[13px] text-[var(--dx-text)]">{r.patient_name || `#${r.patient_id}`}</span>,
       },
       {
         key: "status",
         header: "Status",
-        render: (r) => <Badge variant={homeVisitStatusVariant(r.status)}>{labelize(r.status)}</Badge>,
+        align: "center",
+        render: (r) => <DxBadge tone={statusTone(r.status)}>{labelize(r.status)}</DxBadge>,
       },
       {
         key: "priority",
         header: "Priority",
-        render: (r) => <Badge variant={r.priority === "URGENT" || r.priority === "HIGH" ? "soft-warning" : "secondary"}>{labelize(r.priority)}</Badge>,
+        align: "center",
+        render: (r) => <DxBadge tone={r.priority === "URGENT" || r.priority === "HIGH" ? "warning" : "neutral"}>{labelize(r.priority)}</DxBadge>,
       },
-      { key: "scheduled_start_at", header: "Scheduled", render: (r) => fmt(r.scheduled_start_at) },
-      { key: "caregiver", header: "Caregiver", render: (r) => r.assigned_staff_name || "Unassigned" },
+      { key: "scheduled_start_at", header: "Scheduled", render: (r) => <span className="text-[13px] text-[var(--dx-text-muted)]">{fmt(r.scheduled_start_at)}</span> },
+      { key: "caregiver", header: "Caregiver", render: (r) => <span className="text-[13px] text-[var(--dx-text)]">{r.assigned_staff_name || <span className="text-[var(--dx-text-faint)]">Unassigned</span>}</span> },
       {
         key: "actions",
         header: "",
         align: "right",
         render: (r) => (
-          <Button size="sm" variant="secondary" onClick={() => navigate(routes.homeVisitDetail.replace(":visitId", String(r.id)))}>
-            View
-          </Button>
+          <DxButton size="sm" onClick={() => navigate(routes.homeVisitDetail.replace(":visitId", String(r.id)))}>View</DxButton>
         ),
       },
     ],
@@ -100,59 +114,55 @@ export function HomeVisitsPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Home health" }, { label: "Visits" }]}
         title="Home Visits"
-        description="Schedule, dispatch and track domiciliary visits from request to completion."
+        subtitle="Schedule, dispatch and track domiciliary visits from request to completion."
         actions={
           <>
-            <Button variant="ghost" size="sm" onClick={() => query.refetch()}>
-              <RefreshCw className="h-4 w-4" /> Refresh
-            </Button>
-            <Button onClick={() => setShowCreate(true)}>
-              <Plus className="h-4 w-4" /> New home visit
-            </Button>
+            <DxButton icon title="Refresh" onClick={() => query.refetch()} isLoading={query.isFetching}><RotateCcw /></DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>New home visit</DxButton>
           </>
         }
       />
 
-      <Card className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-wrap items-end gap-3">
         <div className="w-56">
-          <Select
+          <DxSelect
             label="Status"
             value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
             options={HOME_VISIT_STATUS_OPTIONS}
           />
         </div>
-        <div className="text-sm text-secondary-500">{total} visit(s)</div>
-      </Card>
+      </div>
 
-      <Card padding="none">
-        <DataTable<HomeVisit>
-          columns={columns}
-          data={items}
-          rowKey={(r) => r.id}
-          isLoading={query.isLoading}
-          error={query.isError ? apiErrorMessage(query.error, "Couldn't load home visits.") : null}
-          onRetry={() => query.refetch()}
-          empty={{ icon: HomeIcon, title: "No home visits", description: "Create one to get started." }}
-          footer={
-            <Pagination
-              page={page}
-              totalItems={total}
-              totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
-              pageSize={PAGE_SIZE}
-              onPageChange={setPage}
-            />
-          }
-        />
-      </Card>
+      <DxStatusBar>
+        <DxStatusItem icon={<HomeIcon className="h-3.5 w-3.5" />}>{total} visit{total === 1 ? "" : "s"}{status ? ` · ${labelize(status)}` : ""}</DxStatusItem>
+      </DxStatusBar>
 
-      {showCreate && (
+      <DxGrid<HomeVisit>
+        columns={columns}
+        data={items}
+        rowKey={(r) => r.id}
+        isLoading={query.isLoading}
+        error={query.isError ? apiErrorMessage(query.error, "Couldn't load home visits.") : null}
+        onRetry={() => query.refetch()}
+        onRowClick={(r) => navigate(routes.homeVisitDetail.replace(":visitId", String(r.id)))}
+        empty={{ icon: HomeIcon, title: "No home visits", description: "Create one to get started." }}
+        footer={
+          <DxPager
+            page={page}
+            totalItems={total}
+            totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
+        }
+      />
+
+      {showCreate ? (
         <CreateHomeVisitModal
           onClose={() => setShowCreate(false)}
           onCreated={() => {
@@ -161,8 +171,8 @@ export function HomeVisitsPage() {
             toast.success("Home visit created");
           }}
         />
-      )}
-    </div>
+      ) : null}
+    </DxPage>
   );
 }
 
@@ -203,37 +213,36 @@ function CreateHomeVisitModal({ onClose, onCreated }: { onClose: () => void; onC
   };
 
   return (
-    <Modal
+    <DxPopup
       isOpen
       onClose={onClose}
       title="Request a home visit"
       size="lg"
+      locked={mutation.isPending}
       footer={
-        <div className="flex justify-end gap-3">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit} disabled={mutation.isPending}>
-            {mutation.isPending ? "Creating…" : "Create visit"}
-          </Button>
-        </div>
+        <>
+          <DxButton onClick={onClose} disabled={mutation.isPending}>Cancel</DxButton>
+          <DxButton variant="primary" onClick={submit} isLoading={mutation.isPending}>Create visit</DxButton>
+        </>
       }
     >
       <div className="space-y-4">
         <PatientPicker value={patient} onChange={setPatient} />
         <div className="grid grid-cols-2 gap-4">
-          <Select label="Visit type" value={visitType} onChange={(e) => setVisitType(e.target.value)} options={HOME_VISIT_TYPE_OPTIONS} />
-          <Select label="Priority" value={priority} onChange={(e) => setPriority(e.target.value)} options={PRIORITY_OPTIONS} />
+          <DxSelect label="Visit type" value={visitType} onChange={(e) => setVisitType(e.target.value)} options={HOME_VISIT_TYPE_OPTIONS} />
+          <DxSelect label="Priority" value={priority} onChange={(e) => setPriority(e.target.value)} options={PRIORITY_OPTIONS} />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Scheduled start" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
-          <Input label="ETA (minutes)" type="number" value={etaMinutes} onChange={(e) => setEtaMinutes(e.target.value)} />
+          <DxInput label="Scheduled start" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+          <DxInput label="ETA (minutes)" type="number" value={etaMinutes} onChange={(e) => setEtaMinutes(e.target.value)} />
         </div>
         <StaffPicker value={staffId} onChange={(id) => setStaffId(id)} />
-        <Textarea label="Reason for visit" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
+        <DxTextarea label="Reason for visit" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Address" leftIcon={<MapPin className="h-4 w-4" />} value={address} onChange={(e) => setAddress(e.target.value)} />
-          <Input label="City" value={city} onChange={(e) => setCity(e.target.value)} />
+          <DxInput label="Address" leftIcon={<MapPin className="h-3.5 w-3.5" />} value={address} onChange={(e) => setAddress(e.target.value)} />
+          <DxInput label="City" value={city} onChange={(e) => setCity(e.target.value)} />
         </div>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

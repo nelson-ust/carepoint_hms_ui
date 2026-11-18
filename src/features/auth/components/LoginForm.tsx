@@ -3,13 +3,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Lock, Mail, Building2, ChevronRight, AlertCircle, ShieldCheck, Heart, Sparkles, Eye, EyeOff } from "lucide-react";
 import { routes } from "@/config/routes";
 import { login } from "@/features/auth/api/auth.api";
 import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
 import { resolveTenantCode } from "@/lib/tenant/tenant-resolver";
-import logo from "@/assets/logo.jpeg";
+import { Logo } from "@/components/branding/Logo";
 
 const backgroundGradients = [
   "from-emerald-950 via-slate-900 to-teal-950",
@@ -158,17 +158,9 @@ export function LoginForm() {
       {/* Main Content */}
       <div className="relative z-10 w-full max-w-xl p-4 lg:p-8 flex flex-col items-center">
         {/* Branding */}
-        <div className="text-center mb-10 group">
-          {/* <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[2.5rem] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] ring-8 ring-white/10 mb-6 transition-transform group-hover:scale-110 duration-500 overflow-hidden p-2">
-            <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
-          </div> */}
-          <Link to="/">
-            <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tighter font-display">
-              Carepoint<span className="text-emerald-400">.</span>
-            </h1>
-          </Link>
-
-          <p className="mt-3 text-emerald-400/80 font-bold text-[10px] uppercase tracking-[0.4em]">
+        <div className="mb-10">
+          <Logo variant="stacked" size={72} onDark to="/" />
+          <p className="mt-3 text-center text-emerald-400/80 font-bold text-[10px] uppercase tracking-[0.4em]">
             Enterprise Health Management
           </p>
         </div>

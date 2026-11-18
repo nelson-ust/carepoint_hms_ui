@@ -1,24 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, Plus, RefreshCw, AlertCircle, Send, Eye, Trash2 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge, type BadgeProps } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Textarea } from "@/components/ui/Textarea";
-import { Select } from "@/components/ui/Select";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { Calendar, Plus, RotateCcw, Send, Eye, Trash2 } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxPanel, DxGrid, DxBadge, DxButton, DxInput, DxSelect, DxTextarea, DxPopup,
+  type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
+import { apiErrorMessage } from "@/lib/api/api-error";
 import { useStaffNameMap } from "@/features/staff/hooks/use-staff";
 import { staffDisplayName } from "@/features/staff/api/staff.api";
 import { ApprovalDetailModal } from "@/features/approvals/components/ApprovalDetailModal";
 import { SelectApproverModal } from "@/features/approvals/components/SelectApproverModal";
 import { leaveApi, type LeaveRequest, type LeaveStatus } from "../api/leave.api";
 
-const statusVariant: Record<LeaveStatus, BadgeProps["variant"]> = {
-  DRAFT: "secondary", PENDING: "soft-warning", APPROVED: "soft-success", REJECTED: "soft-danger", CANCELLED: "secondary",
+const statusTone: Record<LeaveStatus, DxBadgeTone> = {
+  DRAFT: "neutral", PENDING: "warning", APPROVED: "success", REJECTED: "danger", CANCELLED: "neutral",
 };
 
 function fmt(v?: string | null) {
@@ -62,58 +58,50 @@ export function LeaveRequestsPage() {
     onError: () => toast.error("Couldn't delete", "Only drafts can be removed."),
   });
 
-  return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader title="Leave Management" description="Raise leave requests and route them through the approval flow." />
-        <div className="flex gap-3">
-          <button onClick={() => list.refetch()} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400"><RefreshCw className={`h-4 w-4 ${list.isFetching ? "animate-spin" : ""}`} /></button>
-          <Button leftIcon={<Plus className="h-5 w-5" />} onClick={() => setCreateOpen(true)}>New Request</Button>
+  const loadError = list.isError ? apiErrorMessage(list.error, "Failed to load leave requests. Please retry.") : null;
+
+  const columns: DxGridColumn<LeaveRequest>[] = [
+    { key: "employee", header: "Employee", render: (r) => <span className="text-[13px] font-semibold text-[var(--dx-text)]">{nameFor(r.staff_profile_id)}</span> },
+    { key: "period", header: "Period", render: (r) => <span className="text-[13px] text-[var(--dx-text-muted)]">{fmt(r.start_date)} → {fmt(r.end_date)}</span> },
+    { key: "days", header: "Leave days", align: "right", render: (r) => <span className="dx-mono text-[13px] text-[var(--dx-text)]">{String(r.days_requested || daysBetween(r.start_date, r.end_date))}</span> },
+    { key: "status", header: "Status", render: (r) => <DxBadge tone={statusTone[r.status]}>{r.status}</DxBadge> },
+    {
+      key: "action", header: "", align: "right",
+      render: (r) => (
+        <div className="flex items-center justify-end gap-2">
+          {r.status === "DRAFT" ? <DxButton size="sm" variant="primary" leftIcon={<Send className="h-3.5 w-3.5" />} isLoading={submit.isPending && submit.variables?.row.id === r.id} onClick={() => setPendingSubmit(r)}>Submit</DxButton> : null}
+          {r.approval_request_id ? <DxButton size="sm" variant="text" leftIcon={<Eye className="h-3.5 w-3.5" />} onClick={() => setViewRequestId(r.approval_request_id!)}>Approval</DxButton> : null}
+          {r.status === "DRAFT" ? <DxButton icon size="sm" variant="outline-danger" title="Delete" onClick={() => remove.mutate(r.id)}><Trash2 /></DxButton> : null}
         </div>
-      </div>
+      ),
+    },
+  ];
 
-      {list.isError && (
-        <div className="p-5 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center gap-3"><AlertCircle className="h-5 w-5" /><p className="text-sm font-bold">Failed to load leave requests.</p></div>
-      )}
+  return (
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "HR" }, { label: "Leave Management" }]}
+        title="Leave Management"
+        subtitle="Raise leave requests and route them through the approval flow."
+        actions={
+          <>
+            <DxButton icon title="Refresh" onClick={() => list.refetch()} isLoading={list.isFetching}><RotateCcw /></DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setCreateOpen(true)}>New request</DxButton>
+          </>
+        }
+      />
 
-      <Card variant="panel" className="p-0 overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="bg-secondary-900/5 text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              <th className="px-6 py-4">Employee</th><th className="px-6 py-4">Period</th><th className="px-6 py-4">Leave days</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-secondary-100/60">
-            {list.isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => <tr key={i}><td colSpan={5} className="px-6 py-4"><Skeleton className="h-8 w-full" /></td></tr>)
-            ) : requests.length === 0 ? (
-              <tr><td colSpan={5} className="px-6 py-24 text-center"><Calendar className="h-12 w-12 mx-auto text-secondary-200 mb-3" /><p className="font-bold text-secondary-900">No leave requests</p><p className="text-sm text-secondary-400 mt-1">Create one, then submit it for approval.</p></td></tr>
-            ) : (
-              requests.map((r) => (
-                <tr key={r.id} className="hover:bg-primary-50/20">
-                  <td className="px-6 py-4 font-bold text-secondary-900">{nameFor(r.staff_profile_id)}</td>
-                  <td className="px-6 py-4 text-secondary-600">{fmt(r.start_date)} → {fmt(r.end_date)}</td>
-                  <td className="px-6 py-4 text-secondary-600">{String(r.days_requested || daysBetween(r.start_date, r.end_date))}</td>
-                  <td className="px-6 py-4"><Badge variant={statusVariant[r.status]}>{r.status}</Badge></td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      {r.status === "DRAFT" && (
-                        <Button size="sm" leftIcon={<Send className="h-3.5 w-3.5" />} isLoading={submit.isPending && submit.variables?.row.id === r.id} onClick={() => setPendingSubmit(r)}>Submit</Button>
-                      )}
-                      {r.approval_request_id && (
-                        <Button size="sm" variant="ghost" leftIcon={<Eye className="h-3.5 w-3.5" />} onClick={() => setViewRequestId(r.approval_request_id!)}>Approval</Button>
-                      )}
-                      {r.status === "DRAFT" && (
-                        <button onClick={() => remove.mutate(r.id)} className="p-2 rounded-xl hover:bg-rose-50" title="Delete"><Trash2 className="h-4 w-4 text-rose-400" /></button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </Card>
+      <DxPanel title="Requests" icon={<Calendar className="h-4 w-4" />} flush>
+        <DxGrid<LeaveRequest>
+          columns={columns}
+          data={requests}
+          rowKey={(r) => r.id}
+          isLoading={list.isLoading}
+          error={loadError}
+          onRetry={() => list.refetch()}
+          empty={{ icon: Calendar, title: "No leave requests", description: "Create one, then submit it for approval." }}
+        />
+      </DxPanel>
 
       <CreateLeaveModal isOpen={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => qc.invalidateQueries({ queryKey: ["leave-requests"] })} staff={staff} />
       <ApprovalDetailModal requestId={viewRequestId} isOpen={viewRequestId !== null} onClose={() => setViewRequestId(null)} />
@@ -125,7 +113,7 @@ export function LeaveRequestsPage() {
         isSubmitting={submit.isPending}
         onConfirm={(approverId) => pendingSubmit && submit.mutate({ row: pendingSubmit, approverId })}
       />
-    </div>
+    </DxPage>
   );
 }
 
@@ -164,34 +152,38 @@ function CreateLeaveModal({ isOpen, onClose, onCreated, staff }: { isOpen: boole
     create.mutate();
   }
   return (
-    <Modal isOpen={isOpen} onClose={() => { onClose(); resetForm(); }} title="New Leave Request" size="md"
-      footer={<div className="flex justify-end gap-3"><Button variant="secondary" onClick={() => { onClose(); resetForm(); }}>Cancel</Button><Button onClick={save} isLoading={create.isPending} disabled={leaveTypes.length === 0}>Create draft</Button></div>}>
+    <DxPopup
+      isOpen={isOpen} onClose={() => { onClose(); resetForm(); }} title="New Leave Request" size="md"
+      locked={create.isPending}
+      footer={
+        <>
+          <DxButton onClick={() => { onClose(); resetForm(); }}>Cancel</DxButton>
+          <DxButton variant="primary" onClick={save} isLoading={create.isPending} disabled={leaveTypes.length === 0}>Create draft</DxButton>
+        </>
+      }
+    >
       <div className="space-y-4">
-        <Select label="Staff" value={staffId} onChange={(e) => setStaffId(e.target.value)}
+        <DxSelect label="Staff" value={staffId} onChange={(e) => setStaffId(e.target.value)}
           options={[{ value: "", label: "— Select staff —" }, ...staff.map((s: any) => ({ value: String(s.id), label: staffDisplayName(s) }))]} />
-        <Select
+        <DxSelect
           label="Leave type"
           value={leaveTypeId}
           onChange={(e) => setLeaveTypeId(e.target.value)}
           placeholder={types.isLoading ? "Loading leave types…" : "— Select leave type —"}
           options={leaveTypes.map((t) => ({ value: String(t.id), label: t.name }))}
-          hint={
-            !types.isLoading && leaveTypes.length === 0
-              ? "No leave types are configured yet. Add them under HR → Leave types."
-              : undefined
-          }
+          hint={!types.isLoading && leaveTypes.length === 0 ? "No leave types are configured yet. Add them under HR → Leave types." : undefined}
         />
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Start date" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
-          <Input label="End date" type="date" value={end} onChange={(e) => setEnd(e.target.value)} error={dateError ? "Before start date" : undefined} />
+          <DxInput label="Start date" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+          <DxInput label="End date" type="date" value={end} onChange={(e) => setEnd(e.target.value)} error={dateError ? "Before start date" : undefined} />
         </div>
-        {days > 0 && (
-          <p className="text-xs font-semibold text-secondary-500">
-            Duration: <span className="text-secondary-900">{days} day{days > 1 ? "s" : ""}</span>
+        {days > 0 ? (
+          <p className="text-[12px] font-semibold text-[var(--dx-text-muted)]">
+            Duration: <span className="text-[var(--dx-text)]">{days} day{days > 1 ? "s" : ""}</span>
           </p>
-        )}
-        <Textarea label="Reason (optional)" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Add any context for the approver…" />
+        ) : null}
+        <DxTextarea label="Reason (optional)" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Add any context for the approver…" />
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

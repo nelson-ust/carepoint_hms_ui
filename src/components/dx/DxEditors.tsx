@@ -201,9 +201,9 @@ export const DxCheckbox = React.forwardRef<HTMLInputElement, DxCheckboxProps>(
   ({ label, description, className, ...props }, ref) => (
     <label className={cn("dx-check", className)}>
       <input ref={ref} type="checkbox" {...props} />
-      <span>
-        <span>{label}</span>
-        {description ? <span className="block dx-field-hint">{description}</span> : null}
+      <span className="min-w-0 flex-1">
+        <span className="block min-w-0">{label}</span>
+        {description ? <span className="block dx-field-hint min-w-0">{description}</span> : null}
       </span>
     </label>
   ),

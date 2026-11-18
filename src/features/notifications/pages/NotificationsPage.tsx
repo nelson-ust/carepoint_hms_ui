@@ -12,14 +12,18 @@ import {
   Smartphone,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Badge, type BadgeProps } from "@/components/ui/Badge";
-import { Select } from "@/components/ui/Select";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Pagination } from "@/components/data-table/Pagination";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxBadge,
+  DxButton,
+  DxSelect,
+  DxTabs,
+  DxPager,
+  type DxBadgeTone,
+  type DxTabItem,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { cn } from "@/lib/utils/cn";
 import {
@@ -46,20 +50,31 @@ const channelIcons: Record<string, LucideIcon> = {
   WHATSAPP: MessageSquare,
 };
 
-const channelChipClasses: Record<string, string> = {
-  IN_APP: "bg-primary-500/10 text-primary-500",
-  EMAIL: "bg-cyan-500/10 text-cyan-500",
-  SMS: "bg-violet-500/10 text-violet-500",
-  WHATSAPP: "bg-emerald-500/10 text-emerald-500",
+// Data-driven channel chip tints — dx tokens, theme-aware.
+const channelChips: Record<string, { background: string; color: string }> = {
+  IN_APP: { background: "var(--dx-accent-soft)", color: "var(--dx-accent)" },
+  EMAIL: { background: "var(--dx-info-soft)", color: "var(--dx-info)" },
+  SMS: { background: "var(--dx-warning-soft)", color: "var(--dx-warning)" },
+  WHATSAPP: { background: "var(--dx-success-soft)", color: "var(--dx-success)" },
 };
 
-const statusVariants: Record<string, BadgeProps["variant"]> = {
-  PENDING: "soft-warning",
-  SENT: "soft-info",
-  DELIVERED: "soft-info",
-  READ: "soft-success",
-  FAILED: "soft-danger",
-};
+const defaultChip = { background: "var(--dx-surface-sunken)", color: "var(--dx-text-muted)" };
+
+function statusTone(status: string): DxBadgeTone {
+  switch (status) {
+    case "PENDING":
+      return "warning";
+    case "SENT":
+    case "DELIVERED":
+      return "info";
+    case "READ":
+      return "success";
+    case "FAILED":
+      return "danger";
+    default:
+      return "neutral";
+  }
+}
 
 const channelOptions = [
   { value: "", label: "All channels" },
@@ -94,42 +109,33 @@ function NotificationRow({
       onClick={() => onClick(notification)}
       disabled={isMarking}
       className={cn(
-        "flex w-full items-start gap-4 px-6 py-5 text-left transition-colors",
-        "border-b border-secondary-100 last:border-b-0 dark:border-white/5",
-        "hover:bg-primary-500/5",
-        unread && "bg-primary-500/[0.04]"
+        "flex w-full items-start gap-4 border-b border-[var(--dx-border)] px-6 py-5 text-left transition-colors last:border-b-0 hover:bg-[var(--dx-surface-sunken)]",
+        unread && "bg-[var(--dx-accent-soft)]",
       )}
     >
       <div
-        className={cn(
-          "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
-          channelChipClasses[notification.channel] ?? "bg-secondary-500/10 text-secondary-500"
-        )}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg"
+        style={channelChips[notification.channel] ?? defaultChip}
       >
         <ChannelIcon className="h-5 w-5" aria-hidden />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p
-            className={cn(
-              "truncate text-sm text-secondary-900",
-              unread ? "font-black" : "font-bold"
-            )}
-          >
+          <p className={cn("truncate text-[13px] text-[var(--dx-text)]", unread ? "font-bold" : "font-semibold")}>
             {notification.subject || "Notification"}
           </p>
           {unread ? (
-            <span className="h-2 w-2 shrink-0 rounded-full bg-primary-500 shadow-glow-sm" aria-label="Unread" />
+            <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--dx-accent)]" aria-label="Unread" />
           ) : null}
         </div>
-        <p className="mt-1 line-clamp-2 text-sm font-medium text-secondary-500">
+        <p className="mt-1 line-clamp-2 text-[13px] font-medium text-[var(--dx-text-muted)]">
           {notification.body}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Badge variant={statusVariants[notification.status] ?? "secondary"}>
+          <DxBadge tone={statusTone(notification.status)} dot>
             {notification.status}
-          </Badge>
-          <span className="text-xs font-semibold text-secondary-400">
+          </DxBadge>
+          <span className="text-[12px] font-medium text-[var(--dx-text-muted)]">
             {relativeTime(notification.created_at)}
           </span>
         </div>
@@ -208,123 +214,113 @@ export function NotificationsPage() {
     });
   };
 
-  const tabs: { key: InboxTab; label: string; count?: number }[] = [
+  const tabs: DxTabItem<InboxTab>[] = [
     { key: "all", label: "All" },
-    { key: "unread", label: "Unread", count: unreadCount },
+    { key: "unread", label: "Unread", count: unreadCount > 0 ? unreadCount : null },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Communication" }, { label: "Notifications" }]}
         title="Notifications"
-        description="In-app alerts, emails and messages dispatched across your hospital."
+        subtitle="In-app alerts, emails and messages dispatched across your hospital."
         actions={
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
+          <>
+            <DxButton
               leftIcon={<RotateCcw className="h-4 w-4" />}
               onClick={handleRetryFailed}
               isLoading={retryFailed.isPending}
             >
               Retry failed
-            </Button>
-            <Button
-              variant="secondary"
+            </DxButton>
+            <DxButton
+              variant="primary"
               leftIcon={<CheckCheck className="h-4 w-4" />}
               onClick={handleMarkAllRead}
               isLoading={markAllRead.isPending}
               disabled={unreadCount === 0 && !unreadCountQuery.isLoading}
             >
               Mark all read
-            </Button>
-          </div>
+            </DxButton>
+          </>
         }
       />
 
-      <Card padding="none">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
-          <div className="flex items-center gap-2 rounded-2xl bg-secondary-500/5 p-1 dark:bg-white/5">
-            {tabs.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => switchTab(t.key)}
-                className={cn(
-                  "flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest transition-all",
-                  tab === t.key
-                    ? "bg-primary-500/10 text-primary-600 shadow-glow-sm dark:text-primary-300"
-                    : "text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-200"
-                )}
-              >
-                {t.label}
-                {typeof t.count === "number" && t.count > 0 ? (
-                  <span className="data-mono rounded-full bg-primary-500/15 px-2 py-0.5 text-[10px] font-bold text-primary-600 dark:text-primary-300">
-                    {t.count > 99 ? "99+" : t.count}
-                  </span>
-                ) : null}
-              </button>
-            ))}
-          </div>
-          {tab === "all" ? (
-            <div className="w-44">
-              <Select
-                aria-label="Filter by channel"
-                options={channelOptions}
-                value={channel}
-                onChange={(e) => {
-                  setChannel(e.target.value);
-                  setPage(1);
-                }}
-                className="py-2.5"
-              />
-            </div>
-          ) : null}
+      <DxPanel flush>
+        <div className="px-4 pt-2">
+          <DxTabs
+            items={tabs}
+            value={tab}
+            onChange={switchTab}
+            trailing={
+              tab === "all" ? (
+                <div className="w-44">
+                  <DxSelect
+                    aria-label="Filter by channel"
+                    options={channelOptions}
+                    value={channel}
+                    editorSize="sm"
+                    onChange={(e) => {
+                      setChannel(e.target.value);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+              ) : null
+            }
+          />
         </div>
 
         {listQuery.isLoading ? (
-          <div className="space-y-1 border-t border-secondary-100 px-6 py-4 dark:border-white/5">
+          <div className="space-y-1 border-t border-[var(--dx-border)] px-6 py-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="flex items-center gap-4 py-4">
-                <Skeleton className="h-11 w-11 rounded-2xl" />
+                <div className="dx-skeleton h-11 w-11 rounded-lg" />
                 <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-1/3" />
-                  <Skeleton className="h-4 w-2/3" />
+                  <div className="dx-skeleton h-4 w-1/3" />
+                  <div className="dx-skeleton h-4 w-2/3" />
                 </div>
               </div>
             ))}
           </div>
         ) : listQuery.isError ? (
-          <div className="flex flex-col items-center gap-3 border-t border-secondary-100 px-8 py-14 text-center dark:border-white/5">
-            <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-rose-500/10 text-rose-500">
+          <div className="flex flex-col items-center gap-3 border-t border-[var(--dx-border)] px-8 py-14 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--dx-danger-soft)]" style={{ color: "var(--dx-danger)" }}>
               <AlertCircle className="h-7 w-7" aria-hidden />
             </div>
-            <p className="text-sm font-bold text-secondary-900">
-              Could not load notifications.
-            </p>
-            <Button
-              variant="secondary"
+            <p className="text-[13px] font-semibold text-[var(--dx-text)]">Could not load notifications.</p>
+            <DxButton
               size="sm"
               onClick={() => listQuery.refetch()}
               leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
             >
               Retry
-            </Button>
+            </DxButton>
           </div>
         ) : !list || list.items.length === 0 ? (
-          <div className="border-t border-secondary-100 dark:border-white/5">
-            <EmptyState
-              icon={tab === "unread" ? BellRing : Inbox}
-              title={tab === "unread" ? "No unread notifications" : "No notifications yet"}
-              description={
-                tab === "unread"
+          <div className="border-t border-[var(--dx-border)]">
+            <div className="py-16 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]">
+                {tab === "unread" ? (
+                  <BellRing className="h-8 w-8 text-[var(--dx-text-faint)]" />
+                ) : (
+                  <Inbox className="h-8 w-8 text-[var(--dx-text-faint)]" />
+                )}
+              </div>
+              <h4 className="text-[16px] font-bold text-[var(--dx-text)]">
+                {tab === "unread" ? "No unread notifications" : "No notifications yet"}
+              </h4>
+              <p className="mx-auto mt-1 max-w-sm text-[13px] text-[var(--dx-text-muted)]">
+                {tab === "unread"
                   ? "You're all caught up. New alerts will land here first."
-                  : "System alerts and dispatched messages will appear here."
-              }
-            />
+                  : "System alerts and dispatched messages will appear here."}
+              </p>
+            </div>
           </div>
         ) : (
           <>
-            <div className="border-t border-secondary-100 dark:border-white/5">
+            <div className="border-t border-[var(--dx-border)]">
               {list.items.map((n) => (
                 <NotificationRow
                   key={n.id}
@@ -334,7 +330,7 @@ export function NotificationsPage() {
                 />
               ))}
             </div>
-            <Pagination
+            <DxPager
               page={page}
               totalPages={list.totalPages}
               totalItems={list.total}
@@ -343,7 +339,7 @@ export function NotificationsPage() {
             />
           </>
         )}
-      </Card>
-    </div>
+      </DxPanel>
+    </DxPage>
   );
 }

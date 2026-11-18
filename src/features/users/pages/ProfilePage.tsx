@@ -26,16 +26,18 @@ import { z } from "zod";
 
 import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
 import { useToast } from "@/components/feedback/ToastProvider";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { Modal } from "@/components/ui/Modal";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { CardSkeleton, Skeleton } from "@/components/ui/Skeleton";
-import { Textarea } from "@/components/ui/Textarea";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxBadge,
+  DxButton,
+  DxPopup,
+  DxInput,
+  DxSelect,
+  DxTextarea,
+  DxSkeleton,
+} from "@/components/dx";
 import { useDisclosure } from "@/hooks/useDisclosure";
 import { resolveTenantCode } from "@/lib/tenant/tenant-resolver";
 
@@ -71,6 +73,27 @@ function formatDateTime(value?: string | null): string {
   });
 }
 
+function DxEmpty({
+  icon: Icon,
+  title,
+  description,
+  action,
+}: {
+  icon: typeof UserRound;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+      <Icon className="h-10 w-10 text-secondary-300 dark:text-secondary-600" aria-hidden />
+      <p className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">{title}</p>
+      <p className="max-w-sm text-xs text-secondary-500 dark:text-secondary-400">{description}</p>
+      {action}
+    </div>
+  );
+}
+
 // =====================================================================
 // Draw-your-signature pad
 // =====================================================================
@@ -85,7 +108,7 @@ function SignaturePadModal({ isOpen, onClose, onSave, saving }: {
   const drawing = React.useRef(false);
   const [hasInk, setHasInk] = React.useState(false);
 
-  // Fresh pad every time it opens (the canvas itself remounts with the Modal).
+  // Fresh pad every time it opens (the canvas itself remounts with the popup).
   React.useEffect(() => {
     if (isOpen) setHasInk(false);
   }, [isOpen]);
@@ -140,21 +163,21 @@ function SignaturePadModal({ isOpen, onClose, onSave, saving }: {
   };
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={onClose}
       title="Draw your signature"
       size="md"
       footer={
         <div className="flex w-full items-center justify-between gap-2">
-          <Button variant="ghost" onClick={clear} disabled={!hasInk || saving} leftIcon={<Eraser className="h-4 w-4" />}>
+          <DxButton variant="text" onClick={clear} disabled={!hasInk || saving} leftIcon={<Eraser className="h-4 w-4" />}>
             Clear
-          </Button>
+          </DxButton>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-            <Button onClick={save} disabled={!hasInk} isLoading={saving} leftIcon={<PenLine className="h-4 w-4" />}>
+            <DxButton variant="default" onClick={onClose} disabled={saving}>Cancel</DxButton>
+            <DxButton variant="primary" onClick={save} disabled={!hasInk} isLoading={saving} leftIcon={<PenLine className="h-4 w-4" />}>
               Save signature
-            </Button>
+            </DxButton>
           </div>
         </div>
       }
@@ -176,7 +199,7 @@ function SignaturePadModal({ isOpen, onClose, onSave, saving }: {
       <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-secondary-300 dark:text-secondary-500">
         Tip: a wide, steady stroke reproduces best on documents.
       </p>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -270,7 +293,7 @@ function ProfileHeaderCard({ profile }: { profile: MyProfile }) {
   };
 
   return (
-    <Card variant="panel">
+    <DxPanel>
       <div className="flex flex-wrap items-center gap-6">
         <div className="group relative h-20 w-20 shrink-0">
           {profile.profile_photo_display_url ? (
@@ -327,34 +350,34 @@ function ProfileHeaderCard({ profile }: { profile: MyProfile }) {
           )}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {profile.roles.map((role, index) => (
-              <Badge key={role.id ?? role.code ?? index} variant="soft-info">
+              <DxBadge key={role.id ?? role.code ?? index} tone="info">
                 {role.name ?? role.code ?? "Role"}
-              </Badge>
+              </DxBadge>
             ))}
             {tenantCode ? (
-              <Badge variant="secondary">
+              <DxBadge tone="neutral">
                 <Building2 className="h-3 w-3" aria-hidden />
                 {tenantCode.toUpperCase()}
-              </Badge>
+              </DxBadge>
             ) : null}
             {profile.is_email_verified ? (
-              <Badge variant="soft-success">
+              <DxBadge tone="success">
                 <MailCheck className="h-3 w-3" aria-hidden />
                 Email verified
-              </Badge>
+              </DxBadge>
             ) : (
-              <Badge variant="soft-warning">Email unverified</Badge>
+              <DxBadge tone="warning">Email unverified</DxBadge>
             )}
             {profile.is_two_factor_enabled ? (
-              <Badge variant="soft-success">
+              <DxBadge tone="success">
                 <ShieldCheck className="h-3 w-3" aria-hidden />
                 2FA on
-              </Badge>
+              </DxBadge>
             ) : (
-              <Badge variant="soft-warning">
+              <DxBadge tone="warning">
                 <ShieldOff className="h-3 w-3" aria-hidden />
                 2FA off
-              </Badge>
+              </DxBadge>
             )}
           </div>
         </div>
@@ -387,36 +410,37 @@ function ProfileHeaderCard({ profile }: { profile: MyProfile }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <DxButton
+            variant="primary"
+            size="sm"
             onClick={() => setSigPadOpen(true)}
             disabled={sigBusy}
-            className="flex items-center gap-1.5 rounded-xl bg-secondary-900 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white shadow-md hover:bg-black disabled:opacity-60 dark:bg-primary-500 dark:hover:bg-primary-600"
+            isLoading={sigBusy}
+            leftIcon={<PenLine className="h-4 w-4" />}
           >
-            {sigBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PenLine className="h-3.5 w-3.5" />}
             Draw
-          </button>
-          <button
-            type="button"
+          </DxButton>
+          <DxButton
+            variant="default"
+            size="sm"
             onClick={() => sigRef.current?.click()}
             disabled={sigBusy}
-            className="flex items-center gap-1.5 rounded-xl border border-secondary-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-secondary-600 hover:bg-secondary-50 disabled:opacity-60 dark:border-white/10 dark:text-secondary-300 dark:hover:bg-white/5"
+            leftIcon={<Upload className="h-4 w-4" />}
           >
-            <Upload className="h-3.5 w-3.5" />
             {profile.signature_display_url ? "Replace" : "Upload"}
-          </button>
+          </DxButton>
           {profile.signature_display_url && !sigBusy && (
-            <button
-              type="button"
+            <DxButton
+              variant="outline-danger"
+              size="sm"
               onClick={() => removeSig.mutate(undefined, {
                 onSuccess: () => toast.success("Signature removed"),
                 onError: (err: any) => toast.error("Couldn't remove signature", getApiErrorMessage(err, "Please try again.")),
               })}
-              className="flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50"
+              leftIcon={<Trash2 className="h-4 w-4" />}
             >
-              <Trash2 className="h-3.5 w-3.5" />
               Remove
-            </button>
+            </DxButton>
           )}
         </div>
         <input ref={sigRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={onPickSignature} />
@@ -428,7 +452,7 @@ function ProfileHeaderCard({ profile }: { profile: MyProfile }) {
         onSave={onDrawSave}
         saving={uploadSig.isPending}
       />
-    </Card>
+    </DxPanel>
   );
 }
 
@@ -510,43 +534,42 @@ function ProfileDetailsCard({ profile }: { profile: MyProfile }) {
   });
 
   return (
-    <Card>
-      <CardHeader
-        title="Personal Information"
-        description="Details visible to your care team. Email and role changes are managed by an administrator."
-      />
+    <DxPanel
+      title="Personal Information"
+      description="Details visible to your care team. Email and role changes are managed by an administrator."
+    >
       <form onSubmit={onSubmit} className="space-y-5">
         <div className="grid gap-5 sm:grid-cols-2">
-          <Input label="First Name" error={errors.first_name?.message} {...register("first_name")} />
-          <Input label="Last Name" error={errors.last_name?.message} {...register("last_name")} />
-          <Input
+          <DxInput label="First Name" error={errors.first_name?.message} {...register("first_name")} />
+          <DxInput label="Last Name" error={errors.last_name?.message} {...register("last_name")} />
+          <DxInput
             label="Middle Name"
             error={errors.middle_name?.message}
             {...register("middle_name")}
           />
-          <Input
+          <DxInput
             label="Phone Number"
             placeholder="+233 20 000 0000"
             error={errors.phone_number?.message}
             {...register("phone_number")}
           />
-          <Input label="Job Title" error={errors.job_title?.message} {...register("job_title")} />
-          <Select
+          <DxInput label="Job Title" error={errors.job_title?.message} {...register("job_title")} />
+          <DxSelect
             label="Gender"
             options={GENDER_OPTIONS}
             placeholder="Select gender"
             error={errors.gender?.message}
             {...register("gender")}
           />
-          <Input
+          <DxInput
             label="Date of Birth"
             type="date"
             error={errors.date_of_birth?.message}
             {...register("date_of_birth")}
           />
-          <Input label="Email" value={profile.email} disabled hint="Managed by your administrator." />
+          <DxInput label="Email" value={profile.email} disabled hint="Managed by your administrator." />
         </div>
-        <Textarea
+        <DxTextarea
           label="Bio"
           placeholder="A short professional summary."
           rows={3}
@@ -554,7 +577,8 @@ function ProfileDetailsCard({ profile }: { profile: MyProfile }) {
           {...register("bio")}
         />
         <div className="flex justify-end">
-          <Button
+          <DxButton
+            variant="primary"
             type="submit"
             size="sm"
             leftIcon={<Save className="h-4 w-4" />}
@@ -562,10 +586,10 @@ function ProfileDetailsCard({ profile }: { profile: MyProfile }) {
             isLoading={updateProfile.isPending}
           >
             Save Changes
-          </Button>
+          </DxButton>
         </div>
       </form>
-    </Card>
+    </DxPanel>
   );
 }
 
@@ -611,13 +635,12 @@ function ChangePasswordCard() {
   });
 
   return (
-    <Card>
-      <CardHeader
-        title="Change Password"
-        description="Use at least 8 characters. You may be signed out of other devices."
-      />
+    <DxPanel
+      title="Change Password"
+      description="Use at least 8 characters. You may be signed out of other devices."
+    >
       <form onSubmit={onSubmit} className="space-y-5">
-        <Input
+        <DxInput
           label="Current Password"
           type="password"
           autoComplete="current-password"
@@ -625,14 +648,14 @@ function ChangePasswordCard() {
           {...register("current_password")}
         />
         <div className="grid gap-5 sm:grid-cols-2">
-          <Input
+          <DxInput
             label="New Password"
             type="password"
             autoComplete="new-password"
             error={errors.new_password?.message}
             {...register("new_password")}
           />
-          <Input
+          <DxInput
             label="Confirm New Password"
             type="password"
             autoComplete="new-password"
@@ -641,17 +664,18 @@ function ChangePasswordCard() {
           />
         </div>
         <div className="flex justify-end">
-          <Button
+          <DxButton
+            variant="primary"
             type="submit"
             size="sm"
             leftIcon={<KeyRound className="h-4 w-4" />}
             isLoading={changePassword.isPending}
           >
             Update Password
-          </Button>
+          </DxButton>
         </div>
       </form>
-    </Card>
+    </DxPanel>
   );
 }
 
@@ -695,26 +719,25 @@ function TwoFactorCard({ profile }: { profile: MyProfile }) {
   };
 
   return (
-    <Card>
-      <CardHeader
-        title="Two-Factor Authentication"
-        description="Add a second verification step when signing in."
-        actions={
-          enabled ? (
-            <Badge variant="soft-success">
-              <CheckCircle2 className="h-3 w-3" aria-hidden />
-              Enabled
-            </Badge>
-          ) : (
-            <Badge variant="soft-warning">Disabled</Badge>
-          )
-        }
-      />
+    <DxPanel
+      title="Two-Factor Authentication"
+      description="Add a second verification step when signing in."
+      actions={
+        enabled ? (
+          <DxBadge tone="success">
+            <CheckCircle2 className="h-3 w-3" aria-hidden />
+            Enabled
+          </DxBadge>
+        ) : (
+          <DxBadge tone="warning">Disabled</DxBadge>
+        )
+      }
+    >
       <div className="space-y-5">
         {!enabled ? (
           <div className="flex flex-wrap items-end gap-4">
             <div className="w-56">
-              <Select
+              <DxSelect
                 label="Delivery Method"
                 options={TWO_FACTOR_METHODS}
                 value={method}
@@ -723,21 +746,22 @@ function TwoFactorCard({ profile }: { profile: MyProfile }) {
                 }
               />
             </div>
-            <Button
+            <DxButton
+              variant="primary"
               size="sm"
               leftIcon={<ShieldCheck className="h-4 w-4" />}
               onClick={() => handleToggle(true)}
               isLoading={setupTwoFactor.isPending}
             >
               Enable 2FA
-            </Button>
+            </DxButton>
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-4">
             <p className="text-sm font-medium text-secondary-600 dark:text-secondary-400">
               Two-factor authentication is protecting your account.
             </p>
-            <Button
+            <DxButton
               variant="danger"
               size="sm"
               leftIcon={<ShieldOff className="h-4 w-4" />}
@@ -745,7 +769,7 @@ function TwoFactorCard({ profile }: { profile: MyProfile }) {
               isLoading={setupTwoFactor.isPending}
             >
               Disable 2FA
-            </Button>
+            </DxButton>
           </div>
         )}
 
@@ -755,12 +779,12 @@ function TwoFactorCard({ profile }: { profile: MyProfile }) {
               Authenticator setup
             </p>
             {setupResult.setup_secret ? (
-              <p className="data-mono mt-2 break-all text-sm text-secondary-900 dark:text-secondary-100">
+              <p className="dx-mono mt-2 break-all text-sm text-secondary-900 dark:text-secondary-100">
                 Secret: {setupResult.setup_secret}
               </p>
             ) : null}
             {setupResult.provisioning_uri ? (
-              <p className="data-mono mt-1 break-all text-xs text-secondary-500 dark:text-secondary-400">
+              <p className="dx-mono mt-1 break-all text-xs text-secondary-500 dark:text-secondary-400">
                 {setupResult.provisioning_uri}
               </p>
             ) : null}
@@ -770,7 +794,7 @@ function TwoFactorCard({ profile }: { profile: MyProfile }) {
           </div>
         ) : null}
       </div>
-    </Card>
+    </DxPanel>
   );
 }
 
@@ -789,14 +813,14 @@ function SessionRow({ session }: { session: UserSession }) {
           <p className="truncate text-sm font-semibold text-secondary-900 dark:text-secondary-100">
             {session.user_agent || "Unknown device"}
           </p>
-          <p className="data-mono mt-0.5 text-xs text-secondary-400 dark:text-secondary-500">
+          <p className="dx-mono mt-0.5 text-xs text-secondary-400 dark:text-secondary-500">
             {session.ip_address || "Unknown IP"} · signed in {formatDateTime(session.login_at)}
           </p>
         </div>
       </div>
       <div className="flex items-center gap-2">
-        {session.is_current ? <Badge variant="soft-success">This device</Badge> : null}
-        {session.revoked_at ? <Badge variant="soft-danger">Revoked</Badge> : null}
+        {session.is_current ? <DxBadge tone="success">This device</DxBadge> : null}
+        {session.revoked_at ? <DxBadge tone="danger">Revoked</DxBadge> : null}
       </div>
     </div>
   );
@@ -821,34 +845,33 @@ function SessionsCard({ profile }: { profile: MyProfile }) {
   const sessions = sessionsQuery.data ?? [];
 
   return (
-    <Card>
-      <CardHeader
-        title="Active Sessions"
-        description="Devices currently signed in to your account."
-        actions={
-          sessions.length > 0 ? (
-            <Button
-              variant="danger"
-              size="sm"
-              leftIcon={<LogOut className="h-4 w-4" />}
-              onClick={revokeDialog.open}
-            >
-              Revoke All
-            </Button>
-          ) : undefined
-        }
-      />
+    <DxPanel
+      title="Active Sessions"
+      description="Devices currently signed in to your account."
+      actions={
+        sessions.length > 0 ? (
+          <DxButton
+            variant="danger"
+            size="sm"
+            leftIcon={<LogOut className="h-4 w-4" />}
+            onClick={revokeDialog.open}
+          >
+            Revoke All
+          </DxButton>
+        ) : undefined
+      }
+    >
       {sessionsQuery.isLoading ? (
         <div className="space-y-3">
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
+          <DxSkeleton className="h-16 w-full" />
+          <DxSkeleton className="h-16 w-full" />
         </div>
       ) : sessionsQuery.isError ? (
         <p className="text-sm font-medium text-secondary-500 dark:text-secondary-400">
           Session management is only available to administrators on this account.
         </p>
       ) : sessions.length === 0 ? (
-        <EmptyState
+        <DxEmpty
           icon={MonitorSmartphone}
           title="No active sessions"
           description="Sessions will appear here after you sign in."
@@ -870,12 +893,12 @@ function SessionsCard({ profile }: { profile: MyProfile }) {
         confirmLabel="Revoke All"
         tone="danger"
       />
-    </Card>
+    </DxPanel>
   );
 }
 
 // =====================================================================
-// Page
+// Appearance
 // =====================================================================
 
 function AppearanceCard() {
@@ -886,12 +909,11 @@ function AppearanceCard() {
   ];
 
   return (
-    <Card>
-      <CardHeader
-        title="Appearance"
-        description="Choose your theme. Your choice is saved to your profile and follows you on every device."
-      />
-      <div className="grid gap-4 p-6 pt-0 sm:grid-cols-2">
+    <DxPanel
+      title="Appearance"
+      description="Choose your theme. Your choice is saved to your profile and follows you on every device."
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
         {options.map((opt) => {
           const active = theme === opt.value;
           const Icon = opt.icon;
@@ -916,38 +938,51 @@ function AppearanceCard() {
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-secondary-900">{opt.label}</span>
+                  <span className="text-sm font-bold text-secondary-900 dark:text-secondary-100">{opt.label}</span>
                   {active && <CheckCircle2 className="h-4 w-4 text-primary-500" />}
                 </div>
-                <p className="mt-1 text-xs font-medium text-secondary-500">{opt.hint}</p>
+                <p className="mt-1 text-xs font-medium text-secondary-500 dark:text-secondary-400">{opt.hint}</p>
               </div>
             </button>
           );
         })}
       </div>
-    </Card>
+    </DxPanel>
   );
 }
+
+// =====================================================================
+// Page
+// =====================================================================
 
 export function ProfilePage() {
   const profileQuery = useMyProfile();
   const profile = profileQuery.data;
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
         title="My Profile"
-        description="Manage your personal information and account security."
+        subtitle="Manage your personal information and account security."
+        crumbs={[{ label: "Home", to: "/" }, { label: "My Profile" }]}
       />
 
       {profileQuery.isLoading ? (
         <div className="space-y-6">
-          <CardSkeleton />
-          <CardSkeleton />
+          <DxPanel>
+            <DxSkeleton className="h-20 w-full" />
+          </DxPanel>
+          <DxPanel>
+            <div className="space-y-3">
+              <DxSkeleton className="h-8 w-1/3" />
+              <DxSkeleton className="h-10 w-full" />
+              <DxSkeleton className="h-10 w-full" />
+            </div>
+          </DxPanel>
         </div>
       ) : profileQuery.isError || !profile ? (
-        <Card>
-          <EmptyState
+        <DxPanel>
+          <DxEmpty
             icon={UserRound}
             title="Unable to load your profile"
             description={getApiErrorMessage(
@@ -955,14 +990,14 @@ export function ProfilePage() {
               "Your profile could not be fetched. Please try again."
             )}
             action={
-              <Button variant="secondary" size="sm" onClick={() => profileQuery.refetch()}>
+              <DxButton variant="default" size="sm" onClick={() => profileQuery.refetch()}>
                 Retry
-              </Button>
+              </DxButton>
             }
           />
-        </Card>
+        </DxPanel>
       ) : (
-        <>
+        <div className="space-y-6">
           <ProfileHeaderCard profile={profile} />
           <ProfileDetailsCard key={`details-${profile.id}`} profile={profile} />
           <AppearanceCard />
@@ -971,9 +1006,9 @@ export function ProfilePage() {
             <TwoFactorCard profile={profile} />
           </div>
           <SessionsCard profile={profile} />
-        </>
+        </div>
       )}
-    </div>
+    </DxPage>
   );
 }
 

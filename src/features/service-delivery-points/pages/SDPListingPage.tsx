@@ -3,22 +3,27 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
   Plus,
-  RefreshCw,
+  RotateCcw,
   Activity,
   Users,
   Trash2,
   Pencil,
   Power,
   MapPin,
+  Search,
 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Button } from "@/components/ui/Button";
-import { CardSkeleton } from "@/components/ui/Skeleton";
-import { SearchInput } from "@/components/forms/SearchInput";
-import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxBadge,
+  DxButton,
+  DxInput,
+  DxSelect,
+  DxCheckbox,
+  DxPopup,
+  DxMessage,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import {
   listServiceDeliveryPoints,
@@ -56,17 +61,27 @@ function typeLabel(t?: string | null): string {
     .join(" ");
 }
 
-const TYPE_OPTIONS = [{ value: "", label: "All types" }, ...SERVICE_POINT_TYPES.map((t) => ({ value: t, label: typeLabel(t) }))];
+const TYPE_OPTIONS = [
+  { value: "", label: "All types" },
+  ...SERVICE_POINT_TYPES.map((t) => ({ value: t, label: typeLabel(t) })),
+];
 
 export function SDPListingPage() {
   const toast = useToast();
   const qc = useQueryClient();
 
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ServiceDeliveryPoint | null>(null);
   const [toDelete, setToDelete] = useState<ServiceDeliveryPoint | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setSearch(searchInput), 250);
+    return () => window.clearTimeout(id);
+  }, [searchInput]);
 
   const listQuery = useQuery({
     queryKey: ["service-delivery-points", "list"],
@@ -82,7 +97,11 @@ export function SDPListingPage() {
   const statsById = useMemo(() => {
     const m = new Map<number, { waiting: number; serving: number; total_today: number }>();
     for (const p of statsQuery.data?.points ?? []) {
-      m.set(p.service_delivery_point_id, { waiting: p.waiting, serving: p.serving, total_today: p.total_today });
+      m.set(p.service_delivery_point_id, {
+        waiting: p.waiting,
+        serving: p.serving,
+        total_today: p.total_today,
+      });
     }
     return m;
   }, [statsQuery.data]);
@@ -109,126 +128,176 @@ export function SDPListingPage() {
   };
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) => setServiceDeliveryPointStatus(id, isActive),
-    onSuccess: (_d, v) => { invalidate(); toast.success(v.isActive ? "Point activated" : "Point deactivated"); },
+    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
+      setServiceDeliveryPointStatus(id, isActive),
+    onSuccess: (_d, v) => {
+      invalidate();
+      toast.success(v.isActive ? "Point activated" : "Point deactivated");
+    },
     onError: () => toast.error("Couldn't update status", "Please try again."),
   });
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteServiceDeliveryPoint(id),
-    onSuccess: () => { invalidate(); toast.success("Service point deleted"); },
+    onSuccess: () => {
+      invalidate();
+      toast.success("Service point deleted");
+    },
     onError: () => toast.error("Couldn't delete", "The point may have active queue tickets."),
   });
 
-  const openCreate = () => { setEditing(null); setModalOpen(true); };
-  const openEdit = (p: ServiceDeliveryPoint) => { setEditing(p); setModalOpen(true); };
+  const openCreate = () => {
+    setEditing(null);
+    setModalOpen(true);
+  };
+  const openEdit = (p: ServiceDeliveryPoint) => {
+    setEditing(p);
+    setModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await deleteMutation.mutateAsync(toDelete.id);
+      setToDelete(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const isRefreshing = listQuery.isFetching || statsQuery.isFetching;
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader
-          title="Service Delivery Points"
-          description="Manage clinical service points (Triage, Lab, Pharmacy) and their associated queue prefixes."
-        />
-        <button onClick={openCreate} className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20">
-          <Plus className="h-5 w-5" />
-          <span className="font-bold">New Service Point</span>
-        </button>
-      </div>
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Operations" }, { label: "Service Delivery Points" }]}
+        title="Service Delivery Points"
+        subtitle="Manage clinical service points (Triage, Lab, Pharmacy) and their associated queue prefixes."
+        actions={
+          <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>
+            New service point
+          </DxButton>
+        }
+      />
 
-      {listQuery.isError && (
-        <div className="p-5 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center gap-3">
-          <Building2 className="h-5 w-5" /><p className="text-sm font-bold">Failed to load service points.</p>
+      {listQuery.isError ? (
+        <DxMessage tone="danger">Failed to load service points.</DxMessage>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+        {/* KPI rail */}
+        <div className="space-y-4 lg:col-span-1">
+          <DxPanel>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
+              Active Points
+            </p>
+            <h4 className="mt-1 text-[26px] font-bold tracking-tight text-[var(--dx-text)]">
+              {activeCount}
+            </h4>
+            <p className="mt-1 text-[11px] text-[var(--dx-text-muted)]">{sdps.length} configured</p>
+          </DxPanel>
+          <DxPanel>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
+              Total Queued Today
+            </p>
+            <h4 className="mt-1 text-[26px] font-bold tracking-tight text-[var(--dx-accent)]">
+              {statsQuery.isLoading ? "—" : totalToday.toLocaleString()}
+            </h4>
+            <p className="mt-1 text-[11px] text-[var(--dx-text-muted)]">
+              Tickets issued across all points
+            </p>
+          </DxPanel>
         </div>
-      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* KPI Cards */}
-        <div className="lg:col-span-1 space-y-4">
-          <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40 shadow-premium">
-            <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-2">Active Points</p>
-            <h4 className="text-2xl font-black text-secondary-900">{activeCount}</h4>
-            <p className="mt-1 text-[11px] text-secondary-400">{sdps.length} configured</p>
-          </div>
-          <div className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40 shadow-premium">
-            <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mb-2">Total Queued Today</p>
-            <h4 className="text-2xl font-black text-primary-600">{statsQuery.isLoading ? "—" : totalToday.toLocaleString()}</h4>
-            <p className="mt-1 text-[11px] text-secondary-400">Tickets issued across all points</p>
-          </div>
-        </div>
-
-        {/* SDP List */}
-        <div className="lg:col-span-3 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h3 className="text-lg font-bold text-secondary-900 flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary-500" />
+        {/* SDP list */}
+        <div className="space-y-5 lg:col-span-3">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <h3 className="flex items-center gap-2 text-[15px] font-bold text-[var(--dx-text)]">
+              <Building2 className="h-5 w-5 text-[var(--dx-accent)]" />
               Operational Units
             </h3>
-            <div className="flex flex-1 sm:flex-none items-center gap-2 sm:justify-end">
-              <SearchInput className="flex-1 sm:w-56" placeholder="Search points…" onSearch={setSearch} />
-              <div className="w-40">
-                <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} options={TYPE_OPTIONS} />
+            <div className="flex flex-1 items-center gap-2 sm:flex-none sm:justify-end">
+              <div className="flex-1 sm:w-56">
+                <DxInput
+                  leftIcon={<Search className="h-3.5 w-3.5" />}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Search points…"
+                />
               </div>
-              <button
-                onClick={() => { listQuery.refetch(); statsQuery.refetch(); }}
-                className="btn-secondary p-2.5 rounded-xl"
+              <div className="w-40">
+                <DxSelect
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  options={TYPE_OPTIONS}
+                />
+              </div>
+              <DxButton
+                icon
                 title="Refresh"
+                onClick={() => {
+                  listQuery.refetch();
+                  statsQuery.refetch();
+                }}
+                isLoading={isRefreshing}
               >
-                <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              </button>
+                <RotateCcw />
+              </DxButton>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {listQuery.isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)
+              Array.from({ length: 4 }).map((_, i) => <div key={i} className="dx-skeleton h-52 w-full" />)
             ) : filtered.length > 0 ? (
               filtered.map((sdp) => {
                 const stat = statsById.get(sdp.id);
                 const waiting = stat?.waiting ?? 0;
                 const serving = stat?.serving ?? 0;
                 return (
-                  <div key={sdp.id} className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40 hover:bg-white/60 transition-all group relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => openEdit(sdp)}
-                        className="p-2 hover:bg-primary-50 text-secondary-400 hover:text-primary-600 rounded-xl"
-                        title="Edit"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => statusMutation.mutate({ id: sdp.id, isActive: !sdp.is_active })}
-                        className="p-2 hover:bg-amber-50 text-secondary-400 hover:text-amber-600 rounded-xl"
+                  <div
+                    key={sdp.id}
+                    className="group relative flex flex-col rounded-lg border border-[var(--dx-border)] bg-[var(--dx-surface)] p-6 transition-colors hover:border-[var(--dx-border-strong)]"
+                  >
+                    <div className="absolute right-3 top-3 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <DxButton icon size="sm" variant="text" title="Edit" onClick={() => openEdit(sdp)}>
+                        <Pencil />
+                      </DxButton>
+                      <DxButton
+                        icon
+                        size="sm"
+                        variant="text"
                         title={sdp.is_active ? "Deactivate" : "Activate"}
                         disabled={statusMutation.isPending}
+                        onClick={() => statusMutation.mutate({ id: sdp.id, isActive: !sdp.is_active })}
                       >
-                        <Power className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setToDelete(sdp)}
-                        className="p-2 hover:bg-rose-50 text-secondary-400 hover:text-rose-500 rounded-xl"
+                        <Power />
+                      </DxButton>
+                      <DxButton
+                        icon
+                        size="sm"
+                        variant="outline-danger"
                         title="Delete"
+                        onClick={() => setToDelete(sdp)}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                        <Trash2 />
+                      </DxButton>
                     </div>
 
-                    <div className="flex items-center gap-5 mb-6">
-                      <div className="h-14 w-14 rounded-2xl bg-secondary-900 text-white flex items-center justify-center shadow-lg shadow-secondary-900/10">
-                        <Activity className="h-7 w-7" />
+                    <div className="mb-5 flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]">
+                        <Activity className="h-6 w-6" />
                       </div>
                       <div className="min-w-0">
-                        <h4 className="text-lg font-black text-secondary-900 truncate">{sdp.name}</h4>
-                        <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mt-1">
+                        <h4 className="truncate text-[15px] font-bold text-[var(--dx-text)]">{sdp.name}</h4>
+                        <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
                           {typeLabel(sdp.service_point_type)} · {sdp.code}
                         </p>
                       </div>
                     </div>
 
-                    <div className="mb-4 flex flex-wrap items-center gap-3 text-[11px] text-secondary-500">
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-secondary-500/5 px-2.5 py-1 font-bold">
+                    <div className="mb-4 flex flex-wrap items-center gap-3 text-[11px] text-[var(--dx-text-muted)]">
+                      <span className="inline-flex items-center gap-1.5 rounded-md bg-[var(--dx-surface-sunken)] px-2.5 py-1 font-semibold">
                         Prefix: {sdp.queue_prefix || "—"}
                       </span>
                       {sdp.location_description ? (
@@ -238,32 +307,40 @@ export function SDPListingPage() {
                       ) : null}
                     </div>
 
-                    <div className="flex items-center justify-between pt-6 border-t border-secondary-100">
+                    <div className="mt-auto flex items-center justify-between border-t border-[var(--dx-border)] pt-4">
                       <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-secondary-400" />
-                        <span className="text-xs font-bold text-secondary-600">
+                        <Users className="h-4 w-4 text-[var(--dx-text-faint)]" />
+                        <span className="text-[12px] font-semibold text-[var(--dx-text-muted)]">
                           {statsQuery.isLoading ? "—" : `${waiting} waiting`}
-                          {serving > 0 ? <span className="ml-1 font-medium text-secondary-400">· {serving} serving</span> : null}
+                          {serving > 0 ? (
+                            <span className="ml-1 font-medium text-[var(--dx-text-faint)]">· {serving} serving</span>
+                          ) : null}
                         </span>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${sdp.is_active ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
-                        {sdp.is_active ? "OPERATIONAL" : "INACTIVE"}
-                      </span>
+                      <DxBadge tone={sdp.is_active ? "success" : "danger"} dot>
+                        {sdp.is_active ? "Operational" : "Inactive"}
+                      </DxBadge>
                     </div>
                   </div>
                 );
               })
             ) : (
-              <div className="col-span-full py-24 text-center bg-white/20 rounded-[3rem] border-2 border-dashed border-secondary-400">
-                <Building2 className="h-16 w-16 mx-auto text-secondary-100 mb-6" />
-                <h4 className="text-xl font-bold text-secondary-900">
-                  {search || typeFilter ? "No matching points" : "No Service Points"}
-                </h4>
-                <p className="text-secondary-500 mt-2 max-w-xs mx-auto">
-                  {search || typeFilter
-                    ? "Adjust your search or filter."
-                    : "Create your first clinical unit to start processing patient queues."}
-                </p>
+              <div className="col-span-full">
+                <DxPanel>
+                  <div className="py-16 text-center">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]">
+                      <Building2 className="h-8 w-8 text-[var(--dx-text-faint)]" />
+                    </div>
+                    <h4 className="text-[16px] font-bold text-[var(--dx-text)]">
+                      {search || typeFilter ? "No matching points" : "No Service Points"}
+                    </h4>
+                    <p className="mx-auto mt-1 max-w-xs text-[13px] text-[var(--dx-text-muted)]">
+                      {search || typeFilter
+                        ? "Adjust your search or filter."
+                        : "Create your first clinical unit to start processing patient queues."}
+                    </p>
+                  </div>
+                </DxPanel>
               </div>
             )}
           </div>
@@ -273,20 +350,45 @@ export function SDPListingPage() {
       <SDPFormModal
         isOpen={modalOpen}
         point={editing}
-        onClose={() => { setModalOpen(false); setEditing(null); }}
+        onClose={() => {
+          setModalOpen(false);
+          setEditing(null);
+        }}
         onSaved={invalidate}
       />
 
-      <ConfirmDialog
+      {/* Delete confirm */}
+      <DxPopup
         isOpen={toDelete !== null}
-        onClose={() => setToDelete(null)}
-        onConfirm={() => { if (toDelete) deleteMutation.mutate(toDelete.id); }}
+        onClose={() => !deleting && setToDelete(null)}
         title="Delete service point?"
-        description={toDelete ? `"${toDelete.name}" will be removed. This can't be undone.` : undefined}
-        confirmLabel="Delete"
-        tone="danger"
-      />
-    </div>
+        size="sm"
+        locked={deleting}
+        footer={
+          <>
+            <DxButton onClick={() => setToDelete(null)} disabled={deleting}>
+              Cancel
+            </DxButton>
+            <DxButton
+              variant="danger"
+              onClick={handleDelete}
+              isLoading={deleting}
+              leftIcon={<Trash2 className="h-4 w-4" />}
+            >
+              Delete
+            </DxButton>
+          </>
+        }
+      >
+        <DxMessage tone="danger">
+          {toDelete ? (
+            <>
+              <strong>{toDelete.name}</strong> will be removed. This can't be undone.
+            </>
+          ) : null}
+        </DxMessage>
+      </DxPopup>
+    </DxPage>
   );
 }
 
@@ -312,7 +414,17 @@ const emptyForm: FormState = {
   is_active: true,
 };
 
-function SDPFormModal({ isOpen, point, onClose, onSaved }: { isOpen: boolean; point: ServiceDeliveryPoint | null; onClose: () => void; onSaved: () => void }) {
+function SDPFormModal({
+  isOpen,
+  point,
+  onClose,
+  onSaved,
+}: {
+  isOpen: boolean;
+  point: ServiceDeliveryPoint | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const toast = useToast();
   const isEdit = point !== null;
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -334,7 +446,8 @@ function SDPFormModal({ isOpen, point, onClose, onSaved }: { isOpen: boolean; po
     }
   }, [point, isOpen]);
 
-  const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
 
   const save = useMutation({
     mutationFn: () => {
@@ -352,7 +465,11 @@ function SDPFormModal({ isOpen, point, onClose, onSaved }: { isOpen: boolean; po
         ? updateServiceDeliveryPoint(point!.id, payload)
         : createServiceDeliveryPoint(payload);
     },
-    onSuccess: () => { toast.success(isEdit ? "Service point updated" : "Service point created"); onSaved(); onClose(); },
+    onSuccess: () => {
+      toast.success(isEdit ? "Service point updated" : "Service point created");
+      onSaved();
+      onClose();
+    },
     onError: (err: any) => {
       const d = err?.response?.data?.detail || err?.response?.data?.message;
       toast.error("Couldn't save", typeof d === "string" ? d : "Check the fields and try again.");
@@ -360,36 +477,56 @@ function SDPFormModal({ isOpen, point, onClose, onSaved }: { isOpen: boolean; po
   });
 
   function submit() {
-    if (!form.name.trim()) { toast.error("Missing name", "A name is required."); return; }
-    if (!form.code.trim()) { toast.error("Missing code", "A unique code is required."); return; }
-    if (!form.service_point_type) { toast.error("Missing type", "Select a service point type."); return; }
+    if (!form.name.trim()) {
+      toast.error("Missing name", "A name is required.");
+      return;
+    }
+    if (!form.code.trim()) {
+      toast.error("Missing code", "A unique code is required.");
+      return;
+    }
+    if (!form.service_point_type) {
+      toast.error("Missing type", "Select a service point type.");
+      return;
+    }
     save.mutate();
   }
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={onClose}
       title={isEdit ? "Edit Service Point" : "New Service Point"}
       size="md"
+      locked={save.isPending}
       footer={
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit} isLoading={save.isPending}>{isEdit ? "Save changes" : "Create point"}</Button>
-        </div>
+        <>
+          <DxButton onClick={onClose} disabled={save.isPending}>
+            Cancel
+          </DxButton>
+          <DxButton variant="primary" onClick={submit} isLoading={save.isPending}>
+            {isEdit ? "Save changes" : "Create point"}
+          </DxButton>
+        </>
       }
     >
       <div className="space-y-4">
-        <Input label="Name" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Laboratory Desk" />
+        <DxInput
+          label="Name"
+          value={form.name}
+          onChange={(e) => set("name", e.target.value)}
+          placeholder="e.g. Laboratory Desk"
+        />
         <div className="grid grid-cols-2 gap-4">
-          <Input
+          <DxInput
             label="Code"
+            mono
             value={form.code}
             onChange={(e) => set("code", e.target.value.toUpperCase())}
             disabled={isEdit}
             hint={isEdit ? "Code can't be changed." : "Unique, e.g. LAB"}
           />
-          <Select
+          <DxSelect
             label="Type"
             value={form.service_point_type}
             onChange={(e) => set("service_point_type", e.target.value)}
@@ -397,24 +534,45 @@ function SDPFormModal({ isOpen, point, onClose, onSaved }: { isOpen: boolean; po
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Queue prefix" value={form.queue_prefix} onChange={(e) => set("queue_prefix", e.target.value.toUpperCase())} placeholder="e.g. LAB" hint="Shown on printed queue tickets." />
-          <Input label="Location (optional)" value={form.location_description} onChange={(e) => set("location_description", e.target.value)} placeholder="e.g. Ground floor, Block B" />
+          <DxInput
+            label="Queue prefix"
+            mono
+            value={form.queue_prefix}
+            onChange={(e) => set("queue_prefix", e.target.value.toUpperCase())}
+            placeholder="e.g. LAB"
+            hint="Shown on printed queue tickets."
+          />
+          <DxInput
+            label="Location (optional)"
+            value={form.location_description}
+            onChange={(e) => set("location_description", e.target.value)}
+            placeholder="e.g. Ground floor, Block B"
+          />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <label className="flex items-center gap-2 rounded-2xl border border-secondary-200 px-4 py-3 text-sm font-semibold text-secondary-700 cursor-pointer">
-            <input type="checkbox" checked={form.supports_walk_in} onChange={(e) => set("supports_walk_in", e.target.checked)} />
-            Walk-in
-          </label>
-          <label className="flex items-center gap-2 rounded-2xl border border-secondary-200 px-4 py-3 text-sm font-semibold text-secondary-700 cursor-pointer">
-            <input type="checkbox" checked={form.supports_appointments} onChange={(e) => set("supports_appointments", e.target.checked)} />
-            Appointments
-          </label>
-          <label className="flex items-center gap-2 rounded-2xl border border-secondary-200 px-4 py-3 text-sm font-semibold text-secondary-700 cursor-pointer">
-            <input type="checkbox" checked={form.is_active} onChange={(e) => set("is_active", e.target.checked)} />
-            Active
-          </label>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-md border border-[var(--dx-border)] px-4 py-3">
+            <DxCheckbox
+              label="Walk-in"
+              checked={form.supports_walk_in}
+              onChange={(e) => set("supports_walk_in", e.target.checked)}
+            />
+          </div>
+          <div className="rounded-md border border-[var(--dx-border)] px-4 py-3">
+            <DxCheckbox
+              label="Appointments"
+              checked={form.supports_appointments}
+              onChange={(e) => set("supports_appointments", e.target.checked)}
+            />
+          </div>
+          <div className="rounded-md border border-[var(--dx-border)] px-4 py-3">
+            <DxCheckbox
+              label="Active"
+              checked={form.is_active}
+              onChange={(e) => set("is_active", e.target.checked)}
+            />
+          </div>
         </div>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

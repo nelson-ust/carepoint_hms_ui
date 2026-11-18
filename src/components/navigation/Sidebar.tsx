@@ -7,11 +7,12 @@ import { localStorageService, storageKeys } from "@/lib/storage/local-storage";
 import { routes } from "@/config/routes";
 import { useUI, SIDEBAR_COLLAPSED_WIDTH } from "@/app/providers/UIProvider";
 import { useMyModules } from "@/lib/modules/useMyModules";
+import { useFacilityProfile } from "@/lib/modules/useFacilityProfile";
 import { usePermissionGate } from "@/lib/permissions/usePermissionGate";
 import { useTenantSettings } from "@/features/settings/hooks/use-branding";
 import { resolveAssetUrl } from "@/lib/api/asset-url";
 import { cn } from "@/lib/utils/cn";
-import logo from "@/assets/logo.jpeg";
+import logo from "@/assets/logo.svg";
 import { CommandPalette } from "./CommandPalette";
 
 const SECTIONS_KEY = "carepoint.sidebar_sections";
@@ -35,6 +36,7 @@ export function Sidebar() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { isEnabled } = useMyModules();
+  const facilityProfile = useFacilityProfile();
   const permissionGate = usePermissionGate();
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(loadCollapsedSections);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -197,7 +199,7 @@ export function Sidebar() {
           <div className="min-w-0 leading-tight">
             <p className="truncate text-[13px] font-semibold text-[var(--dx-text)]">Carepoint HMS</p>
             <p className="truncate text-[10.5px] font-medium text-[var(--dx-text-faint)]">
-              {isSaaSAdmin ? "Platform Admin" : "Hospital Workspace"}
+              {isSaaSAdmin ? "Platform Admin" : facilityProfile.workspaceName}
             </p>
           </div>
         )}

@@ -13,16 +13,12 @@ import {
   ShieldCheck,
   ShieldOff,
 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Badge } from "@/components/ui/Badge";
-import { Skeleton } from "@/components/ui/Skeleton";
+import {
+  DxPopup, DxButton, DxInput, DxSelect, DxBadge, DxTabs,
+  type DxBadgeTone,
+} from "@/components/dx";
 import { FormField } from "@/components/forms/FormField";
-import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
 import { useToast } from "@/components/feedback/ToastProvider";
-import { cn } from "@/lib/utils/cn";
 import { groupPermissionsByModule } from "@/features/roles/api/roles.api";
 import {
   adminUserDisplayName,
@@ -30,7 +26,6 @@ import {
   generateStrongPassword,
   getStaffAdminErrorMessage,
   relativeTime,
-  statusPillVariant,
 } from "../api/staff-admin.api";
 import type { AdminUser, UserSession, UserUpdatePayload } from "../api/staff-admin.api";
 import {
@@ -58,6 +53,44 @@ const TABS: { id: DetailTab; label: string }[] = [
   { id: "security", label: "Security" },
   { id: "danger", label: "Danger Zone" },
 ];
+
+function statusTone(status?: string | null): DxBadgeTone {
+  switch ((status ?? "").toUpperCase()) {
+    case "ACTIVE": return "success";
+    case "SUSPENDED": return "warning";
+    case "LOCKED": return "danger";
+    case "PENDING": return "info";
+    default: return "neutral";
+  }
+}
+
+/** Shared confirmation popup (replaces the legacy ConfirmDialog). */
+function ConfirmPopup({
+  isOpen, onClose, onConfirm, title, description, confirmLabel, tone = "primary", isLoading,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+  title: string;
+  description?: string;
+  confirmLabel: string;
+  tone?: "primary" | "danger";
+  isLoading?: boolean;
+}) {
+  return (
+    <DxPopup
+      isOpen={isOpen} onClose={onClose} title={title} size="sm" locked={isLoading}
+      footer={
+        <>
+          <DxButton onClick={onClose} disabled={isLoading}>Cancel</DxButton>
+          <DxButton variant={tone === "danger" ? "danger" : "primary"} isLoading={isLoading} onClick={async () => { await onConfirm(); onClose(); }}>{confirmLabel}</DxButton>
+        </>
+      }
+    >
+      {description ? <p className="text-[13px] text-[var(--dx-text-muted)]">{description}</p> : null}
+    </DxPopup>
+  );
+}
 
 // ============================================================
 // Profile tab — editable form → PUT /staff-profiles/users/{id}
@@ -139,10 +172,7 @@ function ProfileTab({ user }: { user: AdminUser }) {
       {
         onSuccess: () => toast.success("Profile updated", "Staff details saved successfully."),
         onError: (error) =>
-          toast.error(
-            "Update failed",
-            getStaffAdminErrorMessage(error, "Unable to save profile changes."),
-          ),
+          toast.error("Update failed", getStaffAdminErrorMessage(error, "Unable to save profile changes.")),
       },
     );
   };
@@ -155,37 +185,25 @@ function ProfileTab({ user }: { user: AdminUser }) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
       <div className="grid gap-4 sm:grid-cols-3">
-        <Input label="First Name" error={errors.first_name?.message} {...register("first_name")} />
-        <Input
-          label="Middle Name"
-          error={errors.middle_name?.message}
-          {...register("middle_name")}
-        />
-        <Input label="Last Name" error={errors.last_name?.message} {...register("last_name")} />
+        <DxInput label="First Name" error={errors.first_name?.message} {...register("first_name")} />
+        <DxInput label="Middle Name" error={errors.middle_name?.message} {...register("middle_name")} />
+        <DxInput label="Last Name" error={errors.last_name?.message} {...register("last_name")} />
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
-        <Input label="Username" error={errors.username?.message} {...register("username")} />
-        <Input label="Email" type="email" error={errors.email?.message} {...register("email")} />
-        <Input
-          label="Phone Number"
-          error={errors.phone_number?.message}
-          {...register("phone_number")}
-        />
+        <DxInput label="Username" error={errors.username?.message} {...register("username")} />
+        <DxInput label="Email" type="email" error={errors.email?.message} {...register("email")} />
+        <DxInput label="Phone Number" error={errors.phone_number?.message} {...register("phone_number")} />
       </div>
       {user.staff_profile ? (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Staff Number" error={errors.staff_no?.message} {...register("staff_no")} />
-            <Input label="Job Title" error={errors.job_title?.message} {...register("job_title")} />
+            <DxInput label="Staff Number" error={errors.staff_no?.message} {...register("staff_no")} />
+            <DxInput label="Job Title" error={errors.job_title?.message} {...register("job_title")} />
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Input label="Specialty" error={errors.specialty?.message} {...register("specialty")} />
-            <Input
-              label="License No"
-              error={errors.professional_license_no?.message}
-              {...register("professional_license_no")}
-            />
-            <Select
+            <DxInput label="Specialty" error={errors.specialty?.message} {...register("specialty")} />
+            <DxInput label="License No" error={errors.professional_license_no?.message} {...register("professional_license_no")} />
+            <DxSelect
               label="Department"
               placeholder={departmentsQuery.isLoading ? "Loading…" : "Select department"}
               options={departmentOptions}
@@ -195,22 +213,18 @@ function ProfileTab({ user }: { user: AdminUser }) {
           </div>
           <FormField label="Service Delivery Points">
             {sdpsQuery.isLoading ? (
-              <Skeleton className="h-20 w-full" />
+              <div className="dx-skeleton h-20 w-full" />
             ) : (sdpsQuery.data ?? []).length === 0 ? (
-              <p className="text-xs font-medium text-secondary-400">
-                No service delivery points available.
-              </p>
+              <p className="text-[12px] font-medium text-[var(--dx-text-muted)]">No service delivery points available.</p>
             ) : (
-              <div className="grid max-h-40 gap-1 overflow-y-auto rounded-2xl border border-secondary-200 p-2 sm:grid-cols-2 dark:border-white/10">
+              <div className="grid max-h-40 gap-1 overflow-y-auto rounded-md border border-[var(--dx-border)] p-2 sm:grid-cols-2">
                 {(sdpsQuery.data ?? []).map((sdp) => (
                   <CheckboxRow
                     key={sdp.id}
                     checked={sdpIds.includes(sdp.id)}
                     onToggle={() =>
                       setSdpIds((current) =>
-                        current.includes(sdp.id)
-                          ? current.filter((v) => v !== sdp.id)
-                          : [...current, sdp.id],
+                        current.includes(sdp.id) ? current.filter((v) => v !== sdp.id) : [...current, sdp.id],
                       )
                     }
                     label={sdp.name}
@@ -222,27 +236,19 @@ function ProfileTab({ user }: { user: AdminUser }) {
           </FormField>
         </>
       ) : (
-        <p className="text-xs font-medium text-secondary-400">
+        <p className="text-[12px] font-medium text-[var(--dx-text-muted)]">
           No staff profile is linked to this account, so employment fields are unavailable.
         </p>
       )}
       <div className="flex justify-end">
-        <Button
-          type="submit"
-          variant="primary"
-          leftIcon={<Save className="h-4 w-4" />}
-          isLoading={updateUser.isPending}
-        >
-          Save Changes
-        </Button>
+        <DxButton type="submit" variant="primary" leftIcon={<Save className="h-4 w-4" />} isLoading={updateUser.isPending}>Save changes</DxButton>
       </div>
     </form>
   );
 }
 
 // ============================================================
-// Access tab — role checkboxes (PUT roles replace) + effective
-// permissions from the access-summary endpoint, grouped by module
+// Access tab
 // ============================================================
 
 function AccessTab({ user, active }: { user: AdminUser; active: boolean }) {
@@ -266,13 +272,9 @@ function AccessTab({ user, active }: { user: AdminUser; active: boolean }) {
     saveRoles.mutate(
       { userId: user.id, roleIds: selected, currentRoleIds },
       {
-        onSuccess: () =>
-          toast.success("Roles updated", "The user's role assignments were replaced."),
+        onSuccess: () => toast.success("Roles updated", "The user's role assignments were replaced."),
         onError: (error) =>
-          toast.error(
-            "Role update failed",
-            getStaffAdminErrorMessage(error, "Unable to update role assignments."),
-          ),
+          toast.error("Role update failed", getStaffAdminErrorMessage(error, "Unable to update role assignments.")),
       },
     );
   };
@@ -286,33 +288,20 @@ function AccessTab({ user, active }: { user: AdminUser; active: boolean }) {
     <div className="space-y-8">
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary-400">
-            Assigned Roles
-          </h4>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleSave}
-            disabled={!dirty}
-            isLoading={saveRoles.isPending}
-            leftIcon={<Save className="h-3.5 w-3.5" />}
-          >
-            Save Roles
-          </Button>
+          <h4 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--dx-text-muted)]">Assigned Roles</h4>
+          <DxButton variant="primary" size="sm" onClick={handleSave} disabled={!dirty} isLoading={saveRoles.isPending} leftIcon={<Save className="h-3.5 w-3.5" />}>Save roles</DxButton>
         </div>
         {rolesQuery.isLoading ? (
-          <Skeleton className="h-24 w-full" />
+          <div className="dx-skeleton h-24 w-full" />
         ) : (
-          <div className="grid max-h-48 gap-1 overflow-y-auto rounded-2xl border border-secondary-200 p-2 sm:grid-cols-2 dark:border-white/10">
+          <div className="grid max-h-48 gap-1 overflow-y-auto rounded-md border border-[var(--dx-border)] p-2 sm:grid-cols-2">
             {(rolesQuery.data ?? []).map((role) => (
               <CheckboxRow
                 key={role.id}
                 checked={selected.includes(role.id)}
                 onToggle={() =>
                   setSelected((current) =>
-                    current.includes(role.id)
-                      ? current.filter((v) => v !== role.id)
-                      : [...current, role.id],
+                    current.includes(role.id) ? current.filter((v) => v !== role.id) : [...current, role.id],
                   )
                 }
                 label={role.name}
@@ -322,41 +311,26 @@ function AccessTab({ user, active }: { user: AdminUser; active: boolean }) {
           </div>
         )}
         {selected.length === 0 ? (
-          <p className="mt-2 text-xs font-semibold text-amber-600 dark:text-amber-300">
-            Saving with no roles removes all of this user's role assignments.
-          </p>
+          <p className="mt-2 text-[12px] font-semibold" style={{ color: "var(--dx-warning)" }}>Saving with no roles removes all of this user's role assignments.</p>
         ) : null}
       </section>
 
       <section>
-        <h4 className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-secondary-400">
-          Effective Permissions
-        </h4>
+        <h4 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--dx-text-muted)]">Effective Permissions</h4>
         {accessQuery.isLoading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-16 w-full" />
-          </div>
+          <div className="space-y-3"><div className="dx-skeleton h-6 w-48" /><div className="dx-skeleton h-16 w-full" /></div>
         ) : accessQuery.isError ? (
-          <p className="text-xs font-semibold text-rose-500">
-            Could not load the access summary.
-          </p>
+          <p className="text-[12px] font-semibold" style={{ color: "var(--dx-danger)" }}>Could not load the access summary.</p>
         ) : groups.length === 0 ? (
-          <p className="text-xs font-medium text-secondary-400">
-            This user has no effective permissions.
-          </p>
+          <p className="text-[12px] font-medium text-[var(--dx-text-muted)]">This user has no effective permissions.</p>
         ) : (
           <div className="space-y-4">
             {groups.map((group) => (
               <div key={group.module}>
-                <p className="mb-2 text-xs font-black uppercase tracking-widest text-secondary-500">
-                  {group.module}
-                </p>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">{group.module}</p>
                 <div className="flex flex-wrap gap-2">
                   {group.permissions.map((permission) => (
-                    <Badge key={permission.id} variant="soft-info" title={permission.description ?? undefined}>
-                      {permission.name}
-                    </Badge>
+                    <DxBadge key={permission.id} tone="info" title={permission.description ?? undefined}>{permission.name}</DxBadge>
                   ))}
                 </div>
               </div>
@@ -369,7 +343,7 @@ function AccessTab({ user, active }: { user: AdminUser; active: boolean }) {
 }
 
 // ============================================================
-// Security tab — password reset, MFA toggle, session review/revoke
+// Security tab
 // ============================================================
 
 function sessionIsActive(session: UserSession): boolean {
@@ -397,15 +371,9 @@ function SecurityTab({ user, active }: { user: AdminUser; active: boolean }) {
         payload: { new_password: password, force_password_change_on_next_login: true },
       });
       setTempPassword(password);
-      toast.success(
-        "Password reset",
-        "All active sessions were revoked. Share the temporary password securely.",
-      );
+      toast.success("Password reset", "All active sessions were revoked. Share the temporary password securely.");
     } catch (error) {
-      toast.error(
-        "Password reset failed",
-        getStaffAdminErrorMessage(error, "Unable to reset the password."),
-      );
+      toast.error("Password reset failed", getStaffAdminErrorMessage(error, "Unable to reset the password."));
     }
   };
 
@@ -418,11 +386,7 @@ function SecurityTab({ user, active }: { user: AdminUser; active: boolean }) {
             updated.is_two_factor_enabled ? "MFA enabled" : "MFA disabled",
             `Multi-factor authentication is now ${updated.is_two_factor_enabled ? "required" : "off"} for ${adminUserDisplayName(updated)}.`,
           ),
-        onError: (error) =>
-          toast.error(
-            "MFA update failed",
-            getStaffAdminErrorMessage(error, "Unable to update MFA."),
-          ),
+        onError: (error) => toast.error("MFA update failed", getStaffAdminErrorMessage(error, "Unable to update MFA.")),
       },
     );
   };
@@ -432,11 +396,7 @@ function SecurityTab({ user, active }: { user: AdminUser; active: boolean }) {
       { userId: user.id, sessionIds },
       {
         onSuccess: (result) => toast.success("Sessions revoked", result.message),
-        onError: (error) =>
-          toast.error(
-            "Revoke failed",
-            getStaffAdminErrorMessage(error, "Unable to revoke sessions."),
-          ),
+        onError: (error) => toast.error("Revoke failed", getStaffAdminErrorMessage(error, "Unable to revoke sessions.")),
       },
     );
   };
@@ -447,139 +407,76 @@ function SecurityTab({ user, active }: { user: AdminUser; active: boolean }) {
   return (
     <div className="space-y-8">
       {/* ---- Password ---- */}
-      <section className="rounded-2xl border border-secondary-200 p-5 dark:border-white/10">
+      <section className="rounded-md border border-[var(--dx-border)] p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-sm font-bold text-secondary-900">Reset Password</p>
-            <p className="mt-1 text-xs font-medium text-secondary-500">
-              Generates a strong temporary password, revokes all active sessions, and forces a
-              change at next login.
-            </p>
-            {user.password_changed_at ? (
-              <p className="mt-1 text-xs text-secondary-400">
-                Last changed {relativeTime(user.password_changed_at)}.
-              </p>
-            ) : null}
+            <p className="text-[14px] font-semibold text-[var(--dx-text)]">Reset Password</p>
+            <p className="mt-1 text-[12px] font-medium text-[var(--dx-text-muted)]">Generates a strong temporary password, revokes all active sessions, and forces a change at next login.</p>
+            {user.password_changed_at ? <p className="mt-1 text-[12px] text-[var(--dx-text-muted)]">Last changed {relativeTime(user.password_changed_at)}.</p> : null}
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            leftIcon={<KeyRound className="h-4 w-4" />}
-            onClick={() => setConfirmReset(true)}
-            isLoading={resetPassword.isPending}
-          >
-            Reset Password
-          </Button>
+          <DxButton size="sm" leftIcon={<KeyRound className="h-4 w-4" />} onClick={() => setConfirmReset(true)} isLoading={resetPassword.isPending}>Reset password</DxButton>
         </div>
-        {tempPassword ? (
-          <div className="mt-4">
-            <CopyField label="Temporary password (shown once)" value={tempPassword} />
-          </div>
-        ) : null}
+        {tempPassword ? <div className="mt-4"><CopyField label="Temporary password (shown once)" value={tempPassword} /></div> : null}
       </section>
 
       {/* ---- MFA ---- */}
-      <section className="rounded-2xl border border-secondary-200 p-5 dark:border-white/10">
+      <section className="rounded-md border border-[var(--dx-border)] p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             {user.is_two_factor_enabled ? (
-              <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-500" aria-hidden />
+              <ShieldCheck className="h-5 w-5 shrink-0" style={{ color: "var(--dx-success)" }} aria-hidden />
             ) : (
-              <ShieldOff className="h-5 w-5 shrink-0 text-secondary-400" aria-hidden />
+              <ShieldOff className="h-5 w-5 shrink-0 text-[var(--dx-text-muted)]" aria-hidden />
             )}
             <div className="min-w-0">
-              <p className="text-sm font-bold text-secondary-900">Multi-Factor Authentication</p>
-              <p className="mt-0.5 text-xs font-medium text-secondary-500">
-                {user.is_two_factor_enabled
-                  ? "MFA is currently required for this account."
-                  : "MFA is currently disabled for this account."}
+              <p className="text-[14px] font-semibold text-[var(--dx-text)]">Multi-Factor Authentication</p>
+              <p className="mt-0.5 text-[12px] font-medium text-[var(--dx-text-muted)]">
+                {user.is_two_factor_enabled ? "MFA is currently required for this account." : "MFA is currently disabled for this account."}
               </p>
             </div>
           </div>
-          <Button
-            variant={user.is_two_factor_enabled ? "secondary" : "primary"}
-            size="sm"
-            onClick={handleToggleMfa}
-            isLoading={toggleMfa.isPending}
-          >
+          <DxButton variant={user.is_two_factor_enabled ? "default" : "primary"} size="sm" onClick={handleToggleMfa} isLoading={toggleMfa.isPending}>
             {user.is_two_factor_enabled ? "Disable MFA" : "Enable MFA"}
-          </Button>
+          </DxButton>
         </div>
       </section>
 
       {/* ---- Sessions ---- */}
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary-400">
-            Sessions & Login History
-          </h4>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => setConfirmRevokeAll(true)}
-            disabled={activeSessions.length === 0}
-            isLoading={revokeSessions.isPending}
-          >
-            Revoke All Active
-          </Button>
+          <h4 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--dx-text-muted)]">Sessions & Login History</h4>
+          <DxButton variant="danger" size="sm" onClick={() => setConfirmRevokeAll(true)} disabled={activeSessions.length === 0} isLoading={revokeSessions.isPending}>Revoke all active</DxButton>
         </div>
         {sessionsQuery.isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-14 w-full" />
-            <Skeleton className="h-14 w-full" />
-          </div>
+          <div className="space-y-2"><div className="dx-skeleton h-14 w-full" /><div className="dx-skeleton h-14 w-full" /></div>
         ) : sessionsQuery.isError ? (
-          <div className="flex items-center gap-2 text-xs font-semibold text-rose-500">
+          <div className="flex items-center gap-2 text-[12px] font-semibold" style={{ color: "var(--dx-danger)" }}>
             <AlertCircle className="h-4 w-4" /> Could not load sessions.
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => sessionsQuery.refetch()}
-              leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
-            >
-              Retry
-            </Button>
+            <DxButton variant="text" size="sm" onClick={() => sessionsQuery.refetch()} leftIcon={<RotateCcw className="h-3.5 w-3.5" />}>Retry</DxButton>
           </div>
         ) : sessions.length === 0 ? (
-          <p className="text-xs font-medium text-secondary-400">No sessions recorded.</p>
+          <p className="text-[12px] font-medium text-[var(--dx-text-muted)]">No sessions recorded.</p>
         ) : (
           <ul className="space-y-2">
             {sessions.map((session) => {
               const isActive = sessionIsActive(session);
               return (
-                <li
-                  key={session.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-secondary-200 px-4 py-3 dark:border-white/10"
-                >
+                <li key={session.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--dx-border)] px-4 py-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <Laptop className="h-4 w-4 shrink-0 text-secondary-400" aria-hidden />
+                    <Laptop className="h-4 w-4 shrink-0 text-[var(--dx-text-muted)]" aria-hidden />
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-secondary-900">
-                        <span className="data-mono text-xs">{session.ip_address ?? "Unknown IP"}</span>
-                        {session.is_current ? (
-                          <Badge variant="soft-info" className="ml-2">Current</Badge>
-                        ) : null}
+                      <p className="flex items-center truncate text-[13px] font-semibold text-[var(--dx-text)]">
+                        <span className="dx-mono text-[12px]">{session.ip_address ?? "Unknown IP"}</span>
+                        {session.is_current ? <DxBadge tone="info" className="ml-2">Current</DxBadge> : null}
                       </p>
-                      <p className="mt-0.5 max-w-md truncate text-xs font-medium text-secondary-400">
-                        {session.user_agent ?? "Unknown device"} · signed in{" "}
-                        {relativeTime(session.login_at)}
+                      <p className="mt-0.5 max-w-md truncate text-[12px] font-medium text-[var(--dx-text-muted)]">
+                        {session.user_agent ?? "Unknown device"} · signed in {relativeTime(session.login_at)}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={isActive ? "soft-success" : "secondary"}>
-                      {session.revoked_at ? "Revoked" : isActive ? "Active" : "Expired"}
-                    </Badge>
-                    {isActive ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => revoke([session.id])}
-                        disabled={revokeSessions.isPending}
-                      >
-                        Revoke
-                      </Button>
-                    ) : null}
+                    <DxBadge tone={isActive ? "success" : "neutral"}>{session.revoked_at ? "Revoked" : isActive ? "Active" : "Expired"}</DxBadge>
+                    {isActive ? <DxButton variant="text" size="sm" onClick={() => revoke([session.id])} disabled={revokeSessions.isPending}>Revoke</DxButton> : null}
                   </div>
                 </li>
               );
@@ -588,7 +485,7 @@ function SecurityTab({ user, active }: { user: AdminUser; active: boolean }) {
         )}
       </section>
 
-      <ConfirmDialog
+      <ConfirmPopup
         isOpen={confirmReset}
         onClose={() => setConfirmReset(false)}
         onConfirm={handleReset}
@@ -596,8 +493,9 @@ function SecurityTab({ user, active }: { user: AdminUser; active: boolean }) {
         description={`A strong temporary password will be generated for ${adminUserDisplayName(user)}. All of their active sessions will be revoked and they must change the password at next login.`}
         confirmLabel="Reset Password"
         tone="danger"
+        isLoading={resetPassword.isPending}
       />
-      <ConfirmDialog
+      <ConfirmPopup
         isOpen={confirmRevokeAll}
         onClose={() => setConfirmRevokeAll(false)}
         onConfirm={() => revoke(activeSessions.map((s) => s.id))}
@@ -605,13 +503,14 @@ function SecurityTab({ user, active }: { user: AdminUser; active: boolean }) {
         description={`${adminUserDisplayName(user)} will be signed out of ${activeSessions.length} active session(s) immediately and will need to log in again.`}
         confirmLabel="Revoke All"
         tone="danger"
+        isLoading={revokeSessions.isPending}
       />
     </div>
   );
 }
 
 // ============================================================
-// Danger zone tab — activate / deactivate with explicit consequences
+// Danger zone tab
 // ============================================================
 
 function DangerTab({ user }: { user: AdminUser }) {
@@ -629,19 +528,14 @@ function DangerTab({ user }: { user: AdminUser }) {
         toast.success("Account activated", `${adminUserDisplayName(user)} can now sign in.`);
       } else if (confirmAction === "deactivate") {
         await deactivate.mutateAsync(user.id);
-        toast.success(
-          "Account deactivated",
-          "The account was set to INACTIVE and all active sessions were revoked.",
-        );
+        toast.success("Account deactivated", "The account was set to INACTIVE and all active sessions were revoked.");
       }
     } catch (error) {
       toast.error(
         confirmAction === "activate" ? "Activation failed" : "Deactivation failed",
         getStaffAdminErrorMessage(
           error,
-          confirmAction === "activate"
-            ? "Unable to activate the account."
-            : "Unable to deactivate the account.",
+          confirmAction === "activate" ? "Unable to activate the account." : "Unable to deactivate the account.",
         ),
       );
     }
@@ -649,52 +543,29 @@ function DangerTab({ user }: { user: AdminUser }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4 rounded-md border p-5" style={{ borderColor: "var(--dx-success)", background: "var(--dx-success-soft)" }}>
         <div className="min-w-0">
-          <p className="text-sm font-bold text-secondary-900">Activate Account</p>
-          <p className="mt-1 text-xs font-medium text-secondary-500">
-            Restores sign-in access. The user keeps their existing roles, profile, and password.
-          </p>
+          <p className="text-[14px] font-semibold text-[var(--dx-text)]">Activate Account</p>
+          <p className="mt-1 text-[12px] font-medium text-[var(--dx-text-muted)]">Restores sign-in access. The user keeps their existing roles, profile, and password.</p>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          leftIcon={<Power className="h-4 w-4" />}
-          disabled={isActive}
-          isLoading={activate.isPending}
-          onClick={() => setConfirmAction("activate")}
-        >
+        <DxButton size="sm" leftIcon={<Power className="h-4 w-4" />} disabled={isActive} isLoading={activate.isPending} onClick={() => setConfirmAction("activate")}>
           {isActive ? "Already Active" : "Activate"}
-        </Button>
+        </DxButton>
       </div>
 
-      <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4 rounded-md border p-5" style={{ borderColor: "var(--dx-danger)", background: "var(--dx-danger-soft)" }}>
         <div className="min-w-0">
-          <p className="text-sm font-bold text-secondary-900">Deactivate Account</p>
-          <p className="mt-1 text-xs font-medium text-secondary-500">
-            Sets the account to INACTIVE, blocks all sign-ins, and immediately revokes every active
-            session. Records created by this user are preserved.
-          </p>
+          <p className="text-[14px] font-semibold text-[var(--dx-text)]">Deactivate Account</p>
+          <p className="mt-1 text-[12px] font-medium text-[var(--dx-text-muted)]">Sets the account to INACTIVE, blocks all sign-ins, and immediately revokes every active session. Records created by this user are preserved.</p>
         </div>
-        <Button
-          variant="danger"
-          size="sm"
-          leftIcon={<PowerOff className="h-4 w-4" />}
-          disabled={!isActive}
-          isLoading={deactivate.isPending}
-          onClick={() => setConfirmAction("deactivate")}
-        >
-          Deactivate
-        </Button>
+        <DxButton variant="danger" size="sm" leftIcon={<PowerOff className="h-4 w-4" />} disabled={!isActive} isLoading={deactivate.isPending} onClick={() => setConfirmAction("deactivate")}>Deactivate</DxButton>
       </div>
 
-      <ConfirmDialog
+      <ConfirmPopup
         isOpen={confirmAction !== null}
         onClose={() => setConfirmAction(null)}
         onConfirm={handleConfirm}
-        title={
-          confirmAction === "activate" ? "Activate this account?" : "Deactivate this account?"
-        }
+        title={confirmAction === "activate" ? "Activate this account?" : "Deactivate this account?"}
         description={
           confirmAction === "activate"
             ? `${adminUserDisplayName(user)} will regain access to the system with their current roles and permissions.`
@@ -702,13 +573,14 @@ function DangerTab({ user }: { user: AdminUser }) {
         }
         confirmLabel={confirmAction === "activate" ? "Activate" : "Deactivate"}
         tone={confirmAction === "activate" ? "primary" : "danger"}
+        isLoading={activate.isPending || deactivate.isPending}
       />
     </div>
   );
 }
 
 // ============================================================
-// Modal shell — header + segmented tabs
+// Modal shell — header + tabs
 // ============================================================
 
 export function StaffDetailModal({
@@ -729,88 +601,50 @@ export function StaffDetailModal({
   }, [isOpen, userId]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Staff Profile" size="xl">
+    <DxPopup isOpen={isOpen} onClose={onClose} title="Staff Profile" size="xl">
       {userQuery.isLoading ? (
         <div className="space-y-6">
           <div className="flex items-center gap-4">
-            <Skeleton className="h-16 w-16 rounded-2xl" />
+            <div className="dx-skeleton h-16 w-16 rounded-lg" />
             <div className="flex-1 space-y-2">
-              <Skeleton className="h-6 w-56" />
-              <Skeleton className="h-4 w-40" />
+              <div className="dx-skeleton h-6 w-56" />
+              <div className="dx-skeleton h-4 w-40" />
             </div>
           </div>
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-48 w-full" />
+          <div className="dx-skeleton h-10 w-full" />
+          <div className="dx-skeleton h-48 w-full" />
         </div>
       ) : userQuery.isError || !user ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-rose-500/10 text-rose-500">
+          <div className="flex h-14 w-14 items-center justify-center rounded-lg" style={{ background: "var(--dx-danger-soft)", color: "var(--dx-danger)" }}>
             <AlertCircle className="h-7 w-7" aria-hidden />
           </div>
-          <p className="text-sm font-bold text-secondary-900">
-            Could not load this staff member.
-          </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => userQuery.refetch()}
-            leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
-          >
-            Retry
-          </Button>
+          <p className="text-[14px] font-semibold text-[var(--dx-text)]">Could not load this staff member.</p>
+          <DxButton size="sm" onClick={() => userQuery.refetch()} leftIcon={<RotateCcw className="h-3.5 w-3.5" />}>Retry</DxButton>
         </div>
       ) : (
         <div className="space-y-6">
           {/* ---- Header ---- */}
           <div className="flex flex-wrap items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary-500/15 text-xl font-black text-primary-600 dark:text-primary-300">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-[var(--dx-accent-soft)] text-[20px] font-bold text-[var(--dx-accent)]">
               {adminUserInitials(user)}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="truncate text-xl font-display font-bold text-secondary-900">
-                  {adminUserDisplayName(user)}
-                </h3>
-                <Badge variant={statusPillVariant(user.status)}>{user.status}</Badge>
-                {user.is_superuser ? <Badge variant="soft-warning">Superuser</Badge> : null}
+                <h3 className="truncate text-[20px] font-bold text-[var(--dx-text)]">{adminUserDisplayName(user)}</h3>
+                <DxBadge tone={statusTone(user.status)}>{user.status}</DxBadge>
+                {user.is_superuser ? <DxBadge tone="warning">Superuser</DxBadge> : null}
               </div>
-              <p className="mt-1 truncate text-sm font-medium text-secondary-500">
+              <p className="mt-1 truncate text-[13px] font-medium text-[var(--dx-text-muted)]">
                 {user.email}
-                {user.staff_profile?.staff_no ? (
-                  <>
-                    {" · "}
-                    <span className="data-mono text-xs">{user.staff_profile.staff_no}</span>
-                  </>
-                ) : null}
+                {user.staff_profile?.staff_no ? <>{" · "}<span className="dx-mono text-[12px]">{user.staff_profile.staff_no}</span></> : null}
                 {user.staff_profile?.job_title ? ` · ${user.staff_profile.job_title}` : ""}
               </p>
             </div>
           </div>
 
-          {/* ---- Segmented tabs ---- */}
-          <div
-            role="tablist"
-            aria-label="Staff detail sections"
-            className="flex flex-wrap gap-1 rounded-2xl border border-secondary-200 bg-secondary-50/60 p-1 dark:border-white/10 dark:bg-white/5"
-          >
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                role="tab"
-                type="button"
-                aria-selected={tab === t.id}
-                onClick={() => setTab(t.id)}
-                className={cn(
-                  "flex-1 rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all",
-                  tab === t.id
-                    ? "bg-white text-primary-600 shadow-sm dark:bg-white/10 dark:text-primary-300"
-                    : "text-secondary-400 hover:text-secondary-700 dark:hover:text-secondary-200",
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+          {/* ---- Tabs ---- */}
+          <DxTabs items={TABS.map((t) => ({ key: t.id, label: t.label }))} value={tab} onChange={setTab} />
 
           {/* ---- Active tab ---- */}
           {tab === "profile" ? <ProfileTab user={user} /> : null}
@@ -819,6 +653,6 @@ export function StaffDetailModal({
           {tab === "danger" ? <DangerTab user={user} /> : null}
         </div>
       )}
-    </Modal>
+    </DxPopup>
   );
 }

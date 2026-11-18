@@ -29,8 +29,27 @@ export function normalizeSdpType(value?: string | null): ServicePointType {
  * Mirrors the Standard Outpatient Pathway: Registration → (HMO Desk) → Triage →
  * Consultation → Laboratory → (Radiology) → Pharmacy → Billing.
  */
-export function workstationPathFor(sdpType: string | null | undefined, visitId: number): { path: string; label: string } {
+/** True when a service point belongs to the eye-care pathway (by code or name). */
+export function isEyeServicePoint(hint?: string | null): boolean {
+  const h = String(hint ?? "").toUpperCase();
+  return /\bEYE\b|EYE-|OPHTHAL|OPTOM|REFRACT|VISION SCREEN|OPTICAL/.test(h);
+}
+
+export function workstationPathFor(
+  sdpType: string | null | undefined,
+  visitId: number,
+  hint?: string | null,
+): { path: string; label: string } {
   const t = normalizeSdpType(sdpType);
+  if (isEyeServicePoint(hint)) {
+    const h = String(hint ?? "").toUpperCase();
+    if (/OPTICAL/.test(h) || t === "OTHER") {
+      return { path: `${routes.opticalOrders}?visit=${visitId}`, label: "Open Optical Dispensing" };
+    }
+    if (t === "CLINIC" || t === "TRIAGE" || t === "RADIOLOGY" || t === "PROCEDURE_ROOM") {
+      return { path: `${routes.eyeClinic}?visit=${visitId}`, label: "Open Eye Clinic" };
+    }
+  }
   switch (t) {
     case "TRIAGE":
       return { path: `${routes.triage}/${visitId}`, label: "Open Triage" };

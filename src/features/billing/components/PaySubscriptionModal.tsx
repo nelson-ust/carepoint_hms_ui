@@ -1,10 +1,14 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Banknote, CreditCard, ExternalLink, FileUp, Landmark, UploadCloud } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Textarea } from "@/components/ui/Textarea";
+import {
+  DxPopup,
+  DxButton,
+  DxInput,
+  DxTextarea,
+  DxSegmented,
+  DxMessage,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import {
   subscriptionPlanApi,
@@ -45,8 +49,7 @@ export function PaySubscriptionModal({
     queryFn: subscriptionPlanApi.getPaymentConfig,
     staleTime: 5 * 60 * 1000,
   });
-  const gatewayLabel =
-    paymentConfig.data?.gateway === "paystack" ? "Paystack" : "Flutterwave";
+  const gatewayLabel = paymentConfig.data?.gateway === "paystack" ? "Paystack" : "Flutterwave";
   const onlineConfigured = paymentConfig.data ? paymentConfig.data.configured : true;
 
   const refreshAll = () => {
@@ -107,66 +110,57 @@ export function PaySubscriptionModal({
   const amountLabel = plan ? formatPlanPrice(plan, interval) : "—";
 
   return (
-    <Modal
+    <DxPopup
       isOpen={isOpen}
       onClose={onClose}
       title={plan ? `Pay for ${plan.name}` : "Pay for subscription"}
       size="lg"
+      locked={manualSubmit.isPending}
     >
-      <div className="mb-6 flex items-center justify-between rounded-2xl bg-primary-500/10 px-5 py-4">
+      <div className="mb-6 flex items-center justify-between rounded-md border border-[var(--dx-accent)] bg-[var(--dx-accent-soft)] px-5 py-4">
         <div>
-          <span className="text-sm font-bold text-secondary-700 dark:text-secondary-200">Amount due</span>
-          <p className="text-[11px] font-bold uppercase tracking-widest text-secondary-400">
+          <span className="text-[13px] font-bold text-[var(--dx-text)]">Amount due</span>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
             Billed {interval === "YEARLY" ? "annually" : "monthly"}
           </p>
         </div>
-        <span className="font-display text-xl font-bold text-gradient">{amountLabel}</span>
+        <span className="text-[20px] font-bold text-[var(--dx-accent)]">{amountLabel}</span>
       </div>
 
       {/* Method switch */}
-      <div className="mb-6 grid grid-cols-2 gap-2 rounded-2xl bg-secondary-100 p-1 dark:bg-white/5">
-        <button
-          onClick={() => setMethod("online")}
-          className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all ${
-            method === "online"
-              ? "bg-white text-primary-600 shadow-sm dark:bg-secondary-900 dark:text-primary-300"
-              : "text-secondary-500"
-          }`}
-        >
-          <CreditCard className="h-4 w-4" /> Pay online
-        </button>
-        <button
-          onClick={() => setMethod("manual")}
-          className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all ${
-            method === "manual"
-              ? "bg-white text-primary-600 shadow-sm dark:bg-secondary-900 dark:text-primary-300"
-              : "text-secondary-500"
-          }`}
-        >
-          <Landmark className="h-4 w-4" /> Bank transfer
-        </button>
+      <div className="mb-6">
+        <DxSegmented<Method>
+          ariaLabel="Payment method"
+          items={[
+            { key: "online", label: "Pay online", icon: <CreditCard className="h-4 w-4" /> },
+            { key: "manual", label: "Bank transfer", icon: <Landmark className="h-4 w-4" /> },
+          ]}
+          value={method}
+          onChange={setMethod}
+        />
       </div>
 
       {method === "online" ? (
         <div className="space-y-5">
-          <div className="flex items-start gap-3 rounded-2xl border border-secondary-200 p-4 dark:border-white/10">
-            <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-primary-500" />
+          <div className="flex items-start gap-3 rounded-md border border-[var(--dx-border)] p-4">
+            <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-[var(--dx-accent)]" />
             <div>
-              <p className="text-sm font-bold text-secondary-900">
+              <p className="text-[13px] font-bold text-[var(--dx-text)]">
                 Card, bank transfer or USSD via {gatewayLabel}
               </p>
-              <p className="mt-1 text-xs font-medium text-secondary-500">
-                You'll be taken to {gatewayLabel}'s secure checkout to complete payment, then
-                returned here. Your subscription activates automatically on success.
+              <p className="mt-1 text-[12px] font-medium text-[var(--dx-text-muted)]">
+                You'll be taken to {gatewayLabel}'s secure checkout to complete payment, then returned
+                here. Your subscription activates automatically on success.
               </p>
             </div>
           </div>
           {!onlineConfigured ? (
-            <p className="text-xs font-semibold text-amber-600">
+            <DxMessage tone="warning">
               Online payments aren't configured yet. Please use bank transfer below.
-            </p>
+            </DxMessage>
           ) : null}
-          <Button
+          <DxButton
+            variant="primary"
             className="w-full"
             onClick={() => onlineCheckout.mutate()}
             isLoading={onlineCheckout.isPending}
@@ -174,41 +168,37 @@ export function PaySubscriptionModal({
             leftIcon={<ExternalLink className="h-4 w-4" />}
           >
             Continue to secure checkout
-          </Button>
+          </DxButton>
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="flex items-start gap-3 rounded-2xl border border-cyan-500/25 bg-cyan-500/10 p-4">
-            <Banknote className="mt-0.5 h-5 w-5 shrink-0 text-cyan-500" />
-            <p className="text-xs font-medium leading-relaxed text-secondary-600">
-              Paid at a bank counter or by online transfer? Enter the details and upload your receipt or
-              transfer screenshot. A platform administrator will confirm it, then your subscription activates.
-            </p>
-          </div>
+          <DxMessage tone="info">
+            Paid at a bank counter or by online transfer? Enter the details and upload your receipt or
+            transfer screenshot. A platform administrator will confirm it, then your subscription
+            activates.
+          </DxMessage>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Bank name" placeholder="e.g. First Bank" value={bank} onChange={(e) => setBank(e.target.value)} />
-            <Input label="Account name" placeholder="Payer account name" value={accountName} onChange={(e) => setAccountName(e.target.value)} />
+            <DxInput label="Bank name" placeholder="e.g. First Bank" value={bank} onChange={(e) => setBank(e.target.value)} />
+            <DxInput label="Account name" placeholder="Payer account name" value={accountName} onChange={(e) => setAccountName(e.target.value)} />
           </div>
-          <Input label="Transaction reference" placeholder="Bank/transfer reference" value={reference} onChange={(e) => setReference(e.target.value)} />
-          <Textarea label="Note (optional)" placeholder="Anything the reviewer should know" value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+          <DxInput label="Transaction reference" placeholder="Bank/transfer reference" value={reference} onChange={(e) => setReference(e.target.value)} />
+          <DxTextarea label="Note (optional)" placeholder="Anything the reviewer should know" value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
 
           <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-secondary-500">
-              Proof of payment
-            </label>
+            <label className="dx-field-label mb-1.5 block">Proof of payment</label>
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-secondary-300 bg-secondary-50 px-5 py-6 text-left transition-colors hover:border-primary-400 dark:border-white/15 dark:bg-white/5"
+              className="flex w-full items-center gap-3 rounded-md border border-dashed border-[var(--dx-border-strong)] bg-[var(--dx-surface-sunken)] px-5 py-6 text-left transition-colors hover:border-[var(--dx-accent)]"
             >
-              <UploadCloud className="h-6 w-6 text-primary-500" />
+              <UploadCloud className="h-6 w-6 text-[var(--dx-accent)]" />
               <span className="min-w-0">
-                <span className="block text-sm font-bold text-secondary-900">
+                <span className="block text-[13px] font-semibold text-[var(--dx-text)]">
                   {fileName || "Click to upload receipt / screenshot"}
                 </span>
-                <span className="block text-xs text-secondary-400">PNG, JPG or PDF up to 20MB</span>
+                <span className="block text-[12px] text-[var(--dx-text-muted)]">PNG, JPG or PDF up to 20MB</span>
               </span>
-              {fileName ? <FileUp className="ml-auto h-4 w-4 text-emerald-500" /> : null}
+              {fileName ? <FileUp className="ml-auto h-4 w-4" style={{ color: "var(--dx-success)" }} /> : null}
             </button>
             <input
               ref={fileRef}
@@ -220,15 +210,20 @@ export function PaySubscriptionModal({
           </div>
 
           <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={onClose} disabled={manualSubmit.isPending}>
+            <DxButton onClick={onClose} disabled={manualSubmit.isPending}>
               Cancel
-            </Button>
-            <Button onClick={handleManual} isLoading={manualSubmit.isPending} leftIcon={<UploadCloud className="h-4 w-4" />}>
+            </DxButton>
+            <DxButton
+              variant="primary"
+              onClick={handleManual}
+              isLoading={manualSubmit.isPending}
+              leftIcon={<UploadCloud className="h-4 w-4" />}
+            >
               Submit for confirmation
-            </Button>
+            </DxButton>
           </div>
         </div>
       )}
-    </Modal>
+    </DxPopup>
   );
 }

@@ -40,6 +40,35 @@ type FormKind = "autopsy" | "embalming" | "effect" | "viewing" | "charge" | "cer
 
 const naira = (n: number | string) => `₦ ${Number(n).toLocaleString()}`;
 
+const MANNER_OF_DEATH_OPTIONS = [
+  { value: "Natural", label: "Natural" },
+  { value: "Accident", label: "Accident" },
+  { value: "Suicide", label: "Suicide" },
+  { value: "Homicide", label: "Homicide" },
+  { value: "Undetermined", label: "Undetermined" },
+  { value: "Pending investigation", label: "Pending investigation" },
+];
+const EMBALM_METHOD_OPTIONS = [
+  { value: "Arterial", label: "Arterial" },
+  { value: "Cavity", label: "Cavity" },
+  { value: "Arterial + Cavity", label: "Arterial + Cavity" },
+  { value: "Surface", label: "Surface" },
+  { value: "Hypodermic", label: "Hypodermic" },
+  { value: "Other", label: "Other" },
+];
+const RELATIONSHIP_OPTIONS = [
+  { value: "Spouse", label: "Spouse" },
+  { value: "Child", label: "Child" },
+  { value: "Parent", label: "Parent" },
+  { value: "Sibling", label: "Sibling" },
+  { value: "Grandchild", label: "Grandchild" },
+  { value: "Other relative", label: "Other relative" },
+  { value: "Friend", label: "Friend" },
+  { value: "Guardian", label: "Guardian" },
+  { value: "Employer", label: "Employer" },
+  { value: "Other", label: "Other" },
+];
+
 /**
  * Per-body mortuary workstation: everything a standard mortuary does for a
  * single deceased record — autopsy, embalming, personal effects, family
@@ -70,7 +99,7 @@ export function DeceasedDetailPage() {
   const [embalmForm, setEmbalmForm] = useState({ embalmer_name: "", method: "", chemicals_used: "", embalmed_at: "", mark_completed: true, notes: "" });
   const [effectForm, setEffectForm] = useState({ item: "", quantity: "1", description: "", received_from: "" });
   const [viewingForm, setViewingForm] = useState({ visitor_name: "", relationship_to_deceased: "", contact: "", authorized_by: "", notes: "" });
-  const [chargeForm, setChargeForm] = useState({ charge_type: "STORAGE", description: "", quantity: "1", unit_amount: "", notes: "" });
+  const [chargeForm, setChargeForm] = useState({ charge_type: "STORAGE", fee_schedule_id: "", description: "", quantity: "1", unit_amount: "", account_code: "", notes: "" });
   const [certForm, setCertForm] = useState({ issued_by: "", certifying_doctor: "", cause_of_death: "", manner_of_death: "", place_of_death: "Hospital", notes: "" });
   const [payForm, setPayForm] = useState({ amount: "", method: "CASH", reference: "", payer_name: "" });
 
@@ -82,8 +111,19 @@ export function DeceasedDetailPage() {
   const chargesQuery = useQuery({ queryKey: ["mortuary", "deceased", id, "charges"], queryFn: () => mortuaryApi.listRecordCharges(id), enabled: Number.isFinite(id) });
   const billQuery = useQuery({ queryKey: ["mortuary", "deceased", id, "billing"], queryFn: () => mortuaryApi.getBillingSummary(id), enabled: Number.isFinite(id) });
   const certificateQuery = useQuery({ queryKey: ["mortuary", "deceased", id, "certificate"], queryFn: () => mortuaryApi.getCertificate(id), enabled: Number.isFinite(id) });
+  const accountsQuery = useQuery({ queryKey: ["mortuary", "accounts"], queryFn: mortuaryApi.listAccounts });
+  const feesQuery = useQuery({ queryKey: ["mortuary", "fee-schedule", "active"], queryFn: () => mortuaryApi.listFees(true) });
 
   const record = recordQuery.data;
+  const accountOptions = useMemo(() => (accountsQuery.data ?? []).map((a) => ({ value: a.code, label: `${a.code} — ${a.name}` })), [accountsQuery.data]);
+  const feeItems = useMemo(() => feesQuery.data?.items ?? [], [feesQuery.data]);
+  const feeOptions = useMemo(() => feeItems.map((f) => ({ value: String(f.id), label: `${f.name} — ${naira(f.unit_price)}` })), [feeItems]);
+  const applyFeeItem = (feeId: string) => {
+    const fee = feeItems.find((f) => String(f.id) === feeId);
+    setChargeForm((f) => fee
+      ? { ...f, fee_schedule_id: feeId, charge_type: fee.charge_type, unit_amount: String(fee.unit_price ?? ""), description: f.description || fee.name, account_code: fee.account_code ?? "" }
+      : { ...f, fee_schedule_id: "" });
+  };
   const invalidate = () => qc.invalidateQueries({ queryKey: ["mortuary", "deceased", id] });
   const closeForm = () => setForm(null);
 
@@ -94,7 +134,15 @@ export function DeceasedDetailPage() {
   const createEmbalm = useMut(() => mortuaryApi.createEmbalming(id, { ...embalmForm, embalmed_at: embalmForm.embalmed_at || undefined }), "Embalming recorded", "Could not record embalming");
   const createEffect = useMut(() => mortuaryApi.createEffect(id, { ...effectForm, quantity: Number(effectForm.quantity) || 1 }), "Effect logged", "Could not log effect");
   const createViewing = useMut(() => mortuaryApi.createViewing(id, viewingForm), "Viewing logged", "Could not log viewing");
-  const createCharge = useMut(() => mortuaryApi.createCharge(id, { ...chargeForm, quantity: Number(chargeForm.quantity) || 1, unit_amount: Number(chargeForm.unit_amount) || 0 }), "Charge added", "Could not add charge");
+  const createCharge = useMut(() => mortuaryApi.createCharge(id, {
+    charge_type: chargeForm.charge_type,
+    description: chargeForm.description || undefined,
+    quantity: Number(chargeForm.quantity) || 1,
+    unit_amount: chargeForm.unit_amount === "" ? undefined : Number(chargeForm.unit_amount),
+    account_code: chargeForm.account_code || undefined,
+    fee_schedule_id: chargeForm.fee_schedule_id ? Number(chargeForm.fee_schedule_id) : undefined,
+    notes: chargeForm.notes || undefined,
+  }), "Charge added", "Could not add charge");
   const issueCert = useMut(() => mortuaryApi.issueCertificate(id, certForm), "Certificate issued", "Could not issue certificate");
   const createPayment = useMut(() => mortuaryApi.addPayment(id, { amount: Number(payForm.amount) || 0, method: payForm.method, reference: payForm.reference || undefined, payer_name: payForm.payer_name || undefined }), "Payment recorded", "Could not record payment");
 
@@ -320,7 +368,7 @@ export function DeceasedDetailPage() {
         footer={<><DxButton onClick={closeForm}>Cancel</DxButton><DxButton variant="primary" isLoading={createEmbalm.isPending} onClick={() => createEmbalm.mutate()}>Save</DxButton></>}>
         <DxForm cols={2}>
           <DxInput label="Embalmer" value={embalmForm.embalmer_name} onChange={(e) => setEmbalmForm((f) => ({ ...f, embalmer_name: e.target.value }))} />
-          <DxInput label="Method" value={embalmForm.method} onChange={(e) => setEmbalmForm((f) => ({ ...f, method: e.target.value }))} />
+          <DxSelect label="Method" value={embalmForm.method} onChange={(e) => setEmbalmForm((f) => ({ ...f, method: e.target.value }))} options={EMBALM_METHOD_OPTIONS} placeholder="Select…" />
           <DxInput label="Embalmed at" type="datetime-local" value={embalmForm.embalmed_at} onChange={(e) => setEmbalmForm((f) => ({ ...f, embalmed_at: e.target.value }))} />
           <DxInput label="Chemicals used" value={embalmForm.chemicals_used} onChange={(e) => setEmbalmForm((f) => ({ ...f, chemicals_used: e.target.value }))} />
           <DxTextarea label="Notes" fieldClassName="dx-col-span-full" rows={2} value={embalmForm.notes} onChange={(e) => setEmbalmForm((f) => ({ ...f, notes: e.target.value }))} />
@@ -341,7 +389,7 @@ export function DeceasedDetailPage() {
         footer={<><DxButton onClick={closeForm}>Cancel</DxButton><DxButton variant="primary" isLoading={createViewing.isPending} disabled={!viewingForm.visitor_name.trim()} onClick={() => createViewing.mutate()}>Save</DxButton></>}>
         <DxForm cols={2}>
           <DxInput label="Visitor name" required fieldClassName="dx-col-span-full" value={viewingForm.visitor_name} onChange={(e) => setViewingForm((f) => ({ ...f, visitor_name: e.target.value }))} />
-          <DxInput label="Relationship" value={viewingForm.relationship_to_deceased} onChange={(e) => setViewingForm((f) => ({ ...f, relationship_to_deceased: e.target.value }))} />
+          <DxSelect label="Relationship" value={viewingForm.relationship_to_deceased} onChange={(e) => setViewingForm((f) => ({ ...f, relationship_to_deceased: e.target.value }))} options={RELATIONSHIP_OPTIONS} placeholder="Select…" />
           <DxInput label="Contact" value={viewingForm.contact} onChange={(e) => setViewingForm((f) => ({ ...f, contact: e.target.value }))} />
           <DxInput label="Authorized by" fieldClassName="dx-col-span-full" value={viewingForm.authorized_by} onChange={(e) => setViewingForm((f) => ({ ...f, authorized_by: e.target.value }))} />
           <DxTextarea label="Notes" fieldClassName="dx-col-span-full" rows={2} value={viewingForm.notes} onChange={(e) => setViewingForm((f) => ({ ...f, notes: e.target.value }))} />
@@ -351,11 +399,16 @@ export function DeceasedDetailPage() {
       <DxPopup isOpen={form === "charge"} onClose={closeForm} title="Add mortuary charge" locked={createCharge.isPending}
         footer={<><DxButton onClick={closeForm}>Cancel</DxButton><DxButton variant="primary" isLoading={createCharge.isPending} onClick={() => createCharge.mutate()}>Save</DxButton></>}>
         <DxForm cols={2}>
+          <DxSelect label="Price list item" fieldClassName="dx-col-span-full" value={chargeForm.fee_schedule_id} onChange={(e) => applyFeeItem(e.target.value)}
+            options={feeOptions} placeholder="Pick from price list (optional) — or enter manually below"
+            hint="Choosing an item fills the type, amount and account code." />
           <DxSelect label="Type" value={chargeForm.charge_type} onChange={(e) => setChargeForm((f) => ({ ...f, charge_type: e.target.value }))}
-            options={[{ value: "STORAGE", label: "Storage" }, { value: "EMBALMING", label: "Embalming" }, { value: "AUTOPSY", label: "Autopsy" }, { value: "BODY_PREP", label: "Body prep" }, { value: "MORTUARY_FEE", label: "Mortuary fee" }, { value: "OTHER", label: "Other" }]} />
-          <DxInput label="Description" value={chargeForm.description} onChange={(e) => setChargeForm((f) => ({ ...f, description: e.target.value }))} placeholder="e.g. 3 days cold storage" />
+            options={[{ value: "STORAGE", label: "Storage" }, { value: "EMBALMING", label: "Embalming" }, { value: "PRESERVATION", label: "Preservation" }, { value: "AUTOPSY", label: "Autopsy" }, { value: "BODY_PREP", label: "Body prep" }, { value: "DRESSING", label: "Washing & dressing" }, { value: "COFFIN", label: "Coffin / casket" }, { value: "HEARSE", label: "Hearse / ambulance" }, { value: "DOCUMENTATION", label: "Documentation" }, { value: "PENALTY", label: "Penalty" }, { value: "MORTUARY_FEE", label: "Mortuary fee" }, { value: "OTHER", label: "Other" }]} />
+          <DxSelect label="Account code" value={chargeForm.account_code} onChange={(e) => setChargeForm((f) => ({ ...f, account_code: e.target.value }))}
+            options={accountOptions} placeholder="Auto — by charge type" hint="Ledger this costing posts to." />
+          <DxInput label="Description" fieldClassName="dx-col-span-full" value={chargeForm.description} onChange={(e) => setChargeForm((f) => ({ ...f, description: e.target.value }))} placeholder="e.g. 3 days cold storage" />
           <DxInput label="Quantity" type="number" value={chargeForm.quantity} onChange={(e) => setChargeForm((f) => ({ ...f, quantity: e.target.value }))} hint="e.g. number of days" />
-          <DxInput label="Unit amount (₦)" type="number" value={chargeForm.unit_amount} onChange={(e) => setChargeForm((f) => ({ ...f, unit_amount: e.target.value }))} />
+          <DxInput label="Unit amount (₦)" type="number" value={chargeForm.unit_amount} onChange={(e) => setChargeForm((f) => ({ ...f, unit_amount: e.target.value }))} hint="Leave blank to use the price-list rate." />
           <DxTextarea label="Notes" fieldClassName="dx-col-span-full" rows={2} value={chargeForm.notes} onChange={(e) => setChargeForm((f) => ({ ...f, notes: e.target.value }))} />
         </DxForm>
       </DxPopup>
@@ -366,7 +419,7 @@ export function DeceasedDetailPage() {
           <DxInput label="Certifying doctor" value={certForm.certifying_doctor} onChange={(e) => setCertForm((f) => ({ ...f, certifying_doctor: e.target.value }))} />
           <DxInput label="Issued by" value={certForm.issued_by} onChange={(e) => setCertForm((f) => ({ ...f, issued_by: e.target.value }))} />
           <DxTextarea label="Cause of death" fieldClassName="dx-col-span-full" rows={2} value={certForm.cause_of_death} onChange={(e) => setCertForm((f) => ({ ...f, cause_of_death: e.target.value }))} />
-          <DxInput label="Manner of death" value={certForm.manner_of_death} onChange={(e) => setCertForm((f) => ({ ...f, manner_of_death: e.target.value }))} placeholder="Natural / accident / …" />
+          <DxSelect label="Manner of death" value={certForm.manner_of_death} onChange={(e) => setCertForm((f) => ({ ...f, manner_of_death: e.target.value }))} options={MANNER_OF_DEATH_OPTIONS} placeholder="Select…" />
           <DxInput label="Place of death" value={certForm.place_of_death} onChange={(e) => setCertForm((f) => ({ ...f, place_of_death: e.target.value }))} />
           <DxTextarea label="Notes" fieldClassName="dx-col-span-full" rows={2} value={certForm.notes} onChange={(e) => setCertForm((f) => ({ ...f, notes: e.target.value }))} />
         </DxForm>

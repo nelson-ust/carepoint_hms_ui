@@ -1,12 +1,9 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, Clock, UserCheck, UserX } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Input } from "@/components/ui/Input";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
-import { MetricCard } from "@/components/charts/MetricCard";
-import { SearchInput } from "@/components/forms/SearchInput";
+import { CalendarDays, Clock, Search, UserCheck, UserX } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxPanel, DxGrid, DxKpi, DxBadge, DxInput,
+  type DxGridColumn,
+} from "@/components/dx";
 import { useStaffNameMap } from "@/features/staff/hooks/use-staff";
 import { useAttendance } from "../hooks/use-hr";
 import type { AttendanceRecord } from "../api/hr.api";
@@ -77,122 +74,59 @@ export function AttendancePage() {
     };
   }, [attendanceQuery.data]);
 
-  const columns: DataTableColumn<AttendanceRecord>[] = [
+  const columns: DxGridColumn<AttendanceRecord>[] = [
     {
       key: "staff",
       header: "Staff Member",
       render: (r) => (
         <div>
-          <p className="text-sm font-bold text-secondary-900">
-            {nameMap.get(r.staff_profile_id) ?? `Staff #${r.staff_profile_id}`}
-          </p>
-          <p className="data-mono text-[10px] text-secondary-400">SP-{r.staff_profile_id}</p>
+          <p className="text-[13px] font-semibold text-[var(--dx-text)]">{nameMap.get(r.staff_profile_id) ?? `Staff #${r.staff_profile_id}`}</p>
+          <p className="dx-mono text-[10px] text-[var(--dx-text-muted)]">SP-{r.staff_profile_id}</p>
         </div>
       ),
     },
+    { key: "work_date", header: "Date", render: (r) => <span className="text-[13px] font-medium text-[var(--dx-text)]">{fmtDate(r.work_date)}</span> },
+    { key: "clock_in_at", header: "Check-in", render: (r) => <span className="dx-mono text-[13px]">{fmtTime(r.clock_in_at)}</span> },
+    { key: "clock_out_at", header: "Check-out", render: (r) => <span className="dx-mono text-[13px]">{fmtTime(r.clock_out_at)}</span> },
+    { key: "hours", header: "Hours", align: "right", render: (r) => <span className="dx-mono text-[13px]">{hoursWorked(r)}</span> },
+    { key: "method", header: "Method", render: (r) => <span className="text-[11px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">{r.method}</span> },
     {
-      key: "work_date",
-      header: "Date",
-      render: (r) => <span className="text-sm font-medium text-secondary-700">{fmtDate(r.work_date)}</span>,
-    },
-    {
-      key: "clock_in_at",
-      header: "Check-in",
-      render: (r) => <span className="data-mono text-sm">{fmtTime(r.clock_in_at)}</span>,
-    },
-    {
-      key: "clock_out_at",
-      header: "Check-out",
-      render: (r) => <span className="data-mono text-sm">{fmtTime(r.clock_out_at)}</span>,
-    },
-    {
-      key: "hours",
-      header: "Hours",
-      align: "right",
-      render: (r) => <span className="data-mono text-sm">{hoursWorked(r)}</span>,
-    },
-    {
-      key: "method",
-      header: "Method",
-      render: (r) => (
-        <span className="text-xs font-bold uppercase tracking-widest text-secondary-400">
-          {r.method}
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
+      key: "status", header: "Status",
       render: (r) =>
-        r.is_absent ? (
-          <Badge variant="soft-danger">Absent</Badge>
-        ) : r.is_late ? (
-          <Badge variant="soft-warning">Late {r.minutes_late ? `+${r.minutes_late}m` : ""}</Badge>
-        ) : (
-          <Badge variant="soft-success">On Time</Badge>
-        ),
+        r.is_absent ? <DxBadge tone="danger">Absent</DxBadge>
+          : r.is_late ? <DxBadge tone="warning">Late {r.minutes_late ? `+${r.minutes_late}m` : ""}</DxBadge>
+            : <DxBadge tone="success">On Time</DxBadge>,
     },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "HR" }, { label: "Attendance" }]}
         title="Attendance Log"
-        description="Clock-in and clock-out records across the selected date range."
+        subtitle="Clock-in and clock-out records across the selected date range."
       />
 
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Records"
-          value={stats.total}
-          icon={CalendarDays}
-          tone="slate"
-          isLoading={attendanceQuery.isLoading}
-        />
-        <MetricCard
-          label="Present"
-          value={stats.present}
-          icon={UserCheck}
-          tone="primary"
-          isLoading={attendanceQuery.isLoading}
-        />
-        <MetricCard
-          label="Late Arrivals"
-          value={stats.late}
-          icon={Clock}
-          tone="amber"
-          isLoading={attendanceQuery.isLoading}
-        />
-        <MetricCard
-          label="Absences"
-          value={stats.absent}
-          icon={UserX}
-          tone="rose"
-          isLoading={attendanceQuery.isLoading}
-        />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DxKpi label="Records" value={stats.total} icon={CalendarDays} tone="neutral" isLoading={attendanceQuery.isLoading} />
+        <DxKpi label="Present" value={stats.present} icon={UserCheck} tone="accent" isLoading={attendanceQuery.isLoading} />
+        <DxKpi label="Late Arrivals" value={stats.late} icon={Clock} tone="warning" isLoading={attendanceQuery.isLoading} />
+        <DxKpi label="Absences" value={stats.absent} icon={UserX} tone="danger" isLoading={attendanceQuery.isLoading} />
       </div>
 
-      <Card padding="none">
-        <div className="flex flex-wrap items-end gap-3 px-6 py-4">
-          <SearchInput onSearch={setSearch} placeholder="Search staff…" className="w-64" />
-          <Input
-            label="From"
-            type="date"
-            value={fromDate}
-            max={toDate || undefined}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="w-44 py-2.5"
-          />
-          <Input
-            label="To"
-            type="date"
-            value={toDate}
-            min={fromDate || undefined}
-            onChange={(e) => setToDate(e.target.value)}
-            className="w-44 py-2.5"
-          />
+      <DxPanel title="Attendance" icon={<CalendarDays className="h-4 w-4" />} flush>
+        <div className="flex flex-wrap items-end gap-3 border-b border-[var(--dx-border)] px-4 py-3">
+          <div className="w-64">
+            <DxInput leftIcon={<Search className="h-3.5 w-3.5" />} placeholder="Search staff…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div className="w-44">
+            <DxInput label="From" type="date" value={fromDate} max={toDate || undefined} onChange={(e) => setFromDate(e.target.value)} editorSize="sm" />
+          </div>
+          <div className="w-44">
+            <DxInput label="To" type="date" value={toDate} min={fromDate || undefined} onChange={(e) => setToDate(e.target.value)} editorSize="sm" />
+          </div>
         </div>
-        <DataTable
+        <DxGrid<AttendanceRecord>
           columns={columns}
           data={records}
           rowKey={(r) => r.id}
@@ -205,7 +139,7 @@ export function AttendancePage() {
             description: "No clock-ins were recorded in this date range.",
           }}
         />
-      </Card>
-    </div>
+      </DxPanel>
+    </DxPage>
   );
 }

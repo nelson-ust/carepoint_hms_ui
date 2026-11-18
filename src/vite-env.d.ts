@@ -16,7 +16,8 @@ declare module "*.jpeg" {
 }
 
 declare module "*.svg" {
-  const content: React.FunctionComponent<React.SVGAttributes<SVGElement>> | string;
+  // This project does not use svgr, so SVGs are imported as URL strings.
+  const content: string;
   export default content;
 }
 

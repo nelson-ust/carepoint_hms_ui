@@ -1,14 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock, Plus, RefreshCw, AlertCircle, Send, Eye, Trash2, X, CalendarDays, Wand2 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge, type BadgeProps } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Textarea } from "@/components/ui/Textarea";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { Clock, Plus, RotateCcw, Send, Eye, Trash2, X, CalendarDays, Wand2 } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxPanel, DxGrid, DxBadge, DxButton, DxInput, DxTextarea, DxPopup,
+  type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { getStoredUser } from "@/lib/auth/current-user";
 import { apiErrorMessage } from "@/lib/api/api-error";
@@ -17,8 +13,8 @@ import { SelectApproverModal } from "@/features/approvals/components/SelectAppro
 import { leaveApi, type LeaveDay } from "../../hr/api/leave.api";
 import { timesheetsApi, type Timesheet, type TimesheetStatus, type TimesheetEntry } from "../../hr/api/timesheets.api";
 
-const statusVariant: Record<TimesheetStatus, BadgeProps["variant"]> = {
-  DRAFT: "secondary", SUBMITTED: "soft-info", APPROVED: "soft-success", REJECTED: "soft-danger", LOCKED: "soft-warning",
+const statusTone: Record<TimesheetStatus, DxBadgeTone> = {
+  DRAFT: "neutral", SUBMITTED: "info", APPROVED: "success", REJECTED: "danger", LOCKED: "warning",
 };
 
 function fmt(v?: string | null) {
@@ -75,71 +71,58 @@ export function TimesheetsPage() {
 
   const leaveCount = (t: Timesheet) => (t.entries ?? []).filter((e) => e.is_leave).length;
 
+  const loadError = list.isError ? apiErrorMessage(list.error, "Failed to load your timesheets. The server rejected the request — try again.") : null;
+
+  const columns: DxGridColumn<Timesheet>[] = [
+    { key: "period", header: "Period", render: (t) => <button onClick={() => setDetail(t)} className="text-[13px] font-semibold text-[var(--dx-text)] hover:text-[var(--dx-accent)] hover:underline">{fmt(t.period_start)} → {fmt(t.period_end)}</button> },
+    {
+      key: "days", header: "Days", render: (t) => (
+        <span className="text-[13px] text-[var(--dx-text-muted)]">
+          {t.entries?.length ?? 0}
+          {leaveCount(t) > 0 ? <span style={{ color: "var(--dx-info)" }}> ({leaveCount(t)} leave)</span> : null}
+          {(t.absence_days ?? 0) > 0 ? <span style={{ color: "var(--dx-danger)" }}> ({t.absence_days} abs)</span> : null}
+        </span>
+      ),
+    },
+    { key: "hours", header: "Regular / OT", render: (t) => <span className="dx-mono text-[13px] text-[var(--dx-text)]">{num(t.total_regular_hours)}h <span style={{ color: "var(--dx-warning)" }}>/ {num(t.total_overtime_hours)}h OT</span></span> },
+    { key: "status", header: "Status", render: (t) => <DxBadge tone={statusTone[t.status]}>{t.status}</DxBadge> },
+    {
+      key: "action", header: "", align: "right",
+      render: (t) => (
+        <div className="flex items-center justify-end gap-2">
+          {t.status === "DRAFT" ? <DxButton size="sm" variant="primary" leftIcon={<Send className="h-3.5 w-3.5" />} isLoading={submit.isPending && submit.variables?.row.id === t.id} onClick={() => setPendingSubmit(t)}>Submit</DxButton> : null}
+          {t.approval_request_id ? <DxButton size="sm" variant="text" leftIcon={<Eye className="h-3.5 w-3.5" />} onClick={() => setViewRequestId(t.approval_request_id!)}>Approval</DxButton> : null}
+          {t.status === "DRAFT" ? <DxButton icon size="sm" variant="outline-danger" title="Delete" onClick={() => remove.mutate(t.id)}><Trash2 /></DxButton> : null}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader title="My Timesheets" description="Log your own hours day by day and route them through the approval flow." />
-        <div className="flex gap-3">
-          <button onClick={() => list.refetch()} className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400"><RefreshCw className={`h-4 w-4 ${list.isFetching ? "animate-spin" : ""}`} /></button>
-          <Button leftIcon={<Plus className="h-5 w-5" />} onClick={() => setCreateOpen(true)}>Log Hours</Button>
-        </div>
-      </div>
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "HR" }, { label: "My Timesheets" }]}
+        title="My Timesheets"
+        subtitle="Log your own hours day by day and route them through the approval flow."
+        actions={
+          <>
+            <DxButton icon title="Refresh" onClick={() => list.refetch()} isLoading={list.isFetching}><RotateCcw /></DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setCreateOpen(true)}>Log hours</DxButton>
+          </>
+        }
+      />
 
-      {list.isError && (
-        <div className="p-5 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center gap-3">
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <div className="min-w-0">
-            <p className="text-sm font-bold">Failed to load your timesheets.</p>
-            <p className="text-xs mt-0.5">{apiErrorMessage(list.error, "The server rejected the request — try again.")}</p>
-          </div>
-          <Button size="sm" variant="secondary" className="ml-auto shrink-0" onClick={() => list.refetch()}>Retry</Button>
-        </div>
-      )}
-
-      <Card variant="panel" className="p-0 overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="bg-secondary-900/5 text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              <th className="px-6 py-4">Period</th><th className="px-6 py-4">Days</th><th className="px-6 py-4">Regular / OT</th><th className="px-6 py-4">Status</th><th className="px-6 py-4 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-secondary-100/60">
-            {list.isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => <tr key={i}><td colSpan={5} className="px-6 py-4"><Skeleton className="h-8 w-full" /></td></tr>)
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-6 py-24 text-center"><Clock className="h-12 w-12 mx-auto text-secondary-200 mb-3" /><p className="font-bold text-secondary-900">No timesheets yet</p><p className="text-sm text-secondary-400 mt-1">Log your hours, then submit for approval.</p></td></tr>
-            ) : (
-              rows.map((t) => (
-                <tr key={t.id} className="hover:bg-primary-50/20">
-                  <td className="px-6 py-4">
-                    <button onClick={() => setDetail(t)} className="font-bold text-secondary-900 hover:text-primary-600 hover:underline">{fmt(t.period_start)} → {fmt(t.period_end)}</button>
-                  </td>
-                  <td className="px-6 py-4 text-secondary-600">
-                    {t.entries?.length ?? 0}
-                    {leaveCount(t) > 0 ? <span className="text-violet-500"> ({leaveCount(t)} leave)</span> : null}
-                    {(t.absence_days ?? 0) > 0 ? <span className="text-rose-400"> ({t.absence_days} abs)</span> : null}
-                  </td>
-                  <td className="px-6 py-4 text-secondary-600">{num(t.total_regular_hours)}h <span className="text-amber-500">/ {num(t.total_overtime_hours)}h OT</span></td>
-                  <td className="px-6 py-4"><Badge variant={statusVariant[t.status]}>{t.status}</Badge></td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      {t.status === "DRAFT" && (
-                        <Button size="sm" leftIcon={<Send className="h-3.5 w-3.5" />} isLoading={submit.isPending && submit.variables?.row.id === t.id} onClick={() => setPendingSubmit(t)}>Submit</Button>
-                      )}
-                      {t.approval_request_id && (
-                        <Button size="sm" variant="ghost" leftIcon={<Eye className="h-3.5 w-3.5" />} onClick={() => setViewRequestId(t.approval_request_id!)}>Approval</Button>
-                      )}
-                      {t.status === "DRAFT" && (
-                        <button onClick={() => remove.mutate(t.id)} className="p-2 rounded-xl hover:bg-rose-50" title="Delete"><Trash2 className="h-4 w-4 text-rose-400" /></button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </Card>
+      <DxPanel title="Timesheets" icon={<Clock className="h-4 w-4" />} flush>
+        <DxGrid<Timesheet>
+          columns={columns}
+          data={rows}
+          rowKey={(t) => t.id}
+          isLoading={list.isLoading}
+          error={loadError}
+          onRetry={() => list.refetch()}
+          empty={{ icon: Clock, title: "No timesheets yet", description: "Log your hours, then submit for approval." }}
+        />
+      </DxPanel>
 
       <CreateTimesheetModal isOpen={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => qc.invalidateQueries({ queryKey: ["my-timesheets"] })} />
       <TimesheetDetailModal timesheet={detail} onClose={() => setDetail(null)} />
@@ -152,7 +135,7 @@ export function TimesheetsPage() {
         onConfirm={(approverId) => pendingSubmit && submit.mutate({ row: pendingSubmit, approverId })}
       />
       <ApprovalDetailModal requestId={viewRequestId} isOpen={viewRequestId !== null} onClose={() => setViewRequestId(null)} />
-    </div>
+    </DxPage>
   );
 }
 
@@ -277,64 +260,64 @@ function CreateTimesheetModal({ isOpen, onClose, onCreated }: { isOpen: boolean;
     create.mutate();
   }
 
-  const numCell = "w-16 text-right";
+  const cls = "dx-editor dx-editor-sm w-16 text-right";
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Log Timesheet" size="xl"
-      footer={<div className="flex justify-end gap-3"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} isLoading={create.isPending}>Create draft</Button></div>}>
+    <DxPopup
+      isOpen={isOpen} onClose={onClose} title="Log Timesheet" size="xl"
+      locked={create.isPending}
+      footer={<><DxButton onClick={onClose}>Cancel</DxButton><DxButton variant="primary" onClick={save} isLoading={create.isPending}>Create draft</DxButton></>}
+    >
       <div className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Period start" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
-          <Input label="Period end" type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+          <DxInput label="Period start" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+          <DxInput label="Period end" type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-secondary-500">Daily hours</label>
+          <div className="mb-2 flex items-center justify-between">
+            <span className="dx-field-label">Daily hours</span>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="ghost" leftIcon={<Wand2 className="h-3.5 w-3.5" />} onClick={autofillPeriod} title="Fill every day in the period (8h on weekdays)">Autofill</Button>
-              <Button size="sm" variant="secondary" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={addRow}>Add day</Button>
+              <DxButton size="sm" variant="text" leftIcon={<Wand2 className="h-3.5 w-3.5" />} onClick={autofillPeriod} title="Fill every day in the period (8h on weekdays)">Autofill</DxButton>
+              <DxButton size="sm" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={addRow}>Add day</DxButton>
             </div>
           </div>
-          <div className="overflow-x-auto rounded-2xl border border-secondary-100">
-            <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto rounded-md border border-[var(--dx-border)]">
+            <table className="w-full text-left text-[12px]">
               <thead>
-                <tr className="bg-secondary-900/5 text-[10px] font-bold uppercase tracking-widest text-secondary-500">
+                <tr className="bg-[var(--dx-surface-sunken)] text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
                   <th className="px-3 py-2">Date</th><th className="px-3 py-2 text-right">Reg</th><th className="px-3 py-2 text-right">OT</th><th className="px-3 py-2 text-right">Night</th><th className="px-3 py-2 text-right">Wknd</th><th className="px-3 py-2 text-right">Hol</th><th className="px-3 py-2 text-center">Absent</th><th className="px-3 py-2">Note</th><th className="px-3 py-2"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-secondary-100/60">
+              <tbody className="divide-y divide-[var(--dx-border)]">
                 {entries.map((e, i) => {
                   const locked = e.is_leave;
-                  const rowBg = e.is_leave ? "bg-violet-50/70" : e.is_absent ? "bg-rose-50/40" : "";
+                  const rowStyle = e.is_leave ? { background: "var(--dx-info-soft)" } : e.is_absent ? { background: "var(--dx-danger-soft)" } : undefined;
                   const hourDisabled = locked || e.is_absent;
-                  const cls = `${numCell} rounded-lg border border-secondary-200 px-2 py-1 text-xs disabled:bg-secondary-50 disabled:text-secondary-300`;
                   return (
-                    <tr key={i} className={`align-middle ${rowBg}`}>
-                      <td className="px-2 py-1.5">
-                        <input type="date" value={e.work_date} disabled={locked} onChange={(ev) => patch(i, "work_date", ev.target.value)} className="rounded-lg border border-secondary-200 px-2 py-1 text-xs disabled:bg-violet-50 disabled:text-violet-700 disabled:font-semibold" />
-                      </td>
+                    <tr key={i} className="align-middle" style={rowStyle}>
+                      <td className="px-2 py-1.5"><input type="date" value={e.work_date} disabled={locked} onChange={(ev) => patch(i, "work_date", ev.target.value)} className="dx-editor dx-editor-sm" /></td>
                       <td className="px-2 py-1.5"><input type="number" min="0" step="0.25" disabled={hourDisabled} value={e.regular_hours} onChange={(ev) => patch(i, "regular_hours", ev.target.value)} className={cls} /></td>
                       <td className="px-2 py-1.5"><input type="number" min="0" step="0.25" disabled={hourDisabled} value={e.overtime_hours} onChange={(ev) => patch(i, "overtime_hours", ev.target.value)} className={cls} /></td>
                       <td className="px-2 py-1.5"><input type="number" min="0" step="0.25" disabled={hourDisabled} value={e.night_hours} onChange={(ev) => patch(i, "night_hours", ev.target.value)} className={cls} /></td>
                       <td className="px-2 py-1.5"><input type="number" min="0" step="0.25" disabled={hourDisabled} value={e.weekend_hours} onChange={(ev) => patch(i, "weekend_hours", ev.target.value)} className={cls} /></td>
                       <td className="px-2 py-1.5"><input type="number" min="0" step="0.25" disabled={hourDisabled} value={e.holiday_hours} onChange={(ev) => patch(i, "holiday_hours", ev.target.value)} className={cls} /></td>
-                      <td className="px-2 py-1.5 text-center"><input type="checkbox" disabled={locked} checked={e.is_absent} onChange={(ev) => patch(i, "is_absent", ev.target.checked)} className="h-4 w-4 rounded border-secondary-300 disabled:opacity-30" /></td>
+                      <td className="px-2 py-1.5 text-center"><input type="checkbox" disabled={locked} checked={e.is_absent} onChange={(ev) => patch(i, "is_absent", ev.target.checked)} className="h-4 w-4 rounded disabled:opacity-30" style={{ accentColor: "var(--dx-accent)" }} /></td>
                       <td className="px-2 py-1.5">
                         {e.is_leave ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-violet-100 text-violet-700 font-semibold text-[10px] uppercase tracking-wide">{e.leave_label}</span>
+                          <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={{ background: "var(--dx-info-soft)", color: "var(--dx-info)" }}>{e.leave_label}</span>
                         ) : (
-                          <input type="text" value={e.note} onChange={(ev) => patch(i, "note", ev.target.value)} placeholder="—" className="w-28 rounded-lg border border-secondary-200 px-2 py-1 text-xs" />
+                          <input type="text" value={e.note} onChange={(ev) => patch(i, "note", ev.target.value)} placeholder="—" className="dx-editor dx-editor-sm w-28" />
                         )}
                       </td>
                       <td className="px-2 py-1.5">
-                        <button onClick={() => removeRow(i)} disabled={locked} className="p-1.5 rounded-lg hover:bg-rose-50 disabled:opacity-20" title={locked ? "Leave days are managed automatically" : "Remove day"}><X className="h-3.5 w-3.5 text-rose-400" /></button>
+                        <DxButton icon size="sm" variant="text" onClick={() => removeRow(i)} disabled={locked} title={locked ? "Leave days are managed automatically" : "Remove day"}><X /></DxButton>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
               <tfoot>
-                <tr className="bg-secondary-50 font-bold text-secondary-700 text-[11px]">
+                <tr className="bg-[var(--dx-surface-sunken)] text-[11px] font-bold text-[var(--dx-text)]">
                   <td className="px-3 py-2">Totals</td>
                   <td className="px-3 py-2 text-right">{totals.reg}</td>
                   <td className="px-3 py-2 text-right">{totals.ot}</td>
@@ -342,21 +325,21 @@ function CreateTimesheetModal({ isOpen, onClose, onCreated }: { isOpen: boolean;
                   <td className="px-3 py-2 text-right">{totals.weekend}</td>
                   <td className="px-3 py-2 text-right">{totals.holiday}</td>
                   <td className="px-3 py-2 text-center">{totals.abs} abs</td>
-                  <td className="px-3 py-2" colSpan={2}>{totals.leave > 0 ? <span className="text-violet-600">{totals.leave} leave day{totals.leave === 1 ? "" : "s"}</span> : null}</td>
+                  <td className="px-3 py-2" colSpan={2}>{totals.leave > 0 ? <span style={{ color: "var(--dx-info)" }}>{totals.leave} leave day{totals.leave === 1 ? "" : "s"}</span> : null}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-4 text-[11px] text-secondary-400">
-            <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-violet-200 border border-violet-300" /> Leave (auto-filled from approved requests, not editable)</span>
+          <div className="mt-2 flex flex-wrap items-center gap-4 text-[11px] text-[var(--dx-text-muted)]">
+            <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border" style={{ background: "var(--dx-info-soft)", borderColor: "var(--dx-info)" }} /> Leave (auto-filled from approved requests, not editable)</span>
             <span>Marking a day absent zeroes its hours. Totals roll up on save.</span>
-            {leaveQuery.isFetching && <span className="text-violet-400">Checking leave…</span>}
+            {leaveQuery.isFetching ? <span style={{ color: "var(--dx-info)" }}>Checking leave…</span> : null}
           </div>
         </div>
 
-        <Textarea label="Notes (optional)" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <DxTextarea label="Notes (optional)" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -364,44 +347,47 @@ function TimesheetDetailModal({ timesheet, onClose }: { timesheet: Timesheet | n
   if (!timesheet) return null;
   const entries = timesheet.entries ?? [];
   const leaveDays = entries.filter((e) => e.is_leave).length;
+  const chip = "rounded-md bg-[var(--dx-surface-sunken)] px-2 py-1 text-[var(--dx-text-muted)]";
   return (
-    <Modal isOpen={!!timesheet} onClose={onClose} size="lg"
+    <DxPopup
+      isOpen={!!timesheet} onClose={onClose} size="lg"
       title={`Timesheet — ${fmt(timesheet.period_start)} → ${fmt(timesheet.period_end)}`}
-      footer={<div className="flex justify-end"><Button variant="secondary" onClick={onClose}>Close</Button></div>}>
+      footer={<DxButton onClick={onClose}>Close</DxButton>}
+    >
       <div className="space-y-4">
-        <div className="flex flex-wrap gap-2 text-xs">
-          <Badge variant={statusVariant[timesheet.status]}>{timesheet.status}</Badge>
-          <span className="px-2 py-1 rounded-lg bg-secondary-50 text-secondary-600">Regular {num(timesheet.total_regular_hours)}h</span>
-          <span className="px-2 py-1 rounded-lg bg-secondary-50 text-secondary-600">OT {num(timesheet.total_overtime_hours)}h</span>
-          <span className="px-2 py-1 rounded-lg bg-secondary-50 text-secondary-600">Night {num(timesheet.total_night_hours)}h</span>
-          <span className="px-2 py-1 rounded-lg bg-secondary-50 text-secondary-600">Weekend {num(timesheet.total_weekend_hours)}h</span>
-          <span className="px-2 py-1 rounded-lg bg-secondary-50 text-secondary-600">Holiday {num(timesheet.total_holiday_hours)}h</span>
-          {leaveDays > 0 && <span className="px-2 py-1 rounded-lg bg-violet-100 text-violet-700">Leave {leaveDays}d</span>}
-          <span className="px-2 py-1 rounded-lg bg-secondary-50 text-secondary-600">Absences {timesheet.absence_days ?? 0}</span>
+        <div className="flex flex-wrap items-center gap-2 text-[12px]">
+          <DxBadge tone={statusTone[timesheet.status]}>{timesheet.status}</DxBadge>
+          <span className={chip}>Regular {num(timesheet.total_regular_hours)}h</span>
+          <span className={chip}>OT {num(timesheet.total_overtime_hours)}h</span>
+          <span className={chip}>Night {num(timesheet.total_night_hours)}h</span>
+          <span className={chip}>Weekend {num(timesheet.total_weekend_hours)}h</span>
+          <span className={chip}>Holiday {num(timesheet.total_holiday_hours)}h</span>
+          {leaveDays > 0 ? <span className="rounded-md px-2 py-1" style={{ background: "var(--dx-info-soft)", color: "var(--dx-info)" }}>Leave {leaveDays}d</span> : null}
+          <span className={chip}>Absences {timesheet.absence_days ?? 0}</span>
         </div>
         {entries.length === 0 ? (
-          <div className="py-12 text-center text-secondary-400"><CalendarDays className="h-10 w-10 mx-auto mb-2 text-secondary-200" />No daily entries recorded.</div>
+          <div className="py-12 text-center text-[var(--dx-text-muted)]"><CalendarDays className="mx-auto mb-2 h-10 w-10 text-[var(--dx-text-faint)]" />No daily entries recorded.</div>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-secondary-100">
-            <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto rounded-md border border-[var(--dx-border)]">
+            <table className="w-full text-left text-[12px]">
               <thead>
-                <tr className="bg-secondary-900/5 text-[10px] font-bold uppercase tracking-widest text-secondary-500">
+                <tr className="bg-[var(--dx-surface-sunken)] text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
                   <th className="px-3 py-2">Date</th><th className="px-3 py-2 text-right">Reg</th><th className="px-3 py-2 text-right">OT</th><th className="px-3 py-2 text-right">Night</th><th className="px-3 py-2 text-right">Wknd</th><th className="px-3 py-2 text-right">Hol</th><th className="px-3 py-2 text-center">Type</th><th className="px-3 py-2">Note</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-secondary-100/60">
+              <tbody className="divide-y divide-[var(--dx-border)]">
                 {entries.map((e, i) => (
-                  <tr key={i} className={e.is_leave ? "bg-violet-50/70" : e.is_absent ? "bg-rose-50/40" : ""}>
-                    <td className="px-3 py-2 font-semibold text-secondary-800">{fmt(e.work_date)}</td>
+                  <tr key={i} style={e.is_leave ? { background: "var(--dx-info-soft)" } : e.is_absent ? { background: "var(--dx-danger-soft)" } : undefined}>
+                    <td className="px-3 py-2 font-semibold text-[var(--dx-text)]">{fmt(e.work_date)}</td>
                     <td className="px-3 py-2 text-right">{num(e.regular_hours)}</td>
                     <td className="px-3 py-2 text-right">{num(e.overtime_hours)}</td>
                     <td className="px-3 py-2 text-right">{num(e.night_hours)}</td>
                     <td className="px-3 py-2 text-right">{num(e.weekend_hours)}</td>
                     <td className="px-3 py-2 text-right">{num(e.holiday_hours)}</td>
                     <td className="px-3 py-2 text-center">
-                      {e.is_leave ? <span className="text-violet-600 font-bold">Leave</span> : e.is_absent ? <span className="text-rose-500 font-bold">Absent</span> : "—"}
+                      {e.is_leave ? <span className="font-bold" style={{ color: "var(--dx-info)" }}>Leave</span> : e.is_absent ? <span className="font-bold" style={{ color: "var(--dx-danger)" }}>Absent</span> : "—"}
                     </td>
-                    <td className="px-3 py-2 text-secondary-500">{e.note || "—"}</td>
+                    <td className="px-3 py-2 text-[var(--dx-text-muted)]">{e.note || "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -409,6 +395,6 @@ function TimesheetDetailModal({ timesheet, onClose }: { timesheet: Timesheet | n
           </div>
         )}
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

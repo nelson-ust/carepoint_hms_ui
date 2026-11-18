@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Bell, CalendarClock, Dna, FlaskConical, HeartPulse, Home, LogOut, MessageSquare, Receipt, UserRound, Video } from "lucide-react";
+import { Bell, CalendarClock, Dna, FlaskConical, HeartPulse, Home, LogOut, MessageSquare, Receipt, UserRound, Video, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { resolveAssetUrl } from "@/lib/api/asset-url";
 import { clearPortalSession, getStoredPortalSession } from "../api/portal.api";
@@ -13,6 +13,7 @@ const navItems = [
   { to: "/portal/lab-results", label: "Lab Results", icon: FlaskConical },
   { to: "/portal/baseline-diagnostics", label: "Diagnostics", icon: Dna },
   { to: "/portal/invoices", label: "Invoices", icon: Receipt },
+  { to: "/portal/wallet", label: "Wallet", icon: Wallet },
   { to: "/portal/messages", label: "Messages", icon: MessageSquare },
   { to: "/portal/notifications", label: "Notifications", icon: Bell },
   { to: "/portal/profile", label: "Profile", icon: UserRound },

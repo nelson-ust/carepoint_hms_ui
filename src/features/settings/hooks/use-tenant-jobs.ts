@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { tenantJobsApi } from "../api/tenant-jobs.api";
+import { tenantJobsApi, type JobUpdatePayload } from "../api/tenant-jobs.api";
 
 export const jobKeys = {
   all: ["tenant-jobs"] as const,
@@ -25,6 +25,27 @@ export function useCreateJob() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: any) => tenantJobsApi.create(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: jobKeys.list() });
+    },
+  });
+}
+
+export function useUpdateJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: JobUpdatePayload }) =>
+      tenantJobsApi.update(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: jobKeys.list() });
+    },
+  });
+}
+
+export function useRunJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => tenantJobsApi.runNow(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: jobKeys.list() });
     },

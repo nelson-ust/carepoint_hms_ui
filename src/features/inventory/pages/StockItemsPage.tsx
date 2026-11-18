@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/layout/PageHeader";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { routes } from "@/config/routes";
@@ -6,24 +5,32 @@ import {
   AlertCircle,
   Boxes,
   CalendarClock,
-  CheckCircle2,
-  Clock,
   Edit3,
-  Filter,
   Hash,
   History,
   Package,
   Plus,
-  RefreshCw,
-  Save,
+  RotateCcw,
   Search,
-  ShoppingCart,
-  Sigma,
   Trash2,
   TrendingDown,
   Upload,
-  X,
 } from "lucide-react";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxKpi,
+  DxGrid,
+  DxBadge,
+  DxButton,
+  DxInput,
+  DxSelect,
+  DxPopup,
+  DxMessage,
+  formatNaira,
+  type DxGridColumn,
+} from "@/components/dx";
 import {
   createStockItem,
   deleteStockItem,
@@ -71,15 +78,6 @@ const emptyForm: ItemForm = {
   batch_no: "",
 };
 
-function priceFmt(value?: number) {
-  if (value == null || Number.isNaN(value)) return "—";
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
 function isExpired(date?: string): boolean {
   if (!date) return false;
   return new Date(date).getTime() < Date.now();
@@ -99,6 +97,13 @@ function isLowStock(item: StockItem): boolean {
     item.quantity_on_hand != null &&
     item.quantity_on_hand <= threshold
   );
+}
+
+function expiryTone(date?: string): "neutral" | "warning" | "danger" {
+  if (!date) return "neutral";
+  if (isExpired(date)) return "danger";
+  const d = daysToExpiry(date);
+  return d != null && d >= 0 && d <= 30 ? "warning" : "neutral";
 }
 
 export function StockItemsPage() {
@@ -154,7 +159,7 @@ export function StockItemsPage() {
       setItems(itemsRes.items ?? []);
       setStores(storesRes.items ?? []);
       setDrugs(drugsRes?.items ?? []);
-    } catch (err: any) {
+    } catch (err) {
       setError(apiErrorMessage(err, "Unable to load stock items. Please retry."));
     } finally {
       setIsLoading(false);
@@ -307,7 +312,7 @@ export function StockItemsPage() {
       }
       showFeedback("success", "Stock item saved.");
       setModal({ open: false, editing: null });
-    } catch (err: any) {
+    } catch (err) {
       setSaveError(apiErrorMessage(err, "Failed to save stock item. Please check the details and retry."));
     } finally {
       setSaving(false);
@@ -322,57 +327,147 @@ export function StockItemsPage() {
       setItems((prev) => prev.filter((x) => x.id !== confirmDelete.id));
       showFeedback("success", "Stock item removed.");
       setConfirmDelete(null);
-    } catch (err: any) {
+    } catch (err) {
       showFeedback("error", apiErrorMessage(err, "Failed to delete."));
     } finally {
       setDeleting(false);
     }
   };
 
-  return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader
-          title="Stock Items"
-          description="Real-time view of every batch held in every store, with low-stock and expiry alerts."
-        />
+  const columns: DxGridColumn<StockItem>[] = [
+    {
+      key: "item_name",
+      header: "Item",
+      render: (it) => (
         <div className="flex items-center gap-3">
-          <Link
-            to="/inventory/stores"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
-          >
-            <Package className="h-4 w-4" />
-            <span className="text-sm font-bold">Stores</span>
-          </Link>
-          <Link
-            to="/inventory/movements"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
-          >
-            <History className="h-4 w-4" />
-            <span className="text-sm font-bold">Movements</span>
-          </Link>
-          <button
-            onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={() => setShowBulkUpload(true)}
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
-          >
-            <Upload className="h-4 w-4" />
-            <span className="text-sm font-bold">Bulk Upload</span>
-          </button>
-          <button
-            onClick={openCreate}
-            className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20"
-          >
-            <Plus className="h-5 w-5" />
-            <span className="font-bold">New Item</span>
-          </button>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]">
+            <Boxes className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-[var(--dx-text)]">{it.item_name}</div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+              <DxBadge tone="neutral">{it.item_type}</DxBadge>
+              {it.sku ? (
+                <span className="inline-flex items-center gap-1 dx-mono text-[11px] text-[var(--dx-text-muted)]">
+                  <Hash className="h-2.5 w-2.5" />
+                  {it.sku}
+                </span>
+              ) : null}
+            </div>
+          </div>
         </div>
-      </div>
+      ),
+    },
+    {
+      key: "store_id",
+      header: "Store",
+      accessor: (it) => storeName(it.store_id),
+      render: (it) => (
+        <span className="inline-flex items-center gap-1.5 text-[var(--dx-text-muted)]">
+          <Package className="h-3 w-3" />
+          {storeName(it.store_id)}
+        </span>
+      ),
+    },
+    {
+      key: "quantity_on_hand",
+      header: "Quantity",
+      align: "right",
+      accessor: (it) => it.quantity_on_hand ?? 0,
+      render: (it) => {
+        const low = isLowStock(it);
+        return (
+          <div className="flex flex-col items-end">
+            <span className="dx-mono font-semibold text-[var(--dx-text)]">
+              {it.quantity_on_hand ?? 0}
+              {it.unit_of_measure ? (
+                <span className="ml-1 text-[11px] text-[var(--dx-text-muted)]">{it.unit_of_measure}</span>
+              ) : null}
+            </span>
+            {it.reorder_level != null ? (
+              <span className="text-[11px] text-[var(--dx-text-faint)]">Reorder @ {it.reorder_level}</span>
+            ) : null}
+            {low ? (
+              <DxBadge tone="warning" className="mt-1" dot>Low stock</DxBadge>
+            ) : null}
+          </div>
+        );
+      },
+    },
+    {
+      key: "expiry_date",
+      header: "Expiry / Batch",
+      accessor: (it) => it.expiry_date ?? "",
+      render: (it) =>
+        it.expiry_date ? (
+          <div className="space-y-1">
+            <DxBadge tone={expiryTone(it.expiry_date)} dot>
+              {new Date(it.expiry_date).toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+            </DxBadge>
+            {it.batch_no ? (
+              <div className="dx-mono text-[11px] text-[var(--dx-text-faint)]">Batch {it.batch_no}</div>
+            ) : null}
+          </div>
+        ) : (
+          <span className="text-[var(--dx-text-faint)]">No expiry</span>
+        ),
+    },
+    {
+      key: "unit_cost",
+      header: "Cost",
+      align: "right",
+      accessor: (it) => it.unit_cost ?? 0,
+      render: (it) => <span className="dx-mono font-semibold text-[var(--dx-text)]">{formatNaira(it.unit_cost)}</span>,
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      render: (it) => (
+        <div className="flex items-center justify-end gap-1">
+          <Link
+            to={`/inventory/movements?item=${it.id}`}
+            className="dx-btn dx-btn-sm"
+            title="Movement history"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <History className="h-3.5 w-3.5" />
+          </Link>
+          <DxButton size="sm" leftIcon={<Edit3 className="h-3.5 w-3.5" />} onClick={(e) => { e.stopPropagation(); openEdit(it); }}>Edit</DxButton>
+          <DxButton
+            icon
+            size="sm"
+            variant="outline-danger"
+            title="Delete"
+            onClick={(e) => { e.stopPropagation(); setConfirmDelete(it); }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </DxButton>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Inventory" }, { label: "Stock Items" }]}
+        title="Stock Items"
+        subtitle="Real-time view of every batch held in every store, with low-stock and expiry alerts."
+        actions={
+          <>
+            <Link to="/inventory/stores" className="dx-btn dx-btn-sm"><Package className="h-4 w-4" /> Stores</Link>
+            <Link to="/inventory/movements" className="dx-btn dx-btn-sm"><History className="h-4 w-4" /> Movements</Link>
+            <DxButton icon title="Refresh" onClick={load} isLoading={isLoading}><RotateCcw /></DxButton>
+            <DxButton leftIcon={<Upload className="h-4 w-4" />} onClick={() => setShowBulkUpload(true)}>Bulk upload</DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>New item</DxButton>
+          </>
+        }
+      />
 
       <BulkUploadModal
         isOpen={showBulkUpload}
@@ -380,429 +475,118 @@ export function StockItemsPage() {
         onImported={load}
       />
 
-      {feedback && (
-        <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
-              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-              : "bg-rose-50 text-rose-700 border-rose-100"
-            }`}
-        >
-          {feedback.tone === "success" ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-          <span className="text-sm font-bold">{feedback.message}</span>
-        </div>
-      )}
+      {feedback ? (
+        <DxMessage tone={feedback.tone === "success" ? "success" : "danger"}>{feedback.message}</DxMessage>
+      ) : null}
 
-      {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
-        <StatCard icon={Boxes} label="Total Items" value={stats.total} tone="primary" />
-        <StatCard icon={TrendingDown} label="Low Stock" value={stats.low} tone="amber" />
-        <StatCard icon={CalendarClock} label="Expiring ≤30d" value={stats.expiringSoon} tone="amber" />
-        <StatCard icon={AlertCircle} label="Expired" value={stats.expired} tone="rose" />
+        <DxKpi icon={Boxes} label="Total Items" value={stats.total} tone="accent" />
+        <DxKpi icon={TrendingDown} label="Low Stock" value={stats.low} tone="warning" />
+        <DxKpi icon={CalendarClock} label="Expiring ≤30d" value={stats.expiringSoon} tone="warning" />
+        <DxKpi icon={AlertCircle} label="Expired" value={stats.expired} tone="danger" />
       </div>
 
-      {/* Filters */}
-      <div className="glass-card rounded-[2rem] p-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center bg-white/40 backdrop-blur-md">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-secondary-400" />
-          <input
-            type="text"
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        <div className="w-full flex-1">
+          <DxInput
+            leftIcon={<Search className="h-3.5 w-3.5" />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, SKU, batch, drug name..."
-            className="w-full bg-white/50 border-none rounded-2xl pl-14 pr-6 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
+            placeholder="Search by name, SKU, batch, drug name…"
           />
         </div>
-        <div className="relative">
-          <Package className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-          <select
+        <div className="w-full md:w-52">
+          <DxSelect
             value={storeFilter}
             onChange={(e) => setStoreFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
-          >
-            <option value="">All Stores</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            aria-label="Filter by store"
+            options={[{ value: "", label: "All Stores" }, ...stores.map((s) => ({ value: String(s.id), label: s.name }))]}
+          />
         </div>
-        <div className="relative">
-          <Filter className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-          <select
+        <div className="w-full md:w-44">
+          <DxSelect
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
-          >
-            <option value="">All Types</option>
-            {STOCK_ITEM_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+            aria-label="Filter by type"
+            options={[{ value: "", label: "All Types" }, ...STOCK_ITEM_TYPES.map((t) => ({ value: t, label: t }))]}
+          />
         </div>
-        <button
+        <DxButton
+          variant={lowOnly ? "primary" : "default"}
+          leftIcon={<TrendingDown className="h-4 w-4" />}
           onClick={() => setLowOnly((v) => !v)}
-          className={`flex items-center gap-2 px-5 py-4 rounded-2xl text-xs font-bold uppercase tracking-widest border transition-all ${lowOnly
-              ? "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20"
-              : "bg-white/80 text-secondary-600 border-secondary-400"
-            }`}
         >
-          <TrendingDown className="h-4 w-4" />
-          Low Only
-        </button>
+          Low only
+        </DxButton>
       </div>
 
-      {/* Table */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-secondary-900/5">
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Item</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Store</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Quantity</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Expiry / Batch</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Cost</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-secondary-100/50">
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="animate-pulse">
-                    <td colSpan={6} className="px-8 py-6">
-                      <div className="h-14 bg-secondary-100/30 rounded-2xl" />
-                    </td>
-                  </tr>
-                ))
-              ) : error ? (
-                <tr>
-                  <td colSpan={6} className="px-8 py-20 text-center">
-                    <AlertCircle className="h-12 w-12 mx-auto text-rose-500/50 mb-4" />
-                    <p className="text-secondary-600 font-bold">{error}</p>
-                    <button onClick={load} className="btn-primary mt-4 py-3 px-8">
-                      Try Again
-                    </button>
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-8 py-32 text-center">
-                    <div className="h-20 w-20 bg-secondary-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
-                      <Boxes className="h-10 w-10 text-secondary-200" />
-                    </div>
-                    <h4 className="text-xl font-bold text-secondary-900">No Stock Items</h4>
-                    <p className="text-sm text-secondary-500 mt-2">
-                      {items.length === 0
-                        ? "Stock the first item to start tracking."
-                        : "No items match your filters."}
-                    </p>
-                    <button onClick={openCreate} className="btn-primary mt-4 inline-flex items-center gap-2 px-8 py-3">
-                      <Plus className="h-4 w-4" />
-                      <span>Add Item</span>
-                    </button>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((it) => {
-                  const expiringSoon = (() => {
-                    const d = daysToExpiry(it.expiry_date);
-                    return d != null && d >= 0 && d <= 30;
-                  })();
-                  const expired = isExpired(it.expiry_date);
-                  const low = isLowStock(it);
-                  return (
-                    <tr
-                      key={it.id}
-                      onClick={() => navigate(routes.inventoryItems + `/${it.id}`)}
-                      className="hover:bg-primary-50/30 transition-all cursor-pointer group"
-                    >
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-3">
-                          <div className="h-11 w-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md shrink-0">
-                            <Boxes className="h-5 w-5" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-secondary-900 truncate">
-                              {it.item_name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <span className="inline-flex px-2 py-0.5 rounded-md bg-primary-50 text-primary-600 border border-primary-100 text-[9px] font-bold uppercase tracking-widest">
-                                {it.item_type}
-                              </span>
-                              {it.sku && (
-                                <span className="inline-flex items-center gap-1 bg-secondary-100 text-secondary-500 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold">
-                                  <Hash className="h-2.5 w-2.5" />
-                                  {it.sku}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <Link
-                          to={`/inventory/stores`}
-                          className="text-xs font-bold text-secondary-700 hover:text-primary-500 inline-flex items-center gap-1.5"
-                        >
-                          <Package className="h-3 w-3" />
-                          {storeName(it.store_id)}
-                        </Link>
-                      </td>
-                      <td className="px-8 py-6">
-                        <p className="text-base font-black text-secondary-900">
-                          {it.quantity_on_hand ?? 0}
-                          {it.unit_of_measure && (
-                            <span className="text-[10px] font-bold text-secondary-500 ml-1.5 uppercase tracking-widest">
-                              {it.unit_of_measure}
-                            </span>
-                          )}
-                        </p>
-                        {it.reorder_level != null && (
-                          <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mt-1">
-                            Reorder @ {it.reorder_level}
-                          </p>
-                        )}
-                        {low && (
-                          <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-md bg-amber-50 text-amber-600 border border-amber-100 text-[9px] font-bold uppercase tracking-widest">
-                            <TrendingDown className="h-2.5 w-2.5" />
-                            Low Stock
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-8 py-6">
-                        {it.expiry_date ? (
-                          <div className="space-y-1">
-                            <div
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border ${expired
-                                  ? "bg-rose-50 text-rose-600 border-rose-100"
-                                  : expiringSoon
-                                    ? "bg-amber-50 text-amber-600 border-amber-100"
-                                    : "bg-secondary-50 text-secondary-600 border-secondary-400"
-                                }`}
-                            >
-                              <Clock className="h-2.5 w-2.5" />
-                              {new Date(it.expiry_date).toLocaleDateString("en-GB", {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              })}
-                            </div>
-                            {it.batch_no && (
-                              <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase">
-                                Batch {it.batch_no}
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-secondary-400 text-[11px] font-bold">No expiry</span>
-                        )}
-                      </td>
-                      <td className="px-8 py-6">
-                        <p className="text-sm font-black text-secondary-900">
-                          {priceFmt(it.unit_cost)}
-                        </p>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center justify-end gap-2">
-                          <Link
-                            to={`/inventory/movements?item=${it.id}`}
-                            className="p-2 rounded-xl hover:bg-secondary-100 text-secondary-500"
-                            title="Movement history"
-                          >
-                            <History className="h-4 w-4" />
-                          </Link>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); openEdit(it); }}
-                            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-primary-700 transition-all shadow-md"
-                          >
-                            <Edit3 className="h-3.5 w-3.5" />
-                            Edit
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setConfirmDelete(it); }}
-                            className="p-2 hover:bg-rose-50 text-rose-500 rounded-xl transition-all"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Modal */}
-      {modal.open && (
-        <ItemModal
-          editing={modal.editing}
-          form={form}
-          onChange={setForm}
-          stores={stores}
-          drugs={drugs}
-          saving={saving}
-          error={saveError}
-          onClose={close}
-          onSubmit={handleSave}
-        />
+      {error ? (
+        <DxMessage tone="danger" action={<DxButton size="sm" onClick={load}>Retry</DxButton>}>{error}</DxMessage>
+      ) : (
+        <DxPanel flush>
+          <DxGrid<StockItem>
+            columns={columns}
+            data={filtered}
+            rowKey={(it) => it.id}
+            isLoading={isLoading}
+            onRowClick={(it) => navigate(routes.inventoryItems + `/${it.id}`)}
+            empty={{
+              icon: Boxes,
+              title: "No Stock Items",
+              description: items.length === 0 ? "Stock the first item to start tracking." : "No items match your filters.",
+              action: <DxButton size="sm" variant="primary" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={openCreate}>Add item</DxButton>,
+            }}
+          />
+        </DxPanel>
       )}
 
-      {confirmDelete && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-          <div className="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl">
-            <div className="flex items-center gap-5 mb-6">
-              <div className="h-14 w-14 rounded-2xl bg-rose-500 text-white flex items-center justify-center shadow-xl shadow-rose-500/20">
-                <Trash2 className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-black font-display tracking-tight">Delete Stock Item</h3>
-                <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-                  This Cannot Be Undone
-                </p>
-              </div>
-            </div>
-            <p className="text-sm text-secondary-600 leading-relaxed mb-6">
-              Delete <strong className="text-secondary-900">{confirmDelete.item_name}</strong>?
-              Movement history will also be lost.
-            </p>
-            <div className="flex gap-4">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                disabled={deleting}
-                className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-[2] py-4 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-black tracking-tight shadow-xl shadow-rose-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                <Trash2 className="h-4 w-4" />
-                {deleting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// Sub-components
-// ============================================================
-
-function ItemModal({
-  editing,
-  form,
-  onChange,
-  stores,
-  drugs,
-  saving,
-  error,
-  onClose,
-  onSubmit,
-}: {
-  editing: StockItem | null;
-  form: ItemForm;
-  onChange: (f: ItemForm) => void;
-  stores: Store[];
-  drugs: Drug[];
-  saving: boolean;
-  error: string | null;
-  onClose: () => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] p-10 max-w-2xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          disabled={saving}
-          className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"
-        >
-          <X className="h-5 w-5 text-secondary-400" />
-        </button>
-        <div className="flex items-center gap-5 mb-8">
-          <div className="h-14 w-14 rounded-2xl bg-primary-600 text-white flex items-center justify-center shadow-xl shadow-primary-500/20">
-            {editing ? <Edit3 className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
-          </div>
-          <div>
-            <h3 className="text-xl font-black font-display tracking-tight">
-              {editing ? "Edit Stock Item" : "New Stock Item"}
-            </h3>
-            <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-              Track A Batch In A Store
-            </p>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-5 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-            <AlertCircle className="h-5 w-5" />
-            <span className="text-sm font-bold">{error}</span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              Store *
-            </label>
-            <select
+      {/* Create / edit */}
+      <DxPopup
+        isOpen={modal.open}
+        onClose={close}
+        title={modal.editing ? "Edit Stock Item" : "New Stock Item"}
+        size="lg"
+        locked={saving}
+        footer={
+          <>
+            <DxButton onClick={close} disabled={saving}>Cancel</DxButton>
+            <DxButton variant="primary" onClick={handleSave} isLoading={saving} leftIcon={<Plus className="h-4 w-4" />}>
+              {modal.editing ? "Save changes" : "Add item"}
+            </DxButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {saveError ? <DxMessage tone="danger">{saveError}</DxMessage> : null}
+          <div className="grid gap-4 md:grid-cols-2">
+            <DxSelect
+              label="Store"
+              required
               value={form.store_id}
-              onChange={(e) => onChange({ ...form, store_id: e.target.value })}
-              disabled={!!editing}
-              className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${editing ? "opacity-60 cursor-not-allowed" : ""
-                }`}
-            >
-              <option value="">Pick a store...</option>
-              {stores.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.code})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              Item Type
-            </label>
-            <select
+              onChange={(e) => setForm({ ...form, store_id: e.target.value })}
+              disabled={!!modal.editing}
+              placeholder="Pick a store…"
+              options={stores.map((s) => ({ value: String(s.id), label: `${s.name} (${s.code})` }))}
+            />
+            <DxSelect
+              label="Item type"
               value={form.item_type}
-              onChange={(e) => onChange({ ...form, item_type: e.target.value })}
-              disabled={!!editing}
-              className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${editing ? "opacity-60 cursor-not-allowed" : ""
-                }`}
-            >
-              {STOCK_ITEM_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </div>
+              onChange={(e) => setForm({ ...form, item_type: e.target.value })}
+              disabled={!!modal.editing}
+              options={STOCK_ITEM_TYPES.map((t) => ({ value: t, label: t }))}
+            />
 
-          {form.item_type === "DRUG" && (
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                Linked Drug (recommended)
-              </label>
-              <select
+            {form.item_type === "DRUG" ? (
+              <DxSelect
+                label="Linked drug (recommended)"
+                fieldClassName="md:col-span-2"
                 value={form.drug_id}
+                hint="Name, SKU & unit are taken from the drug — keeping the formulary the single source of truth."
                 onChange={(e) => {
                   const drugId = e.target.value;
                   const drug = drugs.find((d) => String(d.id) === drugId);
                   if (drug) {
-                    onChange({
+                    setForm({
                       ...form,
                       drug_id: drugId,
                       item_name: drug.name || form.item_name,
@@ -813,184 +597,109 @@ function ItemModal({
                         (drug.reorder_level != null ? String(drug.reorder_level) : form.reorder_level),
                     });
                   } else {
-                    onChange({ ...form, drug_id: "" });
+                    setForm({ ...form, drug_id: "" });
                   }
                 }}
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-              >
-                <option value="">— No drug linkage —</option>
-                {drugs.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} {d.strength ? `· ${d.strength}` : ""}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[9px] font-bold text-secondary-400 uppercase tracking-widest">
-                Name, SKU & unit are taken from the drug — keeping the formulary the single source of truth.
-              </p>
-            </div>
-          )}
+                options={[
+                  { value: "", label: "— No drug linkage —" },
+                  ...drugs.map((d) => ({ value: String(d.id), label: `${d.name}${d.strength ? ` · ${d.strength}` : ""}` })),
+                ]}
+              />
+            ) : null}
 
-          <div className="space-y-2 md:col-span-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              Item Name *
-            </label>
-            <input
-              type="text"
+            <DxInput
+              label="Item name"
+              required
+              fieldClassName="md:col-span-2"
               value={form.item_name}
-              onChange={(e) => onChange({ ...form, item_name: e.target.value })}
+              onChange={(e) => setForm({ ...form, item_name: e.target.value })}
               placeholder="Paracetamol 500mg Tablets"
               readOnly={!!form.drug_id}
-              className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${form.drug_id ? "opacity-60 cursor-not-allowed" : ""}`}
             />
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              SKU
-            </label>
-            <input
-              type="text"
+            <DxInput
+              label="SKU"
+              mono
               value={form.sku}
-              onChange={(e) => onChange({ ...form, sku: e.target.value.toUpperCase() })}
+              onChange={(e) => setForm({ ...form, sku: e.target.value.toUpperCase() })}
               placeholder="PCM-500-T"
               readOnly={!!form.drug_id}
-              className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono ${form.drug_id ? "opacity-60 cursor-not-allowed" : ""}`}
             />
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-1">
-              <Sigma className="h-3 w-3" /> Unit of Measure
-            </label>
-            <input
-              type="text"
+            <DxInput
+              label="Unit of measure"
               value={form.unit_of_measure}
-              onChange={(e) => onChange({ ...form, unit_of_measure: e.target.value })}
+              onChange={(e) => setForm({ ...form, unit_of_measure: e.target.value })}
               placeholder="tabs, ml, vials"
               readOnly={!!form.drug_id}
-              className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full ${form.drug_id ? "opacity-60 cursor-not-allowed" : ""}`}
             />
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              Quantity on Hand
-            </label>
-            <input
+            <DxInput
+              label="Quantity on hand"
               type="number"
               step="any"
+              mono
               value={form.quantity_on_hand}
-              onChange={(e) => onChange({ ...form, quantity_on_hand: e.target.value })}
-              disabled={!!editing}
-              className={`input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono ${editing ? "opacity-60 cursor-not-allowed" : ""
-                }`}
+              onChange={(e) => setForm({ ...form, quantity_on_hand: e.target.value })}
+              disabled={!!modal.editing}
+              hint={modal.editing ? "Use Movements to adjust quantity" : undefined}
             />
-            {editing && (
-              <p className="text-[9px] font-bold text-secondary-400 uppercase tracking-widest">
-                Use Movements to adjust quantity
-              </p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              Reorder Level
-            </label>
-            <input
+            <DxInput
+              label="Reorder level"
               type="number"
               step="any"
+              mono
               value={form.reorder_level}
-              onChange={(e) => onChange({ ...form, reorder_level: e.target.value })}
+              onChange={(e) => setForm({ ...form, reorder_level: e.target.value })}
               placeholder="50"
-              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
             />
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-1">
-              <ShoppingCart className="h-3 w-3" /> Unit Cost (NGN)
-            </label>
-            <input
+            <DxInput
+              label="Unit cost (NGN)"
               type="number"
               step="any"
+              mono
               value={form.unit_cost}
-              onChange={(e) => onChange({ ...form, unit_cost: e.target.value })}
+              onChange={(e) => setForm({ ...form, unit_cost: e.target.value })}
               placeholder="125.00"
-              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
             />
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-              Batch No.
-            </label>
-            <input
-              type="text"
+            <DxInput
+              label="Batch no."
+              mono
               value={form.batch_no}
-              onChange={(e) => onChange({ ...form, batch_no: e.target.value })}
+              onChange={(e) => setForm({ ...form, batch_no: e.target.value })}
               placeholder="B-2026-04-A"
-              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
             />
-          </div>
 
-          <div className="space-y-2 md:col-span-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-1">
-              <CalendarClock className="h-3 w-3" /> Expiry Date
-            </label>
-            <input
+            <DxInput
+              label="Expiry date"
               type="date"
+              mono
+              fieldClassName="md:col-span-2"
               value={form.expiry_date}
-              onChange={(e) => onChange({ ...form, expiry_date: e.target.value })}
-              className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
+              onChange={(e) => setForm({ ...form, expiry_date: e.target.value })}
             />
           </div>
         </div>
+      </DxPopup>
 
-        <div className="pt-6 flex gap-4">
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onSubmit}
-            disabled={saving}
-            className="flex-[2] btn-primary py-4 rounded-2xl font-black tracking-tight shadow-xl shadow-primary-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            {saving ? "Saving..." : editing ? "Save Changes" : "Add Item"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type StatTone = "primary" | "emerald" | "amber" | "rose";
-const statToneStyles: Record<StatTone, string> = {
-  primary: "bg-primary-50 text-primary-600 border-primary-100",
-  emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  amber: "bg-amber-50 text-amber-600 border-amber-100",
-  rose: "bg-rose-50 text-rose-600 border-rose-100",
-};
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: typeof Boxes;
-  label: string;
-  value: number;
-  tone: StatTone;
-}) {
-  return (
-    <div className={`glass-card rounded-[2rem] p-6 border ${statToneStyles[tone]} bg-white/60 backdrop-blur-md`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">{label}</span>
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="text-3xl font-black tracking-tight">{value}</div>
-    </div>
+      {/* Delete confirm */}
+      <DxPopup
+        isOpen={confirmDelete !== null}
+        onClose={() => !deleting && setConfirmDelete(null)}
+        title="Delete Stock Item"
+        size="sm"
+        locked={deleting}
+        footer={
+          <>
+            <DxButton onClick={() => setConfirmDelete(null)} disabled={deleting}>Cancel</DxButton>
+            <DxButton variant="danger" onClick={handleDelete} isLoading={deleting}>Delete item</DxButton>
+          </>
+        }
+      >
+        <DxMessage tone="danger">
+          {confirmDelete ? <>Delete <strong>{confirmDelete.item_name}</strong>? Its movement history will also be lost. This cannot be undone.</> : null}
+        </DxMessage>
+      </DxPopup>
+    </DxPage>
   );
 }

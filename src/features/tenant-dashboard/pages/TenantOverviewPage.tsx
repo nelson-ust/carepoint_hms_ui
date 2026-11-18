@@ -1,240 +1,298 @@
-import { Link } from "react-router-dom";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { MetricCard, type MetricTone } from "@/components/charts/MetricCard";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  Activity,
+  Banknote,
+  BedDouble,
+  CalendarCheck,
+  Clock,
+  CreditCard,
+  FlaskConical,
+  HeartPulse,
+  MessageSquare,
+  Package,
+  Pill,
+  Receipt,
+  RotateCcw,
+  Stethoscope,
+  UserPlus,
+  Users,
+  Wallet,
+} from "lucide-react";
+import {
+  DxBadge,
+  DxButton,
+  DxKpi,
+  DxLiveDot,
+  DxPage,
+  DxPageHeader,
+  DxPageLoading,
+  DxPanel,
+  DxStatusBar,
+  DxStatusItem,
+  formatNaira,
+} from "@/components/dx";
 import { useChartTheme } from "@/components/charts/chart-theme";
 import { routes } from "@/config/routes";
 import { useUnreadPatientMessageCount } from "@/features/portal-messages/hooks/use-portal-messages";
 import {
-  Users,
-  CreditCard,
-  Package,
-  Clock,
-  Stethoscope,
-  UserPlus,
-  Activity,
-  Banknote,
-  MessageSquare,
-} from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import { useState, useEffect } from "react";
-import {
   getDashboardOverview,
   getRecentActivity,
-  type TenantOverviewData,
   type TenantActivityEvent,
 } from "../api/tenant-dashboard.api";
 
-function activityLabel(event: TenantActivityEvent): { title: string; detail: string } {
+function activityMeta(event: TenantActivityEvent): { title: string; detail: string; icon: typeof Clock } {
   switch (event.type) {
     case "patient_registered":
-      return { title: "Patient registered", detail: event.label || "New patient record created" };
+      return { title: "Patient registered", detail: event.label || "New patient record created", icon: UserPlus };
     case "visit_started":
-      return { title: "Visit started", detail: event.patient_id ? `Patient #${event.patient_id}` : "New encounter opened" };
+      return { title: "Visit started", detail: event.patient_id ? `Patient #${event.patient_id}` : "New encounter opened", icon: Activity };
     case "payment_received":
       return {
         title: "Payment received",
-        detail: `₦${(event.amount ?? 0).toLocaleString()}${event.method ? ` • ${event.method}` : ""}`,
+        detail: `${formatNaira(event.amount ?? 0)}${event.method ? ` · ${event.method}` : ""}`,
+        icon: Banknote,
       };
     default:
-      return { title: event.type.replace(/_/g, " "), detail: event.label || "" };
+      return { title: event.type.replace(/_/g, " "), detail: event.label || "", icon: Clock };
   }
 }
 
 export function TenantOverviewPage() {
-  const [overview, setOverview] = useState<TenantOverviewData | null>(null);
-  const [activities, setActivities] = useState<TenantActivityEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
   const chart = useChartTheme();
-  const { data: unreadMessages = 0, isLoading: messagesLoading } =
-    useUnreadPatientMessageCount();
+  const axisTick = { fill: chart.tick.fill, fontSize: chart.tick.fontSize, fontWeight: chart.tick.fontWeight };
 
-  useEffect(() => {
-    async function loadMetrics() {
-      try {
-        const [overviewResponse, activityEvents] = await Promise.all([
-          getDashboardOverview(),
-          getRecentActivity(10).catch(() => [] as TenantActivityEvent[]),
-        ]);
-        if (overviewResponse.success) {
-          setOverview(overviewResponse.data);
-        }
-        setActivities(activityEvents);
-      } catch (err) {
-        console.error("Failed to load dashboard metrics", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadMetrics();
-  }, []);
+  const overviewQuery = useQuery({ queryKey: ["dashboard", "overview"], queryFn: getDashboardOverview });
+  const activityQuery = useQuery({ queryKey: ["dashboard", "recent-activity"], queryFn: () => getRecentActivity(10) });
+  const { data: unreadMessages = 0, isLoading: messagesLoading } = useUnreadPatientMessageCount();
+
+  if (overviewQuery.isLoading) return <DxPageLoading label="Building facility overview…" />;
+
+  const d = overviewQuery.data?.data;
+  const activities = activityQuery.data ?? [];
 
   const inventoryAlerts =
-    (overview?.inventory_alerts?.low_stock_count ?? 0) +
-    (overview?.inventory_alerts?.expiring_soon_count ?? 0);
+    (d?.inventory_alerts?.low_stock_count ?? 0) + (d?.inventory_alerts?.expiring_soon_count ?? 0);
+  const backlog =
+    (d?.lab_pharmacy_backlog?.lab_orders_pending ?? 0) +
+    (d?.lab_pharmacy_backlog?.prescriptions_pending ?? 0) +
+    (d?.lab_pharmacy_backlog?.dispenses_pending ?? 0);
+  const totalBeds = d?.inpatient?.total_beds ?? 0;
+  const occupied = d?.inpatient?.occupied_beds ?? 0;
+  const utilisation = d?.inpatient?.utilisation_pct ?? 0;
 
-  const stats: {
-    label: string;
-    value: string;
-    icon: typeof Users;
-    tone: MetricTone;
-  }[] = [
-    { label: "Active Patients", value: (overview?.patients?.total ?? 0).toLocaleString(), icon: Users, tone: "primary" },
-    { label: "Visits Today", value: (overview?.visits?.total_today ?? 0).toString(), icon: Stethoscope, tone: "cyan" },
-    { label: "Collected (MTD)", value: `₦${(overview?.billing?.collected_this_month ?? 0).toLocaleString()}`, icon: CreditCard, tone: "primary" },
-    { label: "Inventory Alerts", value: inventoryAlerts.toString(), icon: Package, tone: "rose" },
-  ];
-
-  const todayChartData = overview
+  const todayChartData = d
     ? [
-        { name: "New Patients", count: overview.today.new_patients_today },
-        { name: "Visits", count: overview.today.visits_today },
-        { name: "In Progress", count: overview.visits.in_progress },
-        { name: "Completed", count: overview.visits.completed_today },
-        { name: "Appointments", count: overview.today.appointments_today },
+        { name: "New patients", count: d.today.new_patients_today },
+        { name: "Visits", count: d.today.visits_today },
+        { name: "In progress", count: d.visits.in_progress },
+        { name: "Completed", count: d.visits.completed_today },
+        { name: "Appointments", count: d.today.appointments_today },
       ]
     : [];
 
+  const backlogData = d
+    ? [
+        { name: "Lab orders", count: d.lab_pharmacy_backlog.lab_orders_pending },
+        { name: "Prescriptions", count: d.lab_pharmacy_backlog.prescriptions_pending },
+        { name: "Dispenses", count: d.lab_pharmacy_backlog.dispenses_pending },
+      ]
+    : [];
+  const backlogColors = [chart.series[0], chart.series[2], chart.series[3]];
+
+  const appts = d?.appointments;
+  const apptData = appts
+    ? [
+        { name: "Scheduled", count: appts.scheduled },
+        { name: "Completed", count: appts.completed },
+        { name: "Cancelled", count: appts.cancelled },
+        { name: "No-show", count: appts.no_show },
+      ]
+    : [];
+  const apptColors = [chart.series[0], chart.series[1], chart.series[4], chart.series[3]];
+
   return (
-    <section className="space-y-10 animate-fade-in">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader
-          title="Facility Intelligence"
-          description="Operational insights and real-time performance tracking for your healthcare facility."
-        />
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Overview" }, { label: "Dashboard" }]}
+        title="Facility Overview"
+        subtitle="Operational insight and real-time performance across the facility — patients, visits, beds, billing and backlog."
+        actions={
+          <>
+            <DxButton onClick={() => navigate(routes.reports)}>
+              <Receipt /> Reports
+            </DxButton>
+            <DxButton
+              icon
+              title="Refresh"
+              onClick={() => {
+                overviewQuery.refetch();
+                activityQuery.refetch();
+              }}
+              isLoading={overviewQuery.isFetching}
+            >
+              <RotateCcw />
+            </DxButton>
+          </>
+        }
+      />
+
+      <DxStatusBar>
+        <DxStatusItem icon={<CalendarCheck className="h-3.5 w-3.5" />}>As of {d?.today?.date ?? "—"}</DxStatusItem>
+        <DxStatusItem icon={<Banknote className="h-3.5 w-3.5" />}>Revenue today {formatNaira(d?.today?.revenue_today ?? 0)}</DxStatusItem>
+        <DxStatusItem><DxLiveDot label="Live" /></DxStatusItem>
+      </DxStatusBar>
+
+      {/* Headline KPIs */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+        <DxKpi label="Active patients" value={(d?.patients?.total ?? 0).toLocaleString()} icon={Users} tone="accent" sub={`${d?.patients?.new_this_month ?? 0} new this month`} onClick={() => navigate(routes.patients)} />
+        <DxKpi label="Visits today" value={(d?.visits?.total_today ?? 0).toLocaleString()} icon={Stethoscope} tone="info" sub={`${d?.visits?.in_progress ?? 0} in progress · ${d?.visits?.completed_today ?? 0} done`} onClick={() => navigate(routes.visits)} />
+        <DxKpi label="Collected (MTD)" value={formatNaira(d?.billing?.collected_this_month ?? 0)} icon={CreditCard} tone="success" sub={`${formatNaira(d?.billing?.billed_this_month ?? 0)} billed`} onClick={() => navigate(routes.billing)} />
+        <DxKpi label="Outstanding" value={formatNaira(d?.billing?.outstanding_total ?? 0)} icon={Wallet} tone="warning" sub={`${d?.billing?.unpaid_invoice_count ?? 0} unpaid invoices`} onClick={() => navigate(routes.billing)} />
+        <DxKpi label="Bed occupancy" value={`${occupied}/${totalBeds}`} icon={BedDouble} tone={utilisation >= 90 ? "danger" : utilisation >= 70 ? "warning" : "success"} sub={`${utilisation}% utilisation`} onClick={() => navigate(routes.beds)} />
+        <DxKpi label="Admitted" value={(d?.inpatient?.admitted ?? 0).toLocaleString()} icon={HeartPulse} tone="accent" sub={`${d?.inpatient?.discharged_today ?? 0} discharged today`} onClick={() => navigate(routes.admissions)} />
+        <DxKpi label="Care backlog" value={backlog.toLocaleString()} icon={FlaskConical} tone={backlog > 0 ? "warning" : "neutral"} sub="lab · pharmacy pending" />
+        <DxKpi label="Inventory alerts" value={inventoryAlerts.toLocaleString()} icon={Package} tone={inventoryAlerts > 0 ? "danger" : "neutral"} sub={`${d?.inventory_alerts?.low_stock_count ?? 0} low · ${d?.inventory_alerts?.expiring_soon_count ?? 0} expiring`} onClick={() => navigate(routes.inventory)} />
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => (
-          <MetricCard
-            key={stat.label}
-            label={stat.label}
-            value={stat.value}
-            icon={stat.icon}
-            tone={stat.tone}
-            isLoading={isLoading}
-          />
-        ))}
-        <Link
-          to={routes.patientMessages}
-          className="rounded-3xl transition-transform hover:-translate-y-0.5"
-          title="View patient messages"
+      {/* Today's operations + activity stream */}
+      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+        <div className="xl:col-span-2">
+          <DxPanel title="Today's operations" icon={<Activity />} description="Live counts for registrations, visits and appointments today.">
+            <div style={{ height: 300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={todayChartData} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
+                  <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" tick={axisTick} axisLine={false} tickLine={false} dy={6} />
+                  <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} width={32} />
+                  <Tooltip cursor={chart.cursor} contentStyle={chart.tooltip} />
+                  <Bar dataKey="count" name="Count" fill={chart.series[0]} radius={[6, 6, 0, 0]} barSize={44} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </DxPanel>
+        </div>
+
+        <DxPanel
+          title="Recent activity"
+          icon={<Clock />}
+          description="Latest registrations, visits and payments."
+          flush
+          actions={<DxButton size="sm" onClick={() => navigate(routes.reports)}>View all</DxButton>}
         >
-          <MetricCard
-            label="Patient Messages"
-            value={unreadMessages.toLocaleString()}
-            icon={MessageSquare}
-            tone="amber"
-            isLoading={messagesLoading}
-          />
-        </Link>
-      </div>
-
-      {/* Charts & Activity Section */}
-      <div className="grid gap-8 lg:grid-cols-12">
-        <div className="lg:col-span-8 space-y-8">
-          <div className="glass-card rounded-[2rem] p-8 md:p-10">
-            <div className="flex items-center justify-between mb-10">
-              <div>
-                <h3 className="text-xl font-bold">Today's Operations</h3>
-                <p className="text-sm text-secondary-500">Live counts for registrations, visits and appointments today</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: chart.series[0] }} />
-                <span className="text-xs font-bold text-secondary-600">Count</span>
-              </div>
-            </div>
-            <div className="h-[350px] w-full">
-              {isLoading ? (
-                <div className="h-full w-full rounded-2xl bg-secondary-100/30 animate-pulse" />
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={todayChartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
-                    <XAxis
-                      dataKey="name"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={chart.tick}
-                      dy={10}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={chart.tick}
-                      allowDecimals={false}
-                    />
-                    <Tooltip
-                      cursor={chart.cursor}
-                      contentStyle={chart.tooltip}
-                    />
-                    <Bar
-                      dataKey="count"
-                      fill={chart.series[0]}
-                      radius={[8, 8, 0, 0]}
-                      barSize={40}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="lg:col-span-4 space-y-8">
-          <div className="glass-card rounded-[2rem] p-8 md:p-10 flex flex-col h-full">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xl font-bold">Recent Stream</h3>
-            </div>
-            <div className="space-y-6 flex-1 overflow-y-auto pr-2 scrollbar-hide">
-              {activities.length === 0 && !isLoading ? (
-                <p className="text-sm font-medium text-secondary-400">No recent activity.</p>
-              ) : (
-                activities.map((activity, index) => {
-                  const { title, detail } = activityLabel(activity);
-                  const Icon =
-                    activity.type === "patient_registered"
-                      ? UserPlus
-                      : activity.type === "payment_received"
-                        ? Banknote
-                        : activity.type === "visit_started"
-                          ? Activity
-                          : Clock;
-                  return (
-                    <div key={`${activity.type}-${activity.occurred_at}-${index}`} className="flex gap-4 group cursor-pointer">
-                      <div className="h-10 w-10 shrink-0 rounded-xl bg-secondary-50 flex items-center justify-center text-secondary-500 group-hover:bg-primary-50 group-hover:text-primary-600 transition-all dark:bg-white/5 dark:group-hover:bg-primary-500/10 dark:group-hover:text-primary-400">
-                        <Icon className="h-5 w-5" />
+          <div className="max-h-[300px] space-y-1 overflow-y-auto p-2">
+            {activities.length === 0 ? (
+              <p className="py-10 text-center text-[12.5px] text-[var(--dx-text-muted)]">No recent activity.</p>
+            ) : (
+              activities.map((a, i) => {
+                const { title, detail, icon: Icon } = activityMeta(a);
+                return (
+                  <div key={`${a.type}-${a.occurred_at}-${i}`} className="flex items-start gap-3 rounded-md px-2.5 py-2 hover:bg-[var(--dx-surface-alt)]">
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-[13px] font-semibold text-[var(--dx-text)]">{title}</p>
+                        <span className="shrink-0 text-[10.5px] text-[var(--dx-text-muted)]">
+                          {a.occurred_at ? new Date(a.occurred_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                        </span>
                       </div>
-                      <div className="flex-1 min-w-0 border-b border-secondary-400 pb-4 dark:border-white/10">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <p className="text-sm font-bold text-secondary-900 truncate">{title}</p>
-                          <span className="text-[10px] font-bold text-secondary-400 whitespace-nowrap">
-                            {activity.occurred_at
-                              ? new Date(activity.occurred_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                              : ""}
-                          </span>
-                        </div>
-                        <p className="text-xs text-secondary-500 line-clamp-1">{detail}</p>
-                      </div>
+                      <p className="truncate text-[11.5px] text-[var(--dx-text-muted)]">{detail}</p>
                     </div>
-                  );
-                })
-              )}
-            </div>
-            <button className="btn-secondary w-full mt-8 py-2.5">
-              Generate Report
-            </button>
+                  </div>
+                );
+              })
+            )}
           </div>
-        </div>
+        </DxPanel>
       </div>
-    </section>
+
+      {/* Backlog + appointments + bed utilisation */}
+      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+        <DxPanel title="Care backlog" icon={<Pill />} description="Pending lab orders, prescriptions and dispenses.">
+          <div style={{ height: 240 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={backlogData} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
+                <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={axisTick} axisLine={false} tickLine={false} dy={6} />
+                <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} width={32} />
+                <Tooltip cursor={chart.cursor} contentStyle={chart.tooltip} />
+                <Bar dataKey="count" name="Pending" radius={[6, 6, 0, 0]} barSize={46}>
+                  {backlogData.map((_e, i) => (
+                    <Cell key={i} fill={backlogColors[i]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </DxPanel>
+
+        <DxPanel title="Appointments today" icon={<CalendarCheck />} description="Status split for today's appointments.">
+          <div style={{ height: 240 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={apptData} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
+                <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={axisTick} axisLine={false} tickLine={false} dy={6} />
+                <YAxis tick={axisTick} axisLine={false} tickLine={false} allowDecimals={false} width={32} />
+                <Tooltip cursor={chart.cursor} contentStyle={chart.tooltip} />
+                <Bar dataKey="count" name="Appointments" radius={[6, 6, 0, 0]} barSize={46}>
+                  {apptData.map((_e, i) => (
+                    <Cell key={i} fill={apptColors[i]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </DxPanel>
+
+        <DxPanel title="Inpatient & beds" icon={<BedDouble />} description="Ward occupancy at a glance." flush>
+          <div className="space-y-3 p-3">
+            <div className="rounded-md bg-[var(--dx-surface-sunken)] px-3 py-2.5">
+              <div className="flex items-center justify-between text-[12.5px]">
+                <span className="text-[var(--dx-text-muted)]">Bed utilisation</span>
+                <span className="dx-mono font-bold text-[var(--dx-text)]">{utilisation}%</span>
+              </div>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--dx-border)]">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.min(100, utilisation)}%`,
+                    backgroundColor: utilisation >= 90 ? "var(--dx-danger)" : utilisation >= 70 ? "var(--dx-warning)" : "var(--dx-success)",
+                  }}
+                />
+              </div>
+              <div className="mt-1.5 text-[11.5px] text-[var(--dx-text-muted)]">{occupied} of {totalBeds} beds occupied</div>
+            </div>
+            <div className="flex items-center justify-between rounded-md border border-[var(--dx-border)] px-3 py-2">
+              <span className="inline-flex items-center gap-2 text-[12.5px] text-[var(--dx-text-muted)]"><HeartPulse className="h-3.5 w-3.5" /> Currently admitted</span>
+              <span className="text-[13px] font-semibold text-[var(--dx-text)]">{d?.inpatient?.admitted ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-md border border-[var(--dx-border)] px-3 py-2">
+              <span className="inline-flex items-center gap-2 text-[12.5px] text-[var(--dx-text-muted)]"><UserPlus className="h-3.5 w-3.5" /> Discharged today</span>
+              <span className="text-[13px] font-semibold text-[var(--dx-text)]">{d?.inpatient?.discharged_today ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-md border border-[var(--dx-border)] px-3 py-2">
+              <span className="inline-flex items-center gap-2 text-[12.5px] text-[var(--dx-text-muted)]"><MessageSquare className="h-3.5 w-3.5" /> Patient messages</span>
+              <DxBadge tone={unreadMessages > 0 ? "warning" : "neutral"}>{messagesLoading ? "…" : `${unreadMessages} unread`}</DxBadge>
+            </div>
+            <DxButton className="w-full justify-center" onClick={() => navigate(routes.beds)}>
+              <BedDouble /> Manage beds
+            </DxButton>
+          </div>
+        </DxPanel>
+      </div>
+    </DxPage>
   );
 }

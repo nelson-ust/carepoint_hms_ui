@@ -1,19 +1,21 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertCircle,
   Banknote,
   CreditCard,
   Eye,
   Plus,
-  RefreshCw,
+  RotateCcw,
   ScanLine,
   Search,
   ShieldCheck,
   Wallet,
 } from "lucide-react";
 import { format, isValid } from "date-fns";
-import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  DxPage, DxPageHeader, DxPanel, DxBadge, DxButton, DxInput, DxSelect, DxMessage,
+  type DxBadgeTone,
+} from "@/components/dx";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import {
   membershipApi,
@@ -22,6 +24,8 @@ import {
   type MembershipCard,
 } from "../api/membership.api";
 import { IssueCardModal } from "../components/IssueCardModal";
+import { useNavigate } from "react-router-dom";
+import { routes } from "@/config/routes";
 import { CardDetailModal } from "../components/CardDetailModal";
 import { FundingRequestsModal } from "../components/FundingRequestsModal";
 import { VerifyCardModal } from "../components/VerifyCardModal";
@@ -34,15 +38,15 @@ function safeDate(v?: string | null): string {
   return isValid(d) ? format(d, "MMM d, yyyy") : "—";
 }
 
-function statusClasses(status: string): string {
+function statusTone(status: string): DxBadgeTone {
   switch (status) {
     case "ACTIVE":
-      return "bg-emerald-50 text-emerald-600 border-emerald-100";
+      return "success";
     case "SUSPENDED":
     case "INACTIVE":
-      return "bg-amber-50 text-amber-600 border-amber-100";
+      return "warning";
     default:
-      return "bg-rose-50 text-rose-600 border-rose-100";
+      return "danger";
   }
 }
 
@@ -52,6 +56,7 @@ export function MembershipCardsPage() {
   const [showIssue, setShowIssue] = useState(false);
   const [showFundingRequests, setShowFundingRequests] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
+  const navigate = useNavigate();
   const [detailCard, setDetailCard] = useState<MembershipCard | null>(null);
 
   const pendingFundingQuery = useQuery({
@@ -86,192 +91,111 @@ export function MembershipCardsPage() {
   };
 
   return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-        <PageHeader
-          title="Membership Cards"
-          description="Issue and manage prepaid patient identification & wallet cards."
-        />
-        <div className="flex gap-3">
-          <button
-            onClick={refresh}
-            className="btn-secondary rounded-2xl border-secondary-400 bg-white/80 p-4"
-          >
-            <RefreshCw className={`h-4 w-4 ${cardsQuery.isFetching ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={() => setShowVerify(true)}
-            className="btn-secondary gap-2 rounded-2xl border-secondary-400 bg-white/80 px-6 py-3"
-          >
-            <ScanLine className="h-5 w-5" />
-            <span className="font-bold">Scan &amp; Verify</span>
-          </button>
-          <button
-            onClick={() => setShowFundingRequests(true)}
-            className="btn-secondary relative gap-2 rounded-2xl border-secondary-400 bg-white/80 px-6 py-3"
-          >
-            <Banknote className="h-5 w-5" />
-            <span className="font-bold">Funding Requests</span>
-            {pendingFundingCount > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-black text-white shadow-lg">
-                {pendingFundingCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setShowIssue(true)}
-            className="btn-primary gap-3 px-8 py-3 shadow-xl shadow-primary-500/20"
-          >
-            <Plus className="h-5 w-5" />
-            <span className="font-bold">Issue New Card</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-10 lg:grid-cols-4">
-        {/* Summary */}
-        <div className="space-y-6 lg:col-span-1">
-          <div className="glass-card rounded-[2.5rem] border border-secondary-400/50 bg-white/40 p-8 shadow-premium">
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-900 text-white shadow-lg shadow-primary-900/20">
-              <ShieldCheck className="h-8 w-8" />
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Patients" }, { label: "Membership Cards" }]}
+        title="Membership Cards"
+        subtitle="Issue and manage prepaid patient identification & wallet cards."
+        actions={
+          <>
+            <DxButton icon title="Refresh" onClick={refresh} isLoading={cardsQuery.isFetching}><RotateCcw /></DxButton>
+            <DxButton leftIcon={<ScanLine className="h-4 w-4" />} onClick={() => setShowVerify(true)}>Scan &amp; verify</DxButton>
+            <div className="relative">
+              <DxButton leftIcon={<Banknote className="h-4 w-4" />} onClick={() => setShowFundingRequests(true)}>Funding requests</DxButton>
+              {pendingFundingCount > 0 ? (
+                <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white" style={{ background: "var(--dx-danger)" }}>
+                  {pendingFundingCount}
+                </span>
+              ) : null}
             </div>
-            <h4 className="mb-2 text-xl font-black text-secondary-900">Card Registry</h4>
-            <p className="mb-8 text-xs leading-relaxed text-secondary-500">
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setShowIssue(true)}>Issue new card</DxButton>
+          </>
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+        {/* Summary */}
+        <div className="lg:col-span-1">
+          <DxPanel title="Card Registry" icon={<ShieldCheck className="h-4 w-4" />}>
+            <p className="mb-5 text-[12px] leading-relaxed text-[var(--dx-text-muted)]">
               Prepaid wallet cards patients can fund and use across your service points.
             </p>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-secondary-700">Total Cards</span>
-                <span className="text-xl font-black text-secondary-900">
-                  {statsQuery.isLoading ? "…" : stats?.total ?? 0}
+            <div className="space-y-3">
+              {[
+                { label: "Total cards", value: statsQuery.isLoading ? "…" : stats?.total ?? 0, color: "var(--dx-text)" },
+                { label: "Active", value: statsQuery.isLoading ? "…" : stats?.active ?? 0, color: "var(--dx-success)" },
+                { label: "Suspended / expired", value: statsQuery.isLoading ? "…" : (stats?.suspended ?? 0) + (stats?.expired ?? 0), color: "var(--dx-danger)" },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] px-3 py-2">
+                  <span className="text-[13px] font-medium text-[var(--dx-text-muted)]">{row.label}</span>
+                  <span className="text-[18px] font-bold" style={{ color: row.color }}>{row.value}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between rounded-md border border-[var(--dx-accent)] bg-[var(--dx-accent-soft)] px-3 py-2.5">
+                <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--dx-text)]">
+                  <Wallet className="h-4 w-4 text-[var(--dx-accent)]" /> Wallet total
                 </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-secondary-700">Active</span>
-                <span className="text-xl font-black text-emerald-500">
-                  {statsQuery.isLoading ? "…" : stats?.active ?? 0}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-secondary-700">Suspended / Expired</span>
-                <span className="text-xl font-black text-rose-500">
-                  {statsQuery.isLoading ? "…" : (stats?.suspended ?? 0) + (stats?.expired ?? 0)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-t border-secondary-400/40 pt-4">
-                <span className="flex items-center gap-1.5 text-sm font-bold text-secondary-700">
-                  <Wallet className="h-4 w-4 text-primary-500" /> Wallet Total
-                </span>
-                <span className="text-lg font-black text-primary-600">
+                <span className="text-[15px] font-bold text-[var(--dx-accent)]">
                   {statsQuery.isLoading ? "…" : formatCardMoney(stats?.total_balance ?? 0)}
                 </span>
               </div>
             </div>
-          </div>
+          </DxPanel>
         </div>
 
         {/* Registry */}
-        <div className="space-y-6 lg:col-span-3">
+        <div className="space-y-4 lg:col-span-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="group relative w-full max-w-sm">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400 transition-colors group-focus-within:text-primary-500" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by card number or patient name..."
-                className="w-full rounded-2xl border border-secondary-400 bg-white/60 py-3 pl-12 pr-6 text-sm font-medium outline-none transition-all focus:border-primary-500"
-              />
+            <div className="w-full max-w-sm">
+              <DxInput leftIcon={<Search className="h-3.5 w-3.5" />} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by card number or patient name…" />
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-2xl border border-secondary-400 bg-white/80 px-4 py-3 text-xs font-bold uppercase tracking-widest text-secondary-700 outline-none focus:border-primary-500"
-            >
-              {STATUS_FILTERS.map((s) => (
-                <option key={s || "all"} value={s}>
-                  {s || "All statuses"}
-                </option>
-              ))}
-            </select>
+            <div className="w-full sm:w-52">
+              <DxSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status"
+                options={STATUS_FILTERS.map((s) => ({ value: s, label: s || "All statuses" }))} />
+            </div>
           </div>
 
-          {loadError && (
-            <div className="flex items-center justify-between gap-4 rounded-[2rem] border border-rose-100 bg-rose-50 p-6 text-rose-600">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="h-6 w-6" />
-                <p className="text-sm font-bold">{loadError}</p>
-              </div>
-              <button onClick={() => cardsQuery.refetch()} className="btn-secondary px-5 py-2 text-xs">
-                Retry
-              </button>
-            </div>
-          )}
+          {loadError ? (
+            <DxMessage tone="danger" action={<DxButton size="sm" onClick={() => cardsQuery.refetch()}>Retry</DxButton>}>{loadError}</DxMessage>
+          ) : null}
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {cardsQuery.isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-48 animate-pulse rounded-[2.5rem] bg-white/40" />
-              ))
+              Array.from({ length: 4 }).map((_, i) => <div key={i} className="dx-skeleton h-44 w-full" />)
             ) : cards.length === 0 && !loadError ? (
-              <div className="col-span-2 rounded-[3rem] border-2 border-dashed border-secondary-400 bg-white/20 py-32 text-center">
-                <CreditCard className="mx-auto mb-4 h-12 w-12 text-secondary-200" />
-                <h4 className="text-lg font-bold text-secondary-900">
-                  {search || statusFilter ? "No matching cards" : "No Cards Issued"}
-                </h4>
-                <p className="mt-2 text-sm text-secondary-400">
-                  {search || statusFilter
-                    ? "Try a different search or status filter."
-                    : "Start issuing identification cards to patients."}
-                </p>
-              </div>
+              <DxPanel className="col-span-full">
+                <div className="py-14 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]"><CreditCard className="h-8 w-8 text-[var(--dx-text-faint)]" /></div>
+                  <h4 className="text-[16px] font-bold text-[var(--dx-text)]">{search || statusFilter ? "No matching cards" : "No cards issued"}</h4>
+                  <p className="mx-auto mt-1 max-w-sm text-[13px] text-[var(--dx-text-muted)]">{search || statusFilter ? "Try a different search or status filter." : "Start issuing identification cards to patients."}</p>
+                  {!search && !statusFilter ? (
+                    <DxButton className="mx-auto mt-4" variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setShowIssue(true)}>Issue new card</DxButton>
+                  ) : null}
+                </div>
+              </DxPanel>
             ) : (
               cards.map((card) => (
-                <div
-                  key={card.id}
-                  className="glass-card group relative overflow-hidden rounded-[2.5rem] border border-secondary-400/50 bg-white/40 p-8 transition-all hover:bg-white/60"
-                >
-                  <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary-500/5 blur-xl" />
-                  <div className="mb-8 flex items-start justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary-900 text-white shadow-lg transition-transform group-hover:scale-110">
-                        <CreditCard className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <h4 className="data-mono text-sm font-black uppercase tracking-widest text-secondary-900">
-                          {card.card_number}
-                        </h4>
-                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-secondary-400">
-                          {card.patient_name || `Patient #${card.patient_id}`}
-                        </p>
+                <div key={card.id} className="flex flex-col rounded-lg border border-[var(--dx-border)] bg-[var(--dx-surface)] p-5 transition-colors hover:border-[var(--dx-border-strong)]">
+                  <div className="mb-5 flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]"><CreditCard className="h-5 w-5" /></div>
+                      <div className="min-w-0">
+                        <h4 className="dx-mono text-[13px] font-bold uppercase tracking-wider text-[var(--dx-text)]">{card.card_number}</h4>
+                        <p className="mt-0.5 truncate text-[11px] font-medium text-[var(--dx-text-muted)]">{card.patient_name || `Patient #${card.patient_id}`}</p>
                       </div>
                     </div>
-                    <span
-                      className={`rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${statusClasses(card.status)}`}
-                    >
-                      {card.status}
-                    </span>
+                    <DxBadge tone={statusTone(card.status)}>{card.status}</DxBadge>
                   </div>
-
-                  <div className="flex items-center justify-between border-t border-secondary-400/50 pt-6">
+                  <div className="mt-auto flex items-end justify-between gap-3 border-t border-[var(--dx-border)] pt-4">
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                        Wallet
-                      </span>
-                      <span className="text-sm font-black text-primary-600">{formatCardMoney(card.balance)}</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Wallet</span>
+                      <span className="text-[14px] font-bold text-[var(--dx-accent)]">{formatCardMoney(card.balance)}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                        Valid Thru
-                      </span>
-                      <span className="text-xs font-black text-secondary-900">{safeDate(card.expiry_date)}</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Valid thru</span>
+                      <span className="text-[12px] font-semibold text-[var(--dx-text)]">{safeDate(card.expiry_date)}</span>
                     </div>
-                    <button
-                      onClick={() => setDetailCard(card)}
-                      className="flex h-10 items-center gap-2 rounded-xl bg-secondary-900 px-4 text-xs font-bold text-white transition-all hover:bg-primary-600"
-                    >
-                      <Eye className="h-4 w-4" /> Manage
-                    </button>
+                    <div className="flex gap-2"><DxButton size="sm" variant="default" onClick={() => navigate(routes.cardUsageLog.replace(":cardId", String(card.id)))}>Usage log</DxButton><DxButton size="sm" leftIcon={<Eye className="h-3.5 w-3.5" />} onClick={() => setDetailCard(card)}>Manage</DxButton></div>
                   </div>
                 </div>
               ))
@@ -291,6 +215,6 @@ export function MembershipCardsPage() {
         }}
       />
       <VerifyCardModal isOpen={showVerify} onClose={() => setShowVerify(false)} />
-    </div>
+    </DxPage>
   );
 }

@@ -4,7 +4,7 @@ import { TenantRegistrationForm } from "../components/TenantRegistrationForm";
 import { routes } from "@/config/routes";
 import { useTheme } from "@/lib/theme/ThemeProvider";
 import { Sun, Moon } from "lucide-react";
-import logo from "@/assets/logo.jpeg";
+import { Logo } from "@/components/branding/Logo";
 
 export function TenantRegisterPage() {
   const { theme, toggleTheme } = useTheme();
@@ -15,16 +15,8 @@ export function TenantRegisterPage() {
       {/* Top bar */}
       <header className="sticky top-0 z-30 backdrop-blur-xl bg-white/70 dark:bg-secondary-950/70 border-b border-secondary-400 dark:border-white/50">
         <div className="max-w-6xl mx-auto px-6 lg:px-8 h-20 flex items-center justify-between">
-          <Link to={routes.home} className="flex items-center gap-3 group">
-            <div className="h-11 w-11 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-primary-500/10 ring-4 ring-white/5 group-hover:scale-105 transition-transform overflow-hidden p-1">
-              <img src={logo} alt="Carepoint Logo" className="h-full w-full object-contain" />
-            </div>
-            <div className="hidden sm:block text-left">
-              <p className="text-base font-black tracking-tight">Carepoint</p>
-              <p className="text-[9px] uppercase tracking-[0.25em] font-bold text-primary-600 dark:text-primary-400">
-                HMS Suite
-              </p>
-            </div>
+          <Link to={routes.home} className="group">
+            <Logo variant="inline" size={40} />
           </Link>
 
           <div className="flex items-center gap-2">
@@ -80,7 +72,7 @@ export function TenantRegisterPage() {
         {/* Three-step preview */}
         <div className="grid gap-4 md:grid-cols-5 mx-auto mb-12">
           {[
-            { n: 1, t: "Identity", d: "Hospital name & code" },
+            { n: 1, t: "Identity", d: "Name, code & facility type" },
             { n: 2, t: "Billing", d: "Contact & address" },
             { n: 3, t: "Admin", d: "First user account" },
             { n: 4, t: "Deployment", d: "Hosting approach" },

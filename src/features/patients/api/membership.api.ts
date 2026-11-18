@@ -22,13 +22,19 @@ export type MembershipCard = {
 export type MembershipCardTransaction = {
   id: number;
   membership_card_id: number;
+  patient_id?: number;
   amount: string | number;
   transaction_type: string;
   payment_source?: string | null;
+  payment_reference?: string | null;
   balance_before: string | number;
   balance_after: string | number;
   transaction_date: string;
   narration?: string | null;
+  /** For debits: the service(s) the money paid for. */
+  purpose?: string | null;
+  invoice_id?: number | null;
+  visit_id?: number | null;
 };
 
 export type MembershipCardDetail = MembershipCard & {
@@ -99,6 +105,19 @@ export const membershipApi = {
     apiClient
       .post(`/membership-cards/${id}/fund`, payload, { params: { facility_id: facilityId } })
       .then((res) => res.data),
+
+  /** Download a card usage statement PDF (optionally for a date range). */
+  downloadStatement: async (id: number, params?: { date_from?: string; date_to?: string }) => {
+    const res = await apiClient.get(`/membership-cards/${id}/statement`, { responseType: "blob", params });
+    const url = URL.createObjectURL(res.data as Blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `card-statement-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  },
 
   /** Fetch the printable card PDF (auth-protected) as an object URL. */
   cardPdfObjectUrl: (id: number) =>

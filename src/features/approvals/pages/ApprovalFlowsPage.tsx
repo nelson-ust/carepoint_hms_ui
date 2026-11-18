@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { GitBranch, Plus, Trash2, Settings as SettingsIcon, Star, Layers, Upload, ChevronDown } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxBadge,
+  DxButton,
+  DxSelect,
+  DxSkeleton,
+} from "@/components/dx";
 import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -58,6 +60,19 @@ const BULK_CONFIG: Record<BulkEntity, {
   },
 };
 
+function FlowsEmpty({ icon: Icon, title, description, action }: {
+  icon: any; title: string; description: string; action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+      <Icon className="h-10 w-10 text-[var(--dx-text-faint)]" aria-hidden />
+      <p className="text-sm font-semibold text-[var(--dx-text)]">{title}</p>
+      <p className="max-w-sm text-xs text-[var(--dx-text-muted)]">{description}</p>
+      {action}
+    </div>
+  );
+}
+
 export function ApprovalFlowsPage() {
   const toast = useToast();
   const types = useRequestTypes();
@@ -92,33 +107,41 @@ export function ApprovalFlowsPage() {
   const typeFlows = flows.data ?? [];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
-      <PageHeader title="Approval Flows" description="Define, per request type, the ordered steps and approvers a request must pass through." />
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Approvals" }, { label: "Flows & Types" }]}
+        title="Approval Flows"
+        subtitle="Define, per request type, the ordered steps and approvers a request must pass through."
+      />
       <ApprovalTabs />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="w-72">
-          <Select label="Request type" value={selectedType} onChange={(e) => setSelectedType(e.target.value)}
+          <DxSelect
+            label="Request type"
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.target.value)}
             options={(types.data ?? []).length === 0
               ? [{ value: "", label: "No request types yet" }]
-              : (types.data ?? []).map((t) => ({ value: t.code, label: `${t.name} (${t.code})` }))} />
+              : (types.data ?? []).map((t) => ({ value: t.code, label: `${t.name} (${t.code})` }))}
+          />
         </div>
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Button variant="secondary" leftIcon={<Upload className="h-4 w-4" />} rightIcon={<ChevronDown className="h-4 w-4" />} onClick={() => setBulkMenuOpen((o) => !o)}>
+            <DxButton variant="default" leftIcon={<Upload className="h-4 w-4" />} rightIcon={<ChevronDown className="h-4 w-4" />} onClick={() => setBulkMenuOpen((o) => !o)}>
               Bulk Upload
-            </Button>
+            </DxButton>
             {bulkMenuOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setBulkMenuOpen(false)} />
-                <div className="absolute right-0 z-20 mt-2 w-56 rounded-2xl border border-secondary-100 bg-white p-2 shadow-xl">
+                <div className="absolute right-0 z-20 mt-2 w-56 rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface)] p-1.5 shadow-xl">
                   {(Object.keys(BULK_CONFIG) as BulkEntity[]).map((key) => (
                     <button
                       key={key}
                       onClick={() => { setBulkEntity(key); setBulkMenuOpen(false); }}
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-secondary-700 hover:bg-primary-50/60"
+                      className="flex w-full items-center gap-2 rounded px-3 py-2.5 text-left text-sm font-semibold text-[var(--dx-text)] hover:bg-[var(--dx-surface-alt)]"
                     >
-                      <Upload className="h-4 w-4 text-primary-500" />
+                      <Upload className="h-4 w-4 text-[var(--dx-accent)]" />
                       {BULK_CONFIG[key].label}
                     </button>
                   ))}
@@ -126,59 +149,65 @@ export function ApprovalFlowsPage() {
               </>
             )}
           </div>
-          <Button variant="secondary" leftIcon={<Layers className="h-4 w-4" />} onClick={() => setTypeModalOpen(true)}>
+          <DxButton variant="default" leftIcon={<Layers className="h-4 w-4" />} onClick={() => setTypeModalOpen(true)}>
             New Request Type
-          </Button>
-          <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setEditing(null); setModalOpen(true); }} disabled={!selectedType}>
+          </DxButton>
+          <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setEditing(null); setModalOpen(true); }} disabled={!selectedType}>
             New Flow
-          </Button>
+          </DxButton>
         </div>
       </div>
 
       {(types.data ?? []).length === 0 && !types.isLoading && (
-        <Card>
-          <EmptyState
+        <DxPanel>
+          <FlowsEmpty
             icon={Layers}
             title="No request types found"
             description="Create a request type (e.g. PAYROLL_RUN) to start defining its approval flow."
-            action={<Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setTypeModalOpen(true)}>New Request Type</Button>}
+            action={<DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setTypeModalOpen(true)}>New Request Type</DxButton>}
           />
-        </Card>
+        </DxPanel>
       )}
 
       {flows.isLoading ? (
-        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}</div>
-      ) : typeFlows.length === 0 ? (
-        <Card><EmptyState icon={GitBranch} title="No flows for this type" description="Create a flow so requests of this type can be routed for approval." /></Card>
+        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <DxSkeleton key={i} className="h-28 w-full" />)}</div>
+      ) : typeFlows.length === 0 && (types.data ?? []).length > 0 ? (
+        <DxPanel>
+          <FlowsEmpty icon={GitBranch} title="No flows for this type" description="Create a flow so requests of this type can be routed for approval." />
+        </DxPanel>
       ) : (
         <div className="space-y-4">
           {typeFlows.map((f) => (
-            <Card key={f.id} variant="panel" className="p-6">
+            <DxPanel key={f.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-black text-secondary-900">{f.name}</h3>
-                    {f.is_default && <Badge variant="soft-success"><Star className="h-3 w-3" /> Default</Badge>}
-                    {!f.is_active && <Badge variant="secondary">Inactive</Badge>}
+                    <h3 className="text-lg font-bold text-[var(--dx-text)]">{f.name}</h3>
+                    {f.is_default && <DxBadge tone="success"><Star className="h-3 w-3" /> Default</DxBadge>}
+                    {!f.is_active && <DxBadge tone="neutral">Inactive</DxBadge>}
                   </div>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-secondary-400 mt-1">{f.code}</p>
+                  <p className="dx-mono mt-1 text-[11px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">{f.code}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => { setEditing(f); setModalOpen(true); }} className="p-2 rounded-xl hover:bg-secondary-100" title="Edit"><SettingsIcon className="h-5 w-5 text-secondary-400" /></button>
-                  <button onClick={() => setDeleteTarget(f)} className="p-2 rounded-xl hover:bg-rose-50" title="Delete"><Trash2 className="h-5 w-5 text-rose-400" /></button>
+                <div className="flex items-center gap-1">
+                  <DxButton icon size="sm" variant="text" title="Edit" onClick={() => { setEditing(f); setModalOpen(true); }}>
+                    <SettingsIcon />
+                  </DxButton>
+                  <DxButton icon size="sm" variant="outline-danger" title="Delete" onClick={() => setDeleteTarget(f)}>
+                    <Trash2 />
+                  </DxButton>
                 </div>
               </div>
               <ol className="mt-4 flex flex-wrap gap-2">
                 {f.steps.map((s) => (
-                  <li key={s.step_order} className="flex items-center gap-2 rounded-full bg-secondary-50 px-3 py-1 text-[11px] font-semibold text-secondary-600">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary-900 text-white text-[9px] font-black">{s.step_order}</span>
+                  <li key={s.step_order} className="flex items-center gap-2 rounded-full border border-[var(--dx-border)] bg-[var(--dx-surface-alt)] px-3 py-1 text-[11px] font-semibold text-[var(--dx-text)]">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--dx-accent)] text-[9px] font-bold text-white">{s.step_order}</span>
                     {s.name}
-                    <span className="text-secondary-400">· {s.approver_kind}{s.dynamic_token ? `:${s.dynamic_token}` : ""}</span>
+                    <span className="text-[var(--dx-text-muted)]">· {s.approver_kind}{s.dynamic_token ? `:${s.dynamic_token}` : ""}</span>
                   </li>
                 ))}
-                {f.steps.length === 0 && <li className="text-xs text-secondary-400">No steps.</li>}
+                {f.steps.length === 0 && <li className="text-xs text-[var(--dx-text-muted)]">No steps.</li>}
               </ol>
-            </Card>
+            </DxPanel>
           ))}
         </div>
       )}
@@ -216,6 +245,6 @@ export function ApprovalFlowsPage() {
         confirmLabel="Delete"
         tone="danger"
       />
-    </div>
+    </DxPage>
   );
 }

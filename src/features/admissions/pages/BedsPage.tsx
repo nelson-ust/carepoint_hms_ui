@@ -1,14 +1,16 @@
-import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  DxPage, DxPageHeader, DxPanel, DxKpi, DxBadge, DxButton, DxPopup,
+  DxInput, DxSelect, DxMessage,
+  type DxBadgeTone,
+} from "@/components/dx";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  AlertCircle,
   Bed as BedIcon,
   CheckCircle2,
   ClipboardList,
   Edit3,
   Eye,
-  Filter,
   Hash,
   Hospital,
   ListChecks,
@@ -17,12 +19,10 @@ import {
   Save,
   Search,
   Settings2,
-  ShieldAlert,
   Sparkles,
   Trash2,
   Users,
   Wrench,
-  X,
 } from "lucide-react";
 import {
   BED_STATUSES,
@@ -59,15 +59,6 @@ const emptyForm: BedForm = {
   notes: "",
 };
 
-const statusStyles: Record<string, string> = {
-  AVAILABLE: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  OCCUPIED: "bg-rose-50 text-rose-600 border-rose-100",
-  RESERVED: "bg-amber-50 text-amber-600 border-amber-100",
-  OUT_OF_SERVICE: "bg-secondary-100 text-secondary-500 border-secondary-200",
-  MAINTENANCE: "bg-secondary-100 text-secondary-500 border-secondary-200",
-  CLEANING: "bg-primary-50 text-primary-600 border-primary-100",
-};
-
 const statusIcons: Record<string, typeof BedIcon> = {
   AVAILABLE: CheckCircle2,
   OCCUPIED: Users,
@@ -75,17 +66,6 @@ const statusIcons: Record<string, typeof BedIcon> = {
   OUT_OF_SERVICE: Settings2,
   MAINTENANCE: Wrench,
   CLEANING: Settings2,
-};
-
-const typeStyles: Record<string, string> = {
-  STANDARD: "bg-secondary-100 text-secondary-600 border-secondary-200",
-  SEMI_PRIVATE: "bg-primary-50 text-primary-600 border-primary-100",
-  PRIVATE: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  ICU: "bg-rose-50 text-rose-600 border-rose-100",
-  BASSINETTE: "bg-fuchsia-50 text-fuchsia-600 border-fuchsia-100",
-  PEDIATRIC: "bg-amber-50 text-amber-600 border-amber-100",
-  ISOLATION: "bg-rose-50 text-rose-600 border-rose-100",
-  OTHER: "bg-secondary-100 text-secondary-600 border-secondary-200",
 };
 
 export function BedsPage() {
@@ -317,122 +297,46 @@ export function BedsPage() {
   };
 
   return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader
-          title="Beds"
-          description="Configure individual beds within each ward and monitor their real-time status."
-        />
-        <div className="flex items-center gap-3">
-          <Link
-            to="/wards"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
-          >
-            <Hospital className="h-4 w-4" />
-            <span className="text-sm font-bold">Wards</span>
-          </Link>
-          <Link
-            to="/admissions"
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
-          >
-            <ClipboardList className="h-4 w-4" />
-            <span className="text-sm font-bold">Admissions</span>
-          </Link>
-          <button
-            onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={openCreate}
-            className="btn-primary gap-3 py-3 px-7 shadow-xl shadow-primary-500/20"
-          >
-            <Plus className="h-5 w-5" />
-            <span className="font-bold">New Bed</span>
-          </button>
-        </div>
-      </div>
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Beds" }]}
+        title="Beds"
+        subtitle="Configure individual beds within each ward and monitor their real-time status."
+        actions={
+          <>
+            <Link to="/wards" className="dx-btn"><Hospital /> Wards</Link>
+            <Link to="/admissions" className="dx-btn"><ClipboardList /> Admissions</Link>
+            <DxButton icon title="Refresh" onClick={load} isLoading={isLoading}><RefreshCw /></DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>New bed</DxButton>
+          </>
+        }
+      />
 
-      {feedback && (
-        <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
-              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-              : "bg-rose-50 text-rose-700 border-rose-100"
-            }`}
-        >
-          {feedback.tone === "success" ? (
-            <CheckCircle2 className="h-5 w-5" />
-          ) : (
-            <AlertCircle className="h-5 w-5" />
-          )}
-          <span className="text-sm font-bold">{feedback.message}</span>
-        </div>
-      )}
+      {feedback ? <DxMessage tone={feedback.tone === "success" ? "success" : "danger"}>{feedback.message}</DxMessage> : null}
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <StatCard icon={ListChecks} label="Total Beds" value={stats.total} tone="primary" />
-        <StatCard icon={CheckCircle2} label="Available" value={stats.available} tone="emerald" />
-        <StatCard icon={Users} label="Occupied" value={stats.occupied} tone="rose" />
-        <StatCard icon={Wrench} label="Offline" value={stats.offline} tone="amber" />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <DxKpi label="Total beds" value={stats.total} icon={ListChecks} tone="accent" />
+        <DxKpi label="Available" value={stats.available} icon={CheckCircle2} tone="success" />
+        <DxKpi label="Occupied" value={stats.occupied} icon={Users} tone="danger" />
+        <DxKpi label="Offline" value={stats.offline} icon={Wrench} tone="warning" />
       </div>
 
       {/* Filters */}
-      <div className="glass-card rounded-[2rem] p-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center bg-white/40 backdrop-blur-md">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-secondary-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by bed #, type, ward, notes..."
-            className="w-full bg-white/50 border-none rounded-2xl pl-14 pr-6 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
-          />
+      <div className="flex flex-col gap-3 md:flex-row md:items-end">
+        <div className="flex-1">
+          <DxInput leftIcon={<Search className="h-3.5 w-3.5" />} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by bed #, type, ward, notes…" />
         </div>
-        <div className="relative">
-          <Hospital className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-          <select
-            value={wardFilter}
-            onChange={(e) => setWardFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
-          >
-            <option value="">All Wards</option>
-            {wards.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name ?? `Ward #${w.id}`}
-              </option>
-            ))}
-          </select>
+        <div className="w-full md:w-44">
+          <DxSelect value={wardFilter} onChange={(e) => setWardFilter(e.target.value)} aria-label="Filter by ward"
+            options={[{ value: "", label: "All wards" }, ...wards.map((w) => ({ value: String(w.id), label: w.name ?? `Ward #${w.id}` }))]} />
         </div>
-        <div className="relative">
-          <Filter className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
-          >
-            <option value="">All Statuses</option>
-            {BED_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s.replace("_", " ")}
-              </option>
-            ))}
-          </select>
+        <div className="w-full md:w-44">
+          <DxSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status"
+            options={[{ value: "", label: "All statuses" }, ...BED_STATUSES.map((s) => ({ value: s, label: s.replace("_", " ") }))]} />
         </div>
-        <div className="relative">
-          <BedIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
-          >
-            <option value="">All Types</option>
-            {BED_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t.replace("_", " ")}
-              </option>
-            ))}
-          </select>
+        <div className="w-full md:w-44">
+          <DxSelect value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} aria-label="Filter by type"
+            options={[{ value: "", label: "All types" }, ...BED_TYPES.map((t) => ({ value: t, label: t.replace("_", " ") }))]} />
         </div>
       </div>
 
@@ -441,45 +345,29 @@ export function BedsPage() {
         <div className="space-y-6">
           {Array.from({ length: 2 }).map((_, i) => (
             <div key={i} className="space-y-3">
-              <div className="h-6 bg-secondary-100/60 rounded animate-pulse w-48" />
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {Array.from({ length: 6 }).map((_, j) => (
-                  <div
-                    key={j}
-                    className="rounded-2xl bg-secondary-100/30 h-32 animate-pulse"
-                  />
-                ))}
+              <div className="dx-skeleton h-6 w-48" />
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+                {Array.from({ length: 6 }).map((_, j) => <div key={j} className="dx-skeleton h-32 w-full" />)}
               </div>
             </div>
           ))}
         </div>
       ) : error ? (
-        <div className="glass-card rounded-[2.5rem] p-16 text-center max-w-md mx-auto">
-          <AlertCircle className="h-12 w-12 mx-auto text-rose-500/50 mb-4" />
-          <p className="text-secondary-600 font-bold mb-4">{error}</p>
-          <button onClick={load} className="btn-primary py-3 px-8">
-            Try Again
-          </button>
-        </div>
-      ) : groupedByWard.length === 0 ? (
-        <div className="glass-card rounded-[2.5rem] p-16 text-center max-w-md mx-auto">
-          <div className="h-20 w-20 bg-secondary-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
-            <BedIcon className="h-10 w-10 text-secondary-200" />
+        <DxPanel>
+          <div className="py-12 text-center">
+            <p className="mb-4 text-[13px] text-[var(--dx-danger)]">{error}</p>
+            <DxButton className="mx-auto" variant="primary" onClick={load}>Try again</DxButton>
           </div>
-          <h4 className="text-xl font-bold text-secondary-900">No Beds</h4>
-          <p className="text-sm text-secondary-500 mt-2">
-            {beds.length === 0
-              ? "Configure the first bed in a ward to get started."
-              : "No beds match your filters."}
-          </p>
-          <button
-            onClick={openCreate}
-            className="btn-primary mt-5 inline-flex items-center gap-2 px-8 py-3"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Bed</span>
-          </button>
-        </div>
+        </DxPanel>
+      ) : groupedByWard.length === 0 ? (
+        <DxPanel>
+          <div className="py-16 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]"><BedIcon className="h-8 w-8 text-[var(--dx-text-faint)]" /></div>
+            <h4 className="text-[17px] font-bold text-[var(--dx-text)]">No beds</h4>
+            <p className="mx-auto mt-1 max-w-sm text-[13px] text-[var(--dx-text-muted)]">{beds.length === 0 ? "Configure the first bed in a ward to get started." : "No beds match your filters."}</p>
+            <DxButton className="mx-auto mt-4" variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add bed</DxButton>
+          </div>
+        </DxPanel>
       ) : (
         <div className="space-y-8">
           {groupedByWard.map(([wardId, list]) => {
@@ -488,39 +376,19 @@ export function BedsPage() {
             const groupOccupied = list.filter((b) => b.bed_status === "OCCUPIED").length;
             return (
               <div key={wardId}>
-                <div className="flex items-center justify-between mb-4">
+                <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-md">
-                      <Hospital className="h-5 w-5" />
-                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--dx-accent)] text-white"><Hospital className="h-5 w-5" /></div>
                     <div>
-                      <h3 className="text-lg font-black text-secondary-900">
-                        {ward?.name ?? wardName(wardId)}
-                      </h3>
-                      <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest">
-                        {list.length} beds · {groupAvailable} available · {groupOccupied}{" "}
-                        occupied
-                      </p>
+                      <h3 className="text-[16px] font-bold text-[var(--dx-text)]">{ward?.name ?? wardName(wardId)}</h3>
+                      <p className="text-[11px] font-medium text-[var(--dx-text-muted)]">{list.length} beds · {groupAvailable} available · {groupOccupied} occupied</p>
                     </div>
                   </div>
-                  {ward && (
-                    <Link
-                      to={`/admissions?ward=${ward.id}`}
-                      className="text-[11px] font-bold uppercase tracking-widest text-primary-600 hover:text-primary-700"
-                    >
-                      View Admissions →
-                    </Link>
-                  )}
+                  {ward ? <Link to={`/admissions?ward=${ward.id}`} className="text-[11px] font-semibold uppercase tracking-wide text-[var(--dx-accent)] hover:underline">View admissions →</Link> : null}
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
                   {list.map((b) => (
-                    <BedTile
-                      key={b.id}
-                      bed={b}
-                      onView={() => setDetailBedId(b.id)}
-                      onEdit={() => openEdit(b)}
-                      onDelete={() => setConfirmDelete(b)}
-                    />
+                    <BedTile key={b.id} bed={b} onView={() => setDetailBedId(b.id)} onEdit={() => openEdit(b)} onDelete={() => setConfirmDelete(b)} />
                   ))}
                 </div>
               </div>
@@ -530,276 +398,162 @@ export function BedsPage() {
       )}
 
       {/* Create / Edit modal */}
-      {modal.open && (
-        <ModalShell
-          title={modal.editing ? "Edit Bed" : "New Bed"}
-          subtitle="Configure An Inpatient Bed"
-          onClose={closeModal}
-          icon={modal.editing ? Edit3 : Plus}
-        >
-          {saveError && (
-            <div className="mb-5 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-              <AlertCircle className="h-5 w-5" />
-              <span className="text-sm font-bold">{saveError}</span>
-            </div>
-          )}
-          <div className="space-y-5">
+      {modal.open ? (
+        <ModalShell title={modal.editing ? "Edit bed" : "New bed"} subtitle="Configure an inpatient bed" onClose={closeModal} icon={modal.editing ? Edit3 : Plus}>
+          {saveError ? <DxMessage tone="danger" className="mb-4">{saveError}</DxMessage> : null}
+          <div className="space-y-4">
             <FieldLabel label="Ward *">
-              <select
-                value={form.ward_id}
-                onChange={(e) => setForm({ ...form, ward_id: e.target.value })}
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-              >
-                <option value="">Pick a ward...</option>
-                {wards.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name ?? `Ward #${w.id}`}
-                  </option>
-                ))}
+              <select value={form.ward_id} onChange={(e) => setForm({ ...form, ward_id: e.target.value })} className="dx-editor w-full">
+                <option value="">Pick a ward…</option>
+                {wards.map((w) => (<option key={w.id} value={w.id}>{w.name ?? `Ward #${w.id}`}</option>))}
               </select>
             </FieldLabel>
-            <FieldLabel label="Bed Number *">
-              <input
-                type="text"
-                value={form.bed_no}
-                onChange={(e) => setForm({ ...form, bed_no: e.target.value })}
-                placeholder="e.g. BED-A-12"
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
-              />
+            <FieldLabel label="Bed number *">
+              <input type="text" value={form.bed_no} onChange={(e) => setForm({ ...form, bed_no: e.target.value })} placeholder="e.g. BED-A-12" className="dx-editor w-full dx-mono" />
             </FieldLabel>
-            <FieldLabel label="Bed Type">
+            <FieldLabel label="Bed type">
               <div className="grid grid-cols-3 gap-2">
-                {BED_TYPES.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setForm({ ...form, bed_type: t })}
-                    className={`p-2.5 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${form.bed_type === t
-                        ? "bg-primary-500 text-white border-primary-500 shadow-md"
-                        : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-300"
-                      }`}
-                  >
-                    {t.replace("_", " ")}
-                  </button>
-                ))}
+                {BED_TYPES.map((t) => {
+                  const active = form.bed_type === t;
+                  return (
+                    <button key={t} type="button" onClick={() => setForm({ ...form, bed_type: t })}
+                      className="rounded-md border px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide transition-colors"
+                      style={{ borderColor: active ? "var(--dx-accent)" : "var(--dx-border)", background: active ? "var(--dx-accent)" : "var(--dx-surface)", color: active ? "#fff" : "var(--dx-text-muted)" }}>
+                      {t.replace("_", " ")}
+                    </button>
+                  );
+                })}
               </div>
             </FieldLabel>
             <FieldLabel label="Status">
               <div className="grid grid-cols-3 gap-2">
                 {BED_STATUSES.map((s) => {
                   const Icon = statusIcons[s] ?? BedIcon;
-                  const isActive = form.bed_status === s;
+                  const active = form.bed_status === s;
                   return (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setForm({ ...form, bed_status: s })}
-                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${isActive
-                          ? "bg-slate-900 text-white border-slate-900 shadow-md"
-                          : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-300"
-                        }`}
-                    >
+                    <button key={s} type="button" onClick={() => setForm({ ...form, bed_status: s })}
+                      className="flex flex-col items-center gap-1 rounded-md border px-3 py-2.5 transition-colors"
+                      style={{ borderColor: active ? "var(--dx-accent)" : "var(--dx-border)", background: active ? "var(--dx-accent)" : "var(--dx-surface)", color: active ? "#fff" : "var(--dx-text-muted)" }}>
                       <Icon className="h-3.5 w-3.5" />
-                      <span className="text-[9px] font-bold uppercase tracking-widest">
-                        {s.replace("_", " ")}
-                      </span>
+                      <span className="text-[9px] font-semibold uppercase tracking-wide">{s.replace("_", " ")}</span>
                     </button>
                   );
                 })}
               </div>
             </FieldLabel>
             <FieldLabel label="Notes">
-              <textarea
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                placeholder="Equipment notes, restrictions, accessibility info..."
-                className="input-field h-24 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-              />
+              <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Equipment notes, restrictions, accessibility info…" className="dx-editor w-full" rows={3} />
             </FieldLabel>
           </div>
-          <div className="pt-6 flex gap-4">
-            <button
-              onClick={closeModal}
-              disabled={saving}
-              className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-[2] btn-primary py-4 rounded-2xl font-black tracking-tight shadow-xl shadow-primary-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? "Saving..." : modal.editing ? "Save Changes" : "Add Bed"}
-            </button>
+          <div className="mt-6 flex justify-end gap-2 border-t border-[var(--dx-border)] pt-4">
+            <DxButton onClick={closeModal} disabled={saving}>Cancel</DxButton>
+            <DxButton variant="primary" leftIcon={<Save className="h-4 w-4" />} isLoading={saving} onClick={handleSave}>{modal.editing ? "Save changes" : "Add bed"}</DxButton>
           </div>
         </ModalShell>
-      )}
+      ) : null}
 
       {/* Detail modal */}
-      {detailBedId != null && (
-        <ModalShell
-          title={detailSummary?.bed_no ?? "Bed Detail"}
-          subtitle="Status & Admission History"
-          onClose={() => setDetailBedId(null)}
-          icon={BedIcon}
-          tone="emerald"
-        >
+      {detailBedId != null ? (
+        <ModalShell title={detailSummary?.bed_no ?? "Bed detail"} subtitle="Status & admission history" onClose={() => setDetailBedId(null)} icon={BedIcon} tone="emerald">
           {loadingDetail ? (
-            <div className="space-y-3">
-              <div className="h-24 rounded-2xl bg-secondary-50 animate-pulse" />
-              <div className="h-32 rounded-2xl bg-secondary-50 animate-pulse" />
-            </div>
+            <div className="space-y-3"><div className="dx-skeleton h-24 w-full" /><div className="dx-skeleton h-32 w-full" /></div>
           ) : !detailSummary ? (
-            <div className="p-6 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 text-center">
-              <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-              <p className="text-sm font-bold">Detailed summary unavailable.</p>
-            </div>
+            <DxMessage tone="danger">Detailed summary unavailable.</DxMessage>
           ) : (
             <>
-              {/* Identity strip */}
-              <div className="p-5 rounded-2xl bg-secondary-50 border border-secondary-400 mb-5 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <Hash className="h-4 w-4 text-secondary-400" />
-                  <span className="font-mono font-bold text-sm text-secondary-700">
-                    {detailSummary.bed_no}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {detailSummary.bed_type && (
-                    <span
-                      className={`px-3 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest ${typeStyles[detailSummary.bed_type] ?? typeStyles.OTHER
-                        }`}
-                    >
-                      {detailSummary.bed_type.replace("_", " ")}
-                    </span>
-                  )}
-                  <span
-                    className={`px-3 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-widest ${statusStyles[detailSummary.bed_status] ?? statusStyles.AVAILABLE
-                      }`}
-                  >
-                    {detailSummary.bed_status.replace("_", " ")}
-                  </span>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] p-4">
+                <div className="flex items-center gap-3"><Hash className="h-4 w-4 text-[var(--dx-text-muted)]" /><span className="dx-mono text-[13px] font-semibold text-[var(--dx-text)]">{detailSummary.bed_no}</span></div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {detailSummary.bed_type ? <DxBadge tone={bedTypeTone(detailSummary.bed_type)}>{detailSummary.bed_type.replace("_", " ")}</DxBadge> : null}
+                  <DxBadge tone={bedStatusTone(detailSummary.bed_status)}>{detailSummary.bed_status.replace("_", " ")}</DxBadge>
                 </div>
               </div>
 
-              {detailSummary.ward && (
-                <div className="mb-5 p-4 rounded-2xl bg-primary-50/50 border border-primary-100 flex items-center gap-3">
-                  <Hospital className="h-5 w-5 text-primary-600" />
+              {detailSummary.ward ? (
+                <div className="mb-4 flex items-center gap-3 rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] p-3">
+                  <Hospital className="h-5 w-5 text-[var(--dx-accent)]" />
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-primary-600/80">
-                      Ward
-                    </p>
-                    <p className="text-sm font-black text-primary-900">
-                      {detailSummary.ward.name}
-                      {detailSummary.ward.code && (
-                        <span className="ml-2 text-[10px] font-mono font-bold opacity-60">
-                          {detailSummary.ward.code}
-                        </span>
-                      )}
-                    </p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Ward</p>
+                    <p className="text-[13px] font-semibold text-[var(--dx-text)]">{detailSummary.ward.name}{detailSummary.ward.code ? <span className="ml-2 dx-mono text-[11px] text-[var(--dx-text-muted)]">{detailSummary.ward.code}</span> : null}</p>
                   </div>
                 </div>
-              )}
+              ) : null}
 
-              {detailSummary.notes && (
-                <div className="mb-5 p-4 rounded-2xl bg-amber-50/50 border border-amber-100">
-                  <p className="text-xs text-secondary-700 leading-relaxed italic">
-                    {detailSummary.notes}
-                  </p>
-                </div>
-              )}
+              {detailSummary.notes ? (
+                <div className="mb-4 rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] p-3"><p className="text-[12px] italic leading-relaxed text-[var(--dx-text-muted)]">{detailSummary.notes}</p></div>
+              ) : null}
 
-              <div className="grid grid-cols-2 gap-3 mb-5">
-                <SummaryStat
-                  label="Total Admissions"
-                  value={detailSummary.admission_count}
-                  tone="primary"
-                  icon={ClipboardList}
-                />
-                <div
-                  className={`p-4 rounded-2xl border flex flex-col items-start ${detailSummary.has_active_admission
-                      ? "bg-rose-50 text-rose-600 border-rose-100"
-                      : "bg-emerald-50 text-emerald-600 border-emerald-100"
-                    }`}
-                >
-                  {detailSummary.has_active_admission ? (
-                    <Users className="h-4 w-4 mb-2" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 mb-2" />
-                  )}
-                  <p className="text-2xl font-black tracking-tight">
-                    {detailSummary.has_active_admission ? "Active" : "Free"}
-                  </p>
-                  <p className="text-[9px] font-bold uppercase tracking-widest opacity-80 mt-0.5">
-                    Current State
-                  </p>
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <SummaryStat label="Total admissions" value={detailSummary.admission_count} tone="info" icon={ClipboardList} />
+                <div className="flex flex-col items-start rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface)] p-3">
+                  {detailSummary.has_active_admission ? <Users className="mb-2 h-4 w-4 text-[var(--dx-danger)]" /> : <CheckCircle2 className="mb-2 h-4 w-4 text-[var(--dx-success)]" />}
+                  <p className="text-[18px] font-bold" style={{ color: detailSummary.has_active_admission ? "var(--dx-danger)" : "var(--dx-success)" }}>{detailSummary.has_active_admission ? "Active" : "Free"}</p>
+                  <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Current state</p>
                 </div>
               </div>
 
-              <div className="pt-4 flex gap-4">
-                <button
-                  onClick={() => {
-                    setDetailBedId(null);
-                    const bed = beds.find((x) => x.id === detailSummary.id);
-                    if (bed) openEdit(bed);
-                  }}
-                  className="flex-1 btn-primary py-3 rounded-2xl font-bold flex items-center justify-center gap-2"
-                >
-                  <Edit3 className="h-4 w-4" />
-                  Edit Bed
-                </button>
+              <div className="mt-2 flex">
+                <DxButton variant="primary" className="w-full justify-center" leftIcon={<Edit3 className="h-4 w-4" />} onClick={() => { setDetailBedId(null); const bed = beds.find((x) => x.id === detailSummary.id); if (bed) openEdit(bed); }}>Edit bed</DxButton>
               </div>
             </>
           )}
         </ModalShell>
-      )}
+      ) : null}
 
       {/* Delete confirm */}
-      {confirmDelete && (
-        <ModalShell
-          title="Delete Bed"
-          subtitle="This Cannot Be Undone"
-          onClose={() => !deleting && setConfirmDelete(null)}
-          icon={Trash2}
-          tone="rose"
-        >
-          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-100 flex items-start gap-3">
-            <ShieldAlert className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-rose-700 leading-relaxed">
-              Delete bed <strong>{confirmDelete.bed_no}</strong> in{" "}
-              <strong>{wardName(confirmDelete.ward_id)}</strong>? Historical admission
-              references to this bed will be preserved but the bed will no longer be
-              available for new admissions.
-            </p>
-          </div>
-          <div className="flex gap-4">
-            <button
-              onClick={() => setConfirmDelete(null)}
-              disabled={deleting}
-              className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="flex-[2] py-4 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-black tracking-tight shadow-xl shadow-rose-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
-            >
-              <Trash2 className="h-4 w-4" />
-              {deleting ? "Deleting..." : "Delete Bed"}
-            </button>
+      {confirmDelete ? (
+        <ModalShell title="Delete bed" subtitle="This cannot be undone" onClose={() => !deleting && setConfirmDelete(null)} icon={Trash2} tone="rose">
+          <DxMessage tone="danger" className="mb-4">
+            Delete bed <strong>{confirmDelete.bed_no}</strong> in <strong>{wardName(confirmDelete.ward_id)}</strong>? Historical admission references to this bed will be preserved but the bed will no longer be available for new admissions.
+          </DxMessage>
+          <div className="flex justify-end gap-2">
+            <DxButton onClick={() => setConfirmDelete(null)} disabled={deleting}>Cancel</DxButton>
+            <DxButton variant="danger" leftIcon={<Trash2 className="h-4 w-4" />} isLoading={deleting} onClick={handleDelete}>Delete bed</DxButton>
           </div>
         </ModalShell>
-      )}
-    </div>
+      ) : null}
+    </DxPage>
   );
 }
 
 // =====================================================================
 // Sub-components
 // =====================================================================
+
+type StatTone = "info" | "success" | "warning" | "danger";
+
+function bedStatusTone(status: string): DxBadgeTone {
+  switch ((status || "").toUpperCase()) {
+    case "AVAILABLE":
+      return "success";
+    case "OCCUPIED":
+      return "danger";
+    case "RESERVED":
+      return "warning";
+    case "CLEANING":
+      return "info";
+    default:
+      return "neutral";
+  }
+}
+
+function bedTypeTone(type: string): DxBadgeTone {
+  switch ((type || "").toUpperCase()) {
+    case "SEMI_PRIVATE":
+      return "info";
+    case "PRIVATE":
+      return "success";
+    case "ICU":
+    case "ISOLATION":
+      return "danger";
+    case "BASSINETTE":
+      return "accent";
+    case "PEDIATRIC":
+      return "warning";
+    default:
+      return "neutral";
+  }
+}
 
 function BedTile({
   bed,
@@ -813,141 +567,53 @@ function BedTile({
   onDelete: () => void;
 }) {
   const status = (bed.bed_status || "AVAILABLE").toUpperCase();
-  const statusClass = statusStyles[status] ?? statusStyles.AVAILABLE;
   const StatusIcon = statusIcons[status] ?? BedIcon;
-  const typeKey = (bed.bed_type || "STANDARD").toUpperCase();
+  const barColor =
+    status === "AVAILABLE" ? "var(--dx-success)" :
+    status === "OCCUPIED" ? "var(--dx-danger)" :
+    status === "RESERVED" ? "var(--dx-warning)" : "var(--dx-border-strong)";
 
   return (
-    <div className="group relative rounded-2xl bg-white border border-secondary-400 hover:border-primary-300 hover:shadow-xl hover:shadow-primary-500/5 transition-all p-4">
-      <div
-        className={`absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl ${status === "AVAILABLE"
-            ? "bg-emerald-500"
-            : status === "OCCUPIED"
-              ? "bg-rose-500"
-              : status === "RESERVED"
-                ? "bg-amber-500"
-                : "bg-secondary-300"
-          }`}
-      />
-      <div className="flex items-start justify-between mb-3 mt-1">
-        <div className="h-9 w-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-sm">
-          <BedIcon className="h-4 w-4" />
-        </div>
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={onView}
-            className="p-1 rounded-lg hover:bg-secondary-100 text-secondary-500"
-            title="View"
-          >
-            <Eye className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={onEdit}
-            className="p-1 rounded-lg hover:bg-secondary-100 text-secondary-500"
-            title="Edit"
-          >
-            <Edit3 className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={onDelete}
-            className="p-1 rounded-lg hover:bg-rose-50 text-rose-500"
-            title="Delete"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+    <div className="group relative rounded-lg border border-[var(--dx-border)] bg-[var(--dx-surface)] p-4 transition-colors hover:border-[var(--dx-border-strong)]">
+      <div className="absolute left-0 right-0 top-0 h-1.5 rounded-t-lg" style={{ background: barColor }} />
+      <div className="mb-3 mt-1 flex items-start justify-between">
+        <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--dx-accent)] text-white"><BedIcon className="h-4 w-4" /></div>
+        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <DxButton icon size="sm" variant="text" title="View" onClick={onView}><Eye /></DxButton>
+          <DxButton icon size="sm" variant="text" title="Edit" onClick={onEdit}><Edit3 /></DxButton>
+          <DxButton icon size="sm" variant="text" title="Delete" onClick={onDelete}><Trash2 /></DxButton>
         </div>
       </div>
-      <p className="text-sm font-black text-secondary-900 font-mono truncate">
-        {bed.bed_no}
-      </p>
-      <div className="mt-2 space-y-1.5">
-        <div
-          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-widest ${statusClass}`}
-        >
-          <StatusIcon className="h-2.5 w-2.5" />
-          {status.replace("_", " ")}
-        </div>
-        {bed.bed_type && (
-          <div
-            className={`inline-flex px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-widest ${typeStyles[typeKey] ?? typeStyles.OTHER
-              }`}
-          >
-            {bed.bed_type.replace("_", " ")}
-          </div>
-        )}
+      <p className="dx-mono truncate text-[13px] font-bold text-[var(--dx-text)]">{bed.bed_no}</p>
+      <div className="mt-2 flex flex-col items-start gap-1.5">
+        <DxBadge tone={bedStatusTone(status)}><StatusIcon className="mr-1 inline h-2.5 w-2.5" />{status.replace("_", " ")}</DxBadge>
+        {bed.bed_type ? <DxBadge tone={bedTypeTone(bed.bed_type)}>{bed.bed_type.replace("_", " ")}</DxBadge> : null}
       </div>
     </div>
   );
 }
 
-type StatTone = "primary" | "emerald" | "amber" | "rose";
-const statToneStyles: Record<StatTone, string> = {
-  primary: "bg-primary-50 text-primary-600 border-primary-100",
-  emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  amber: "bg-amber-50 text-amber-600 border-amber-100",
-  rose: "bg-rose-50 text-rose-600 border-rose-100",
+const statToneColor: Record<StatTone, string> = {
+  info: "var(--dx-info)",
+  success: "var(--dx-success)",
+  warning: "var(--dx-warning)",
+  danger: "var(--dx-danger)",
 };
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: typeof BedIcon;
-  label: string;
-  value: number;
-  tone: StatTone;
-}) {
+function SummaryStat({ label, value, tone, icon: Icon }: { label: string; value: number; tone: StatTone; icon: typeof BedIcon }) {
   return (
-    <div
-      className={`glass-card rounded-[2rem] p-6 border ${statToneStyles[tone]} bg-white/60 backdrop-blur-md`}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">{label}</span>
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="text-3xl font-black tracking-tight">{value}</div>
+    <div className="flex flex-col items-start rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface)] p-3">
+      <Icon className="mb-2 h-4 w-4" style={{ color: statToneColor[tone] }} />
+      <p className="text-[20px] font-bold text-[var(--dx-text)]">{value}</p>
+      <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">{label}</p>
     </div>
   );
 }
 
-function SummaryStat({
-  label,
-  value,
-  tone,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  tone: StatTone;
-  icon: typeof BedIcon;
-}) {
+function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div
-      className={`p-4 rounded-2xl border ${statToneStyles[tone]} flex flex-col items-start`}
-    >
-      <Icon className="h-4 w-4 mb-2" />
-      <p className="text-2xl font-black tracking-tight">{value}</p>
-      <p className="text-[9px] font-bold uppercase tracking-widest opacity-80 mt-0.5">
-        {label}
-      </p>
-    </div>
-  );
-}
-
-function FieldLabel({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-2">
-      <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-        {label}
-      </label>
+    <div className="dx-field">
+      <label className="dx-field-label">{label}</label>
       {children}
     </div>
   );
@@ -959,7 +625,6 @@ function ModalShell({
   onClose,
   children,
   icon: Icon,
-  tone = "primary",
 }: {
   title: string;
   subtitle: string;
@@ -968,36 +633,22 @@ function ModalShell({
   icon: typeof BedIcon;
   tone?: "primary" | "emerald" | "rose";
 }) {
-  const cls =
-    tone === "emerald"
-      ? "bg-emerald-500 shadow-emerald-500/20"
-      : tone === "rose"
-        ? "bg-rose-500 shadow-rose-500/20"
-        : "bg-primary-600 shadow-primary-500/20";
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] p-10 max-w-xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"
-        >
-          <X className="h-5 w-5 text-secondary-400" />
-        </button>
-        <div className="flex items-center gap-5 mb-8">
-          <div
-            className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${cls}`}
-          >
-            <Icon className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-black font-display tracking-tight">{title}</h3>
-            <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-              {subtitle}
-            </p>
-          </div>
-        </div>
-        {children}
-      </div>
-    </div>
+    <DxPopup
+      isOpen
+      onClose={onClose}
+      size="md"
+      title={
+        <span className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]"><Icon className="h-5 w-5" /></span>
+          <span className="flex flex-col">
+            <span className="text-[15px] font-bold text-[var(--dx-text)]">{title}</span>
+            <span className="text-[11px] font-normal text-[var(--dx-text-muted)]">{subtitle}</span>
+          </span>
+        </span>
+      }
+    >
+      {children}
+    </DxPopup>
   );
 }

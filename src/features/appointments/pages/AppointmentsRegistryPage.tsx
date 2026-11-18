@@ -7,26 +7,30 @@ import {
   CalendarClock,
   CalendarPlus,
   CalendarX,
-  ChevronLeft,
-  ChevronRight,
   CircleSlash,
   Clock,
   PlayCircle,
   MapPin,
-  RefreshCw,
+  RotateCcw,
   Search,
   Stethoscope,
   UserRound,
   X,
 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { MetricCard } from "@/components/charts/MetricCard";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxKpi,
+  DxBadge,
+  DxButton,
+  DxInput,
+  DxSelect,
+  DxGrid,
+  DxPager,
+  type DxGridColumn,
+  type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import {
@@ -56,22 +60,20 @@ function fmtTimeRange(start?: string | null, end?: string | null): string {
   return startStr;
 }
 
-function statusVariant(
-  status: string,
-): "soft-success" | "soft-warning" | "soft-danger" | "soft-info" | "secondary" {
+function statusTone(status: string): DxBadgeTone {
   switch (status) {
     case "COMPLETED":
-      return "soft-success";
+      return "success";
     case "SCHEDULED":
-      return "soft-info";
+      return "info";
     case "ARRIVED":
     case "IN_PROGRESS":
-      return "soft-warning";
+      return "warning";
     case "MISSED":
     case "CANCELLED":
-      return "soft-danger";
+      return "danger";
     default:
-      return "secondary";
+      return "neutral";
   }
 }
 
@@ -179,20 +181,20 @@ export function AppointmentsRegistryPage() {
     setPage(0);
   };
 
-  const columns: DataTableColumn<Appointment>[] = [
+  const columns: DxGridColumn<Appointment>[] = [
     {
       key: "when",
       header: "Date & time",
       render: (a) => (
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]">
             <CalendarClock className="h-4 w-4" />
           </div>
           <div>
-            <p className="text-sm font-bold text-secondary-900">
+            <p className="text-[13px] font-semibold text-[var(--dx-text)]">
               {fmtDateTime(a.scheduled_start_at).split(" • ")[0]}
             </p>
-            <p className="flex items-center gap-1 text-[11px] text-secondary-400">
+            <p className="flex items-center gap-1 text-[11px] text-[var(--dx-text-muted)]">
               <Clock className="h-3 w-3" />
               {fmtTimeRange(a.scheduled_start_at, a.scheduled_end_at)}
             </p>
@@ -203,20 +205,20 @@ export function AppointmentsRegistryPage() {
     {
       key: "code",
       header: "Ref",
-      render: (a) => <span className="data-mono text-[11px] text-secondary-500">{a.appointment_code}</span>,
+      render: (a) => <span className="dx-mono text-[11px] text-[var(--dx-text-muted)]">{a.appointment_code}</span>,
     },
     {
       key: "patient",
       header: "Patient",
       render: (a) => (
         <div className="flex items-center gap-2">
-          <UserRound className="h-4 w-4 shrink-0 text-secondary-400" />
+          <UserRound className="h-4 w-4 shrink-0 text-[var(--dx-text-faint)]" />
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-secondary-900">
+            <p className="truncate text-[13px] font-semibold text-[var(--dx-text)]">
               {a.patient_name || `Patient #${a.patient_id}`}
             </p>
             {a.patient_phone ? (
-              <p className="text-[11px] text-secondary-400">{a.patient_phone}</p>
+              <p className="text-[11px] text-[var(--dx-text-muted)]">{a.patient_phone}</p>
             ) : null}
           </div>
         </div>
@@ -226,8 +228,8 @@ export function AppointmentsRegistryPage() {
       key: "clinician",
       header: "Clinician",
       render: (a) => (
-        <span className="flex items-center gap-1.5 text-sm text-secondary-700">
-          <Stethoscope className="h-3.5 w-3.5 text-secondary-400" />
+        <span className="flex items-center gap-1.5 text-[13px] text-[var(--dx-text)]">
+          <Stethoscope className="h-3.5 w-3.5 text-[var(--dx-text-faint)]" />
           {a.staff_name || "Unassigned"}
         </span>
       ),
@@ -237,18 +239,18 @@ export function AppointmentsRegistryPage() {
       header: "Service point",
       render: (a) =>
         a.service_delivery_point_name ? (
-          <span className="flex items-center gap-1.5 text-xs text-secondary-600">
-            <MapPin className="h-3.5 w-3.5 text-secondary-400" />
+          <span className="flex items-center gap-1.5 text-[12px] text-[var(--dx-text-muted)]">
+            <MapPin className="h-3.5 w-3.5 text-[var(--dx-text-faint)]" />
             {a.service_delivery_point_name}
           </span>
         ) : (
-          <span className="text-xs text-secondary-400">—</span>
+          <span className="text-[12px] text-[var(--dx-text-faint)]">—</span>
         ),
     },
     {
       key: "status",
       header: "Status",
-      render: (a) => <Badge variant={statusVariant(a.status)}>{appointmentStatusLabel(a.status)}</Badge>,
+      render: (a) => <DxBadge tone={statusTone(a.status)} dot>{appointmentStatusLabel(a.status)}</DxBadge>,
     },
     {
       key: "actions",
@@ -257,24 +259,27 @@ export function AppointmentsRegistryPage() {
       render: (a) =>
         a.status === "SCHEDULED" || a.status === "ARRIVED" ? (
           <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
+            <DxButton
+              size="sm"
+              variant="primary"
               disabled={!canStartVisit(a) || checkInMut.isPending}
               title={
                 canStartVisit(a)
                   ? "Check in and start the visit"
                   : "A visit can only be started on the appointment date"
               }
+              leftIcon={<PlayCircle className="h-3.5 w-3.5" />}
               onClick={(e) => {
                 e.stopPropagation();
                 checkInMut.mutate(a.id);
               }}
-              className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-600 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <PlayCircle className="h-3.5 w-3.5" /> Start Visit
-            </button>
-            <button
-              type="button"
+              Start Visit
+            </DxButton>
+            <DxButton
+              size="sm"
+              variant="outline-danger"
+              leftIcon={<CircleSlash className="h-3.5 w-3.5" />}
               onClick={(e) => {
                 e.stopPropagation();
                 const reason = window.prompt("Reason for cancelling? (optional)") ?? undefined;
@@ -282,98 +287,95 @@ export function AppointmentsRegistryPage() {
                 if (reason === undefined) return;
                 cancelMut.mutate({ id: a.id, reason: reason || undefined });
               }}
-              className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-100"
             >
-              <CircleSlash className="h-3.5 w-3.5" /> Cancel
-            </button>
+              Cancel
+            </DxButton>
           </div>
         ) : null,
     },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Scheduling" }, { label: "Appointments" }]}
         title="Scheduled Appointments"
-        description="Browse every appointment booked across the hospital, with optional filters."
+        subtitle="Browse every appointment booked across the hospital, with optional filters."
         actions={
-          <div className="flex gap-3">
-            <Button
-              variant="ghost"
+          <>
+            <DxButton
               onClick={() => query.refetch()}
-              leftIcon={<RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />}
+              isLoading={query.isFetching}
+              leftIcon={<RotateCcw className="h-4 w-4" />}
             >
               Refresh
-            </Button>
-            <Button onClick={() => setShowBook(true)} leftIcon={<CalendarPlus className="h-4 w-4" />}>
-              Book Appointment
-            </Button>
-          </div>
+            </DxButton>
+            <DxButton
+              variant="primary"
+              onClick={() => setShowBook(true)}
+              leftIcon={<CalendarPlus className="h-4 w-4" />}
+            >
+              Book appointment
+            </DxButton>
+          </>
         }
       />
 
-      <div className="grid gap-6 sm:grid-cols-3">
-        <MetricCard label="Total (all filters)" value={total} icon={CalendarCheck} tone="primary" isLoading={query.isLoading} />
-        <MetricCard label="Scheduled (page)" value={counts.scheduled} icon={CalendarClock} tone="cyan" isLoading={query.isLoading} />
-        <MetricCard label="Cancelled / Missed (page)" value={counts.cancelledOrMissed} icon={CalendarX} tone="rose" isLoading={query.isLoading} />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <DxKpi label="Total (all filters)" value={total} icon={CalendarCheck} tone="accent" isLoading={query.isLoading} />
+        <DxKpi label="Scheduled (page)" value={counts.scheduled} icon={CalendarClock} tone="info" isLoading={query.isLoading} />
+        <DxKpi label="Cancelled / Missed (page)" value={counts.cancelledOrMissed} icon={CalendarX} tone="danger" isLoading={query.isLoading} />
       </div>
 
       {/* Filters */}
-      <Card className="p-5">
+      <DxPanel>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Select
+          <DxSelect
             label="Status"
             value={status}
             onChange={(e) => changeFilter(() => setStatus(e.target.value))}
             options={APPOINTMENT_STATUS_OPTIONS}
           />
-          <Input
+          <DxInput
             label="From date"
             type="date"
             value={fromDate}
             max={toDate || undefined}
             onChange={(e) => changeFilter(() => setFromDate(e.target.value))}
           />
-          <Input
+          <DxInput
             label="To date"
             type="date"
             value={toDate}
             min={fromDate || undefined}
             onChange={(e) => changeFilter(() => setToDate(e.target.value))}
           />
-          <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-secondary-500">
-              Search (this page)
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Patient, clinician, ref…"
-                className="w-full rounded-xl border border-secondary-300 bg-white/70 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-primary-500 dark:bg-white/5"
-              />
-            </div>
-          </div>
+          <DxInput
+            label="Search (this page)"
+            leftIcon={<Search className="h-3.5 w-3.5" />}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Patient, clinician, ref…"
+          />
         </div>
         {anyFilter ? (
           <div className="mt-4 flex justify-end">
-            <Button variant="ghost" size="sm" onClick={resetFilters} leftIcon={<X className="h-4 w-4" />}>
+            <DxButton variant="text" size="sm" onClick={resetFilters} leftIcon={<X className="h-4 w-4" />}>
               Clear filters
-            </Button>
+            </DxButton>
           </div>
         ) : null}
-      </Card>
+      </DxPanel>
 
-      <Card padding="none">
-        <DataTable
+      <DxPanel flush>
+        <DxGrid
           columns={columns}
           data={rows}
           rowKey={(a) => a.id}
           isLoading={query.isLoading}
           error={query.error ? apiErrorMessage(query.error, "Unable to load appointments.") : null}
           onRetry={() => query.refetch()}
+          borderless
           empty={{
             icon: CalendarClock,
             title: anyFilter ? "No matching appointments" : "No appointments yet",
@@ -385,32 +387,15 @@ export function AppointmentsRegistryPage() {
 
         {/* Pagination */}
         {total > PAGE_SIZE ? (
-          <div className="flex items-center justify-between border-t border-secondary-200 px-6 py-4 dark:border-white/10">
-            <p className="text-xs font-medium text-secondary-500">
-              Page {page + 1} of {totalPages} · {total} total
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page === 0 || query.isFetching}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                leftIcon={<ChevronLeft className="h-4 w-4" />}
-              >
-                Prev
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page + 1 >= totalPages || query.isFetching}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          <DxPager
+            page={page + 1}
+            totalPages={totalPages}
+            totalItems={total}
+            pageSize={PAGE_SIZE}
+            onPageChange={(p) => setPage(p - 1)}
+          />
         ) : null}
-      </Card>
+      </DxPanel>
 
       <BookAppointmentModal
         isOpen={showBook}
@@ -420,6 +405,6 @@ export function AppointmentsRegistryPage() {
           query.refetch();
         }}
       />
-    </div>
+    </DxPage>
   );
 }

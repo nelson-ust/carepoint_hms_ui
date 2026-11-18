@@ -13,14 +13,9 @@ import {
   Building2,
   Layers,
 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { MetricCard } from "@/components/charts/MetricCard";
+import {
+  DxPage, DxPageHeader, DxPanel, DxKpi, DxBadge, DxButton, DxSelect,
+} from "@/components/dx";
 import { cn } from "@/lib/utils/cn";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
@@ -222,9 +217,7 @@ export function RosterPage() {
       });
       toast.success(
         "Shifts ready",
-        res.count > 0
-          ? `${res.count} shift${res.count > 1 ? "s" : ""} created.`
-          : "Those shifts already exist for this scope.",
+        res.count > 0 ? `${res.count} shift${res.count > 1 ? "s" : ""} created.` : "Those shifts already exist for this scope.",
       );
     } catch (err) {
       toast.error("Quick setup failed", apiErrorMessage(err, "Please try again."));
@@ -251,239 +244,116 @@ export function RosterPage() {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "HR" }, { label: "Duty Roster" }]}
         title="Duty Roster"
-        description="Configure shifts per department or unit, then assign staff across the week."
+        subtitle="Configure shifts per department or unit, then assign staff across the week."
         actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                const d = new Date(weekStart);
-                d.setDate(d.getDate() - 7);
-                setWeekStart(d);
-              }}
-              leftIcon={<ChevronLeft className="h-4 w-4" />}
-            >
-              Prev
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setWeekStart(startOfWeek(new Date()))}>
-              This Week
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                const d = new Date(weekStart);
-                d.setDate(d.getDate() + 7);
-                setWeekStart(d);
-              }}
-              rightIcon={<ChevronRight className="h-4 w-4" />}
-            >
-              Next
-            </Button>
-          </div>
+          <>
+            <DxButton size="sm" onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }} leftIcon={<ChevronLeft className="h-4 w-4" />}>Prev</DxButton>
+            <DxButton size="sm" onClick={() => setWeekStart(startOfWeek(new Date()))}>This week</DxButton>
+            <DxButton size="sm" onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }} rightIcon={<ChevronRight className="h-4 w-4" />}>Next</DxButton>
+          </>
         }
       />
 
       {/* Scope selectors */}
-      <Card>
+      <DxPanel>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Select
-            label="Department"
-            value={departmentId ?? ""}
-            onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
-            placeholder={departmentsQuery.isLoading ? "Loading…" : "Select department"}
-          >
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </Select>
-          <Select
-            label="Unit (optional)"
-            value={sdpId ?? ""}
-            onChange={(e) => setSdpId(e.target.value ? Number(e.target.value) : null)}
-            disabled={!departmentId}
-          >
+          <DxSelect label="Department" value={departmentId ?? ""} onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)} placeholder={departmentsQuery.isLoading ? "Loading…" : "Select department"}>
+            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </DxSelect>
+          <DxSelect label="Unit (optional)" value={sdpId ?? ""} onChange={(e) => setSdpId(e.target.value ? Number(e.target.value) : null)} disabled={!departmentId}>
             <option value="">All units in department</option>
-            {unitsForDept.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </Select>
+            {unitsForDept.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </DxSelect>
           <div className="flex items-end">
-            <Badge variant="soft-info" className="gap-1.5 px-3 py-2">
-              <Building2 className="h-3.5 w-3.5" />
-              {scopeLabel}
-            </Badge>
+            <DxBadge tone="info"><Building2 className="mr-1.5 inline h-3.5 w-3.5" />{scopeLabel}</DxBadge>
           </div>
           <div className="flex items-end justify-end gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!departmentId}
-              leftIcon={<Plus className="h-4 w-4" />}
-              onClick={() => {
-                setEditingDef(null);
-                setDefModalOpen(true);
-              }}
-            >
-              Add shift
-            </Button>
+            <DxButton size="sm" disabled={!departmentId} leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setEditingDef(null); setDefModalOpen(true); }}>Add shift</DxButton>
           </div>
         </div>
-      </Card>
+      </DxPanel>
 
       {/* Metrics */}
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-        <MetricCard label="Staff Rostered" value={staffRostered} icon={Users} tone="primary" isLoading={isLoading} />
-        <MetricCard label="Shifts This Week" value={totalShifts} icon={CalendarRange} tone="cyan" isLoading={isLoading} />
-        <MetricCard label="Night / On-call" value={nightCount} icon={CalendarClock} tone="violet" isLoading={isLoading} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <DxKpi label="Staff Rostered" value={staffRostered} icon={Users} tone="accent" isLoading={isLoading} />
+        <DxKpi label="Shifts This Week" value={totalShifts} icon={CalendarRange} tone="info" isLoading={isLoading} />
+        <DxKpi label="Night / On-call" value={nightCount} icon={CalendarClock} tone="neutral" isLoading={isLoading} />
       </div>
 
       {/* Shift configuration */}
-      <Card>
-        <CardHeader
-          title="Shifts"
-          description="These are the shift blocks staff can be assigned to for this scope."
-          actions={
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={!departmentId}
-              leftIcon={<Plus className="h-4 w-4" />}
-              onClick={() => {
-                setEditingDef(null);
-                setDefModalOpen(true);
-              }}
-            >
-              Add shift
-            </Button>
-          }
-        />
+      <DxPanel
+        title="Shifts"
+        description="These are the shift blocks staff can be assigned to for this scope."
+        actions={<DxButton size="sm" variant="text" disabled={!departmentId} leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setEditingDef(null); setDefModalOpen(true); }}>Add shift</DxButton>}
+      >
         {!departmentId ? (
-          <EmptyState icon={Layers} title="Pick a department" description="Choose a department above to configure its shifts." />
-        ) : definitionsQuery.isLoading ? (
-          <div className="flex flex-wrap gap-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-40" />
-            ))}
+          <div className="py-10 text-center">
+            <Layers className="mx-auto mb-3 h-9 w-9 text-[var(--dx-text-faint)]" />
+            <p className="text-[14px] font-semibold text-[var(--dx-text)]">Pick a department</p>
+            <p className="mt-1 text-[13px] text-[var(--dx-text-muted)]">Choose a department above to configure its shifts.</p>
           </div>
+        ) : definitionsQuery.isLoading ? (
+          <div className="flex flex-wrap gap-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="dx-skeleton h-16 w-40" />)}</div>
         ) : definitions.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-secondary-200 p-8 text-center dark:border-white/10">
-            <Wand2 className="mx-auto mb-3 h-8 w-8 text-primary-500" />
-            <p className="text-base font-black text-secondary-900 dark:text-secondary-100">
-              Set up the shifts for this scope
-            </p>
-            <p className="mx-auto mt-1 max-w-md text-sm text-secondary-400">
-              Start with a standard rotation — you can edit the times and colours afterwards — or add your own.
-            </p>
+          <div className="rounded-md border border-dashed border-[var(--dx-border-strong)] p-8 text-center">
+            <Wand2 className="mx-auto mb-3 h-8 w-8 text-[var(--dx-accent)]" />
+            <p className="text-[16px] font-bold text-[var(--dx-text)]">Set up the shifts for this scope</p>
+            <p className="mx-auto mt-1 max-w-md text-[13px] text-[var(--dx-text-muted)]">Start with a standard rotation — you can edit the times and colours afterwards — or add your own.</p>
             <div className="mt-5 flex flex-wrap justify-center gap-3">
-              <Button onClick={() => runQuickSetup("TWO")} isLoading={quickSetupMut.isPending} leftIcon={<Wand2 className="h-4 w-4" />}>
-                Set up 2 shifts (Day / Night)
-              </Button>
-              <Button variant="secondary" onClick={() => runQuickSetup("THREE")} isLoading={quickSetupMut.isPending} leftIcon={<Wand2 className="h-4 w-4" />}>
-                Set up 3 shifts (Morning / Afternoon / Night)
-              </Button>
-              <Button
-                variant="ghost"
-                leftIcon={<Plus className="h-4 w-4" />}
-                onClick={() => {
-                  setEditingDef(null);
-                  setDefModalOpen(true);
-                }}
-              >
-                Custom shift
-              </Button>
+              <DxButton variant="primary" onClick={() => runQuickSetup("TWO")} isLoading={quickSetupMut.isPending} leftIcon={<Wand2 className="h-4 w-4" />}>Set up 2 shifts (Day / Night)</DxButton>
+              <DxButton onClick={() => runQuickSetup("THREE")} isLoading={quickSetupMut.isPending} leftIcon={<Wand2 className="h-4 w-4" />}>Set up 3 shifts (Morning / Afternoon / Night)</DxButton>
+              <DxButton variant="text" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setEditingDef(null); setDefModalOpen(true); }}>Custom shift</DxButton>
             </div>
           </div>
         ) : (
           <div className="flex flex-wrap gap-3">
             {definitions.map((def) => (
-              <div
-                key={def.id}
-                className="group relative flex items-center gap-3 rounded-2xl border border-secondary-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/5"
-              >
+              <div key={def.id} className="group relative flex items-center gap-3 rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface)] px-4 py-3">
                 <span className="h-9 w-1.5 rounded-full" style={{ backgroundColor: def.color_hex || "#94a3b8" }} />
                 <div className="pr-14">
-                  <p className="text-sm font-black text-secondary-900 dark:text-secondary-100">{def.name}</p>
-                  <p className="text-[11px] font-bold text-secondary-400">
-                    {def.code} · {fmtTime(def.start_time)}–{fmtTime(def.end_time)}
-                  </p>
+                  <p className="text-[14px] font-semibold text-[var(--dx-text)]">{def.name}</p>
+                  <p className="text-[11px] font-semibold text-[var(--dx-text-muted)]">{def.code} · {fmtTime(def.start_time)}–{fmtTime(def.end_time)}</p>
                 </div>
                 <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  <button
-                    className="rounded-lg p-1.5 text-secondary-400 hover:bg-secondary-100 hover:text-secondary-700 dark:hover:bg-white/10"
-                    title="Edit shift"
-                    onClick={() => {
-                      setEditingDef(def);
-                      setDefModalOpen(true);
-                    }}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    className="rounded-lg p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
-                    title="Delete shift"
-                    onClick={() => removeDefinition(def)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <DxButton icon size="sm" variant="text" title="Edit shift" onClick={() => { setEditingDef(def); setDefModalOpen(true); }}><Pencil /></DxButton>
+                  <DxButton icon size="sm" variant="outline-danger" title="Delete shift" onClick={() => removeDefinition(def)}><Trash2 /></DxButton>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </Card>
+      </DxPanel>
 
       {/* Weekly grid */}
-      <Card padding="none">
-        <CardHeader
-          className="px-6 pt-6"
-          title={`Week of ${fmtShort(weekDays[0])} — ${fmtShort(weekDays[6])}`}
-          description="Click any cell to assign, change or remove a shift."
-        />
+      <DxPanel title={`Week of ${fmtShort(weekDays[0])} — ${fmtShort(weekDays[6])}`} description="Click any cell to assign, change or remove a shift." flush>
         {!departmentId ? (
-          <div className="px-6 pb-8">
-            <EmptyState icon={CalendarRange} title="Select a department" description="Pick a department to build its weekly roster." />
+          <div className="px-4 py-10 text-center">
+            <CalendarRange className="mx-auto mb-3 h-9 w-9 text-[var(--dx-text-faint)]" />
+            <p className="text-[14px] font-semibold text-[var(--dx-text)]">Select a department</p>
+            <p className="mt-1 text-[13px] text-[var(--dx-text-muted)]">Pick a department to build its weekly roster.</p>
           </div>
         ) : isLoading ? (
-          <div className="space-y-3 px-6 pb-6">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full" />
-            ))}
-          </div>
+          <div className="space-y-3 px-4 py-4">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="dx-skeleton h-14 w-full" />)}</div>
         ) : deptStaff.length === 0 ? (
-          <div className="px-6 pb-8">
-            <EmptyState
-              icon={Users}
-              title="No staff in this department"
-              description="Assign staff to this department first, then they'll appear here to be rostered."
-            />
+          <div className="px-4 py-10 text-center">
+            <Users className="mx-auto mb-3 h-9 w-9 text-[var(--dx-text-faint)]" />
+            <p className="text-[14px] font-semibold text-[var(--dx-text)]">No staff in this department</p>
+            <p className="mt-1 text-[13px] text-[var(--dx-text-muted)]">Assign staff to this department first, then they'll appear here to be rostered.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto px-6 pb-6">
+          <div className="overflow-x-auto px-4 py-4">
             <table className="w-full min-w-[920px] border-separate border-spacing-1">
               <thead>
                 <tr>
-                  <th className="w-52 px-3 py-2 text-left text-[10px] font-black uppercase tracking-[0.15em] text-secondary-400">
-                    Staff
-                  </th>
+                  <th className="w-52 px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--dx-text-muted)]">Staff</th>
                   {weekDays.map((d, i) => (
-                    <th
-                      key={weekKeys[i]}
-                      className={cn(
-                        "px-2 py-2 text-center text-[10px] font-black uppercase tracking-[0.15em]",
-                        weekKeys[i] === todayKey ? "text-primary-500" : "text-secondary-400",
-                      )}
-                    >
+                    <th key={weekKeys[i]} className={cn("px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.15em]")} style={weekKeys[i] === todayKey ? { color: "var(--dx-accent)" } : { color: "var(--dx-text-muted)" }}>
                       {d.toLocaleDateString(undefined, { weekday: "short" })}
-                      <span className="mt-0.5 block data-mono text-[10px] font-bold">{fmtShort(d)}</span>
+                      <span className="dx-mono mt-0.5 block text-[10px] font-bold">{fmtShort(d)}</span>
                     </th>
                   ))}
                 </tr>
@@ -493,13 +363,9 @@ export function RosterPage() {
                   const days = assignmentIndex.get(s.id);
                   return (
                     <tr key={s.id}>
-                      <td className="rounded-xl bg-secondary-500/5 px-3 py-2 dark:bg-white/5">
-                        <p className="truncate text-sm font-bold text-secondary-900 dark:text-secondary-100">
-                          {nameMap.get(s.id) ?? `Staff #${s.id}`}
-                        </p>
-                        <p className="data-mono text-[10px] text-secondary-400">
-                          {s.designation || `SP-${s.id}`}
-                        </p>
+                      <td className="rounded-md bg-[var(--dx-surface-sunken)] px-3 py-2">
+                        <p className="truncate text-[13px] font-semibold text-[var(--dx-text)]">{nameMap.get(s.id) ?? `Staff #${s.id}`}</p>
+                        <p className="dx-mono text-[10px] text-[var(--dx-text-muted)]">{s.designation || `SP-${s.id}`}</p>
                       </td>
                       {weekKeys.map((key) => {
                         const a = days?.get(key);
@@ -510,23 +376,17 @@ export function RosterPage() {
                             {live && def ? (
                               <button
                                 onClick={() => openAssign(s.id, key)}
-                                className="w-full rounded-xl border px-2 py-1.5 text-center transition-all hover:brightness-95"
-                                style={{
-                                  backgroundColor: `${def.color_hex || "#64748b"}1a`,
-                                  borderColor: `${def.color_hex || "#64748b"}55`,
-                                  color: def.color_hex || "#475569",
-                                }}
+                                className="w-full rounded-md border px-2 py-1.5 text-center transition-all hover:brightness-95"
+                                style={{ backgroundColor: `${def.color_hex || "#64748b"}1a`, borderColor: `${def.color_hex || "#64748b"}55`, color: def.color_hex || "#475569" }}
                                 title={`${def.name} (${fmtTime(def.start_time)}–${fmtTime(def.end_time)})`}
                               >
-                                <p className="truncate text-[10px] font-black uppercase tracking-widest">{def.code}</p>
-                                <p className="data-mono text-[10px] font-bold">
-                                  {fmtTime(def.start_time)}–{fmtTime(def.end_time)}
-                                </p>
+                                <p className="truncate text-[10px] font-bold uppercase tracking-widest">{def.code}</p>
+                                <p className="dx-mono text-[10px] font-bold">{fmtTime(def.start_time)}–{fmtTime(def.end_time)}</p>
                               </button>
                             ) : (
                               <button
                                 onClick={() => openAssign(s.id, key)}
-                                className="group flex h-full min-h-[52px] w-full items-center justify-center rounded-xl border border-dashed border-secondary-200/70 text-secondary-300 transition-all hover:border-primary-400 hover:text-primary-500 dark:border-white/10"
+                                className="group flex h-full min-h-[52px] w-full items-center justify-center rounded-md border border-dashed border-[var(--dx-border)] text-[var(--dx-text-faint)] transition-colors hover:border-[var(--dx-accent)] hover:text-[var(--dx-accent)]"
                                 title="Assign a shift"
                               >
                                 <Plus className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
@@ -544,28 +404,21 @@ export function RosterPage() {
         )}
         {/* Legend */}
         {definitions.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-2 border-t border-secondary-100 px-6 py-4 dark:border-white/5">
+          <div className="flex flex-wrap items-center gap-2 border-t border-[var(--dx-border)] px-4 py-4">
             {definitions.map((def) => (
-              <Badge
-                key={def.id}
-                variant="outline"
-                style={{ borderColor: `${def.color_hex || "#94a3b8"}66`, color: def.color_hex || undefined }}
-              >
+              <span key={def.id} className="inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold" style={{ borderColor: `${def.color_hex || "#94a3b8"}66`, color: def.color_hex || undefined }}>
                 {def.code} · {fmtTime(def.start_time)}–{fmtTime(def.end_time)}
-              </Badge>
+              </span>
             ))}
           </div>
         ) : null}
-      </Card>
+      </DxPanel>
 
       {/* Modals */}
       {departmentId ? (
         <ShiftDefinitionModal
           isOpen={defModalOpen}
-          onClose={() => {
-            setDefModalOpen(false);
-            setEditingDef(null);
-          }}
+          onClose={() => { setDefModalOpen(false); setEditingDef(null); }}
           departmentId={departmentId}
           serviceDeliveryPointId={sdpId}
           scopeLabel={scopeLabel}
@@ -584,6 +437,6 @@ export function RosterPage() {
           existing={assignTarget.existing}
         />
       ) : null}
-    </div>
+    </DxPage>
   );
 }

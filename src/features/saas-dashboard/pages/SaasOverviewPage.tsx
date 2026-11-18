@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   ArrowUpRight,
   Zap,
+  ScrollText,
 } from "lucide-react";
 import {
   DxBadge,
@@ -105,9 +106,14 @@ export function SaasOverviewPage() {
         title="SaaS ecosystem overview"
         subtitle="Global performance, revenue growth, and tenant distribution analytics."
         actions={
-          <DxButton variant="primary" leftIcon={<Zap className="h-4 w-4" />} onClick={() => navigate(routes.connectivity)}>
-            System health
-          </DxButton>
+          <div className="flex items-center gap-2">
+            <DxButton variant="default" leftIcon={<ScrollText className="h-4 w-4" />} onClick={() => navigate(routes.saasAuditLogs)}>
+              Audit logs
+            </DxButton>
+            <DxButton variant="primary" leftIcon={<Zap className="h-4 w-4" />} onClick={() => navigate(routes.connectivity)}>
+              System health
+            </DxButton>
+          </div>
         }
       />
 

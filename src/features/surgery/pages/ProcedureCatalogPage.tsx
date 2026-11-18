@@ -1,24 +1,22 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ClipboardList, Plus, Trash2, Search, Droplet } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Textarea } from "@/components/ui/Textarea";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { ClipboardList, Plus, Trash2, Search, Droplet } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxPanel, DxGrid, DxBadge, DxButton, DxPopup, DxInput, DxTextarea, DxCheckbox,
+  type DxGridColumn,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import { routes } from "@/config/routes";
 import { useProcedures, surgeryKeys } from "../hooks/use-surgery";
 import { createProcedure, deleteProcedure } from "../api/surgery.api";
 
+type Procedure = {
+  id: number; code: string; name: string; cpt_code?: string | null;
+  typical_duration_minutes?: number | null; default_price?: number | string | null; requires_blood_products?: boolean;
+};
+
 export function ProcedureCatalogPage() {
-  const navigate = useNavigate();
   const toast = useToast();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -59,80 +57,62 @@ export function ProcedureCatalogPage() {
     catch (err) { toast.error("Couldn't remove", apiErrorMessage(err, "It may be in use.")); }
   };
 
-  const items = procedures.data?.items ?? [];
+  const items = (procedures.data?.items ?? []) as Procedure[];
+
+  const columns: DxGridColumn<Procedure>[] = [
+    { key: "code", header: "Code", render: (p) => <span className="dx-mono text-[12px] font-semibold text-[var(--dx-text-muted)]">{p.code}</span> },
+    { key: "name", header: "Name", render: (p) => <span className="text-[13px] font-semibold text-[var(--dx-text)]">{p.name}</span> },
+    { key: "cpt_code", header: "CPT", render: (p) => <span className="text-[13px] text-[var(--dx-text-muted)]">{p.cpt_code || "—"}</span> },
+    { key: "duration", header: "Duration", render: (p) => <span className="text-[13px] text-[var(--dx-text-muted)]">{p.typical_duration_minutes ? `${p.typical_duration_minutes} min` : "—"}</span> },
+    { key: "price", header: "Price", align: "right", render: (p) => <span className="dx-mono text-[13px] text-[var(--dx-text)]">{p.default_price != null ? Number(p.default_price).toLocaleString() : "—"}</span> },
+    { key: "blood", header: "Blood", align: "center", render: (p) => p.requires_blood_products ? <DxBadge tone="danger"><Droplet className="mr-1 inline h-3 w-3" />Yes</DxBadge> : <span className="text-[var(--dx-text-faint)]">—</span> },
+    { key: "actions", header: "", align: "right", render: (p) => <DxButton icon size="sm" variant="outline-danger" title="Delete" onClick={() => remove(p.id)}><Trash2 /></DxButton> },
+  ];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
-      <button onClick={() => navigate(routes.surgery)} className="flex items-center gap-2 text-sm font-bold text-secondary-500 hover:text-primary-600">
-        <ArrowLeft className="h-4 w-4" /> Back to worklist
-      </button>
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Surgery", to: routes.surgery }, { label: "Procedures" }]}
         title="Surgical Procedure Catalog"
-        description="The catalog of procedures that can be booked, with default pricing and instructions."
-        actions={<Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setOpen(true)}>New procedure</Button>}
+        subtitle="The catalog of procedures that can be booked, with default pricing and instructions."
+        actions={<DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setOpen(true)}>New procedure</DxButton>}
       />
-      <Card padding="none">
-        <div className="px-6 pt-6">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" />
-            <input className="input-field pl-10" placeholder="Search procedures…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-        </div>
-        <CardHeader className="px-6 pt-6" title="Procedures" />
-        {procedures.isLoading ? (
-          <div className="space-y-3 px-6 pb-6">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-        ) : items.length === 0 ? (
-          <div className="px-6 pb-8"><EmptyState icon={ClipboardList} title="No procedures" description="Add procedures to the catalog to start booking cases." /></div>
-        ) : (
-          <div className="overflow-x-auto px-6 pb-6">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr className="text-left text-[10px] font-black uppercase tracking-[0.15em] text-secondary-400">
-                  <th className="px-3 py-2">Code</th><th className="px-3 py-2">Name</th><th className="px-3 py-2">CPT</th>
-                  <th className="px-3 py-2">Duration</th><th className="px-3 py-2">Price</th><th className="px-3 py-2">Blood</th><th className="px-3 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((p) => (
-                  <tr key={p.id} className="border-t border-secondary-100 dark:border-white/5">
-                    <td className="px-3 py-3 font-mono text-xs font-bold text-secondary-500">{p.code}</td>
-                    <td className="px-3 py-3 font-black text-secondary-900 dark:text-secondary-100">{p.name}</td>
-                    <td className="px-3 py-3 text-secondary-500">{p.cpt_code || "—"}</td>
-                    <td className="px-3 py-3 text-secondary-500">{p.typical_duration_minutes ? `${p.typical_duration_minutes} min` : "—"}</td>
-                    <td className="px-3 py-3 text-secondary-500">{p.default_price != null ? Number(p.default_price).toLocaleString() : "—"}</td>
-                    <td className="px-3 py-3">{p.requires_blood_products ? <Badge variant="soft-danger"><Droplet className="h-3 w-3" /> Yes</Badge> : <span className="text-secondary-300">—</span>}</td>
-                    <td className="px-3 py-3 text-right"><button onClick={() => remove(p.id)} className="rounded-lg p-1.5 text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10" title="Delete"><Trash2 className="h-4 w-4" /></button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-      <Modal isOpen={open} onClose={() => setOpen(false)} title="New Surgical Procedure" size="lg"
-        footer={<div className="flex justify-end gap-3"><Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={create} isLoading={busy}>Create</Button></div>}>
+
+      <div className="max-w-sm">
+        <DxInput leftIcon={<Search className="h-3.5 w-3.5" />} placeholder="Search procedures…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+
+      <DxPanel title="Procedures" icon={<ClipboardList className="h-4 w-4" />} flush>
+        <DxGrid<Procedure>
+          columns={columns}
+          data={items}
+          rowKey={(p) => p.id}
+          isLoading={procedures.isLoading}
+          empty={{ icon: ClipboardList, title: "No procedures", description: "Add procedures to the catalog to start booking cases." }}
+        />
+      </DxPanel>
+
+      <DxPopup isOpen={open} onClose={() => setOpen(false)} title="New surgical procedure" size="lg" locked={busy}
+        footer={<><DxButton onClick={() => setOpen(false)} disabled={busy}>Cancel</DxButton><DxButton variant="primary" onClick={create} isLoading={busy}>Create</DxButton></>}>
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="APPEND" />
-            <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Appendectomy" />
+            <DxInput label="Code" mono value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="APPEND" />
+            <DxInput label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Appendectomy" />
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Input label="CPT code" value={form.cpt_code} onChange={(e) => setForm({ ...form, cpt_code: e.target.value })} />
-            <Input label="Duration (min)" type="number" value={form.typical_duration_minutes} onChange={(e) => setForm({ ...form, typical_duration_minutes: e.target.value })} />
-            <Input label="Default price" type="number" value={form.default_price} onChange={(e) => setForm({ ...form, default_price: e.target.value })} />
+            <DxInput label="CPT code" value={form.cpt_code} onChange={(e) => setForm({ ...form, cpt_code: e.target.value })} />
+            <DxInput label="Duration (min)" type="number" value={form.typical_duration_minutes} onChange={(e) => setForm({ ...form, typical_duration_minutes: e.target.value })} />
+            <DxInput label="Default price" type="number" value={form.default_price} onChange={(e) => setForm({ ...form, default_price: e.target.value })} />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-secondary-200 px-4 py-3 dark:border-white/10">
-              <input type="checkbox" className="h-5 w-5 rounded accent-rose-600" checked={form.requires_blood_products} onChange={(e) => setForm({ ...form, requires_blood_products: e.target.checked })} />
-              <span className="text-sm font-bold text-secondary-900 dark:text-secondary-100">Requires blood products</span>
-            </label>
-            <Input label="Avg blood loss (ml)" type="number" value={form.average_blood_loss_ml} onChange={(e) => setForm({ ...form, average_blood_loss_ml: e.target.value })} />
+            <div className="flex items-end pb-1"><DxCheckbox label="Requires blood products" checked={form.requires_blood_products} onChange={(e) => setForm({ ...form, requires_blood_products: e.target.checked })} /></div>
+            <DxInput label="Avg blood loss (ml)" type="number" value={form.average_blood_loss_ml} onChange={(e) => setForm({ ...form, average_blood_loss_ml: e.target.value })} />
           </div>
-          <Textarea label="Description" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <Textarea label="Pre-op instructions" rows={2} value={form.pre_op_instructions} onChange={(e) => setForm({ ...form, pre_op_instructions: e.target.value })} />
-          <Textarea label="Post-op instructions" rows={2} value={form.post_op_instructions} onChange={(e) => setForm({ ...form, post_op_instructions: e.target.value })} />
+          <DxTextarea label="Description" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <DxTextarea label="Pre-op instructions" rows={2} value={form.pre_op_instructions} onChange={(e) => setForm({ ...form, pre_op_instructions: e.target.value })} />
+          <DxTextarea label="Post-op instructions" rows={2} value={form.post_op_instructions} onChange={(e) => setForm({ ...form, post_op_instructions: e.target.value })} />
         </div>
-      </Modal>
-    </div>
+      </DxPopup>
+    </DxPage>
   );
 }

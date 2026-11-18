@@ -4,41 +4,41 @@ import { useNavigate } from "react-router-dom";
 import {
   Activity,
   AlertTriangle,
-  CalendarClock,
   Plus,
   Scissors,
-  Stethoscope,
   Building2,
   Boxes,
   ClipboardList,
 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { MetricCard } from "@/components/charts/MetricCard";
-import { cn } from "@/lib/utils/cn";
+import {
+  DxPage, DxPageHeader, DxKpi, DxGrid, DxBadge, DxButton, DxSelect, DxCheckbox,
+  type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { routes } from "@/config/routes";
 import { getPatients, type Patient } from "@/features/patients/api/patients.api";
 import { useSurgicalWorklist, useProcedures, useTheatres } from "../hooks/use-surgery";
 import { caseStatusLabel, fmtDateTime, type SurgicalCase } from "../api/surgery.api";
 import { BookCaseModal } from "../components/BookCaseModal";
 
-const STATUS_TINT: Record<string, string> = {
-  BOOKED: "soft-info",
-  CONFIRMED: "soft-info",
-  PRE_OP: "soft-warning",
-  IN_THEATRE: "soft-warning",
-  PROCEDURE_STARTED: "soft-warning",
-  PROCEDURE_ENDED: "soft-warning",
-  POST_OP: "soft-success",
-  COMPLETED: "soft-success",
-  CANCELLED: "soft-danger",
-  POSTPONED: "secondary",
-};
+function statusTone(status: string): DxBadgeTone {
+  switch (status) {
+    case "BOOKED":
+    case "CONFIRMED":
+      return "info";
+    case "PRE_OP":
+    case "IN_THEATRE":
+    case "PROCEDURE_STARTED":
+    case "PROCEDURE_ENDED":
+      return "warning";
+    case "POST_OP":
+    case "COMPLETED":
+      return "success";
+    case "CANCELLED":
+      return "danger";
+    default:
+      return "neutral";
+  }
+}
 
 const STATUS_FILTERS = [
   { value: "", label: "Open worklist" },
@@ -92,146 +92,75 @@ export function SurgeryWorklistPage() {
   const cases = worklist.data?.items ?? [];
 
   const metrics = useMemo(() => {
-    const active = cases.filter(
-      (c) => !["COMPLETED", "CANCELLED", "POSTPONED"].includes(String(c.status)),
-    );
-    const inTheatre = cases.filter((c) =>
-      ["IN_THEATRE", "PROCEDURE_STARTED", "PROCEDURE_ENDED"].includes(String(c.status)),
-    );
+    const active = cases.filter((c) => !["COMPLETED", "CANCELLED", "POSTPONED"].includes(String(c.status)));
+    const inTheatre = cases.filter((c) => ["IN_THEATRE", "PROCEDURE_STARTED", "PROCEDURE_ENDED"].includes(String(c.status)));
     const emergencies = active.filter((c) => c.is_emergency);
     return { active: active.length, inTheatre: inTheatre.length, emergencies: emergencies.length };
   }, [cases]);
 
   const openCase = (c: SurgicalCase) => navigate(routes.surgeryCase.replace(":caseId", String(c.id)));
 
+  const columns: DxGridColumn<SurgicalCase>[] = [
+    {
+      key: "case_no",
+      header: "Case",
+      render: (c) => (
+        <span className="flex items-center gap-2 text-[13px] font-semibold text-[var(--dx-text)]">
+          {c.case_no}
+          {c.is_emergency ? <DxBadge tone="danger">EMG</DxBadge> : null}
+        </span>
+      ),
+    },
+    { key: "patient", header: "Patient", render: (c) => <span className="text-[13px] text-[var(--dx-text)]">{patientMap.get(c.patient_id) ?? `Patient #${c.patient_id}`}</span> },
+    { key: "procedure", header: "Procedure", render: (c) => <span className="text-[13px] text-[var(--dx-text)]">{procedureMap.get(c.procedure_catalog_id) ?? `#${c.procedure_catalog_id}`}</span> },
+    { key: "theatre", header: "Theatre", render: (c) => <span className="text-[13px] text-[var(--dx-text-muted)]">{c.operating_theatre_id ? theatreMap.get(c.operating_theatre_id) ?? `#${c.operating_theatre_id}` : "—"}</span> },
+    { key: "scheduled", header: "Scheduled", render: (c) => <span className="text-[13px] text-[var(--dx-text-muted)]">{fmtDateTime(c.scheduled_start_at)}</span> },
+    { key: "status", header: "Status", align: "center", render: (c) => <DxBadge tone={statusTone(String(c.status))}>{caseStatusLabel(String(c.status))}</DxBadge> },
+  ];
+
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Surgery" }, { label: "Worklist" }]}
         title="Surgery Worklist"
-        description="Theatre schedule and live case tracking across the surgical lifecycle."
+        subtitle="Theatre schedule and live case tracking across the surgical lifecycle."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" size="sm" leftIcon={<Building2 className="h-4 w-4" />} onClick={() => navigate(routes.theatres)}>
-              Theatres
-            </Button>
-            <Button variant="secondary" size="sm" leftIcon={<ClipboardList className="h-4 w-4" />} onClick={() => navigate(routes.surgicalProcedures)}>
-              Catalog
-            </Button>
-            <Button variant="secondary" size="sm" leftIcon={<Boxes className="h-4 w-4" />} onClick={() => navigate(routes.instrumentSets)}>
-              Instruments
-            </Button>
-            <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setBookOpen(true)}>
-              Book Case
-            </Button>
-          </div>
+          <>
+            <DxButton leftIcon={<Building2 className="h-4 w-4" />} onClick={() => navigate(routes.theatres)}>Theatres</DxButton>
+            <DxButton leftIcon={<ClipboardList className="h-4 w-4" />} onClick={() => navigate(routes.surgicalProcedures)}>Catalog</DxButton>
+            <DxButton leftIcon={<Boxes className="h-4 w-4" />} onClick={() => navigate(routes.instrumentSets)}>Instruments</DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setBookOpen(true)}>Book case</DxButton>
+          </>
         }
       />
 
-      <div className="grid gap-6 sm:grid-cols-3">
-        <MetricCard label="Active Cases" value={metrics.active} icon={Activity} tone="primary" isLoading={worklist.isLoading} />
-        <MetricCard label="In Theatre" value={metrics.inTheatre} icon={Scissors} tone="cyan" isLoading={worklist.isLoading} />
-        <MetricCard label="Emergencies" value={metrics.emergencies} icon={AlertTriangle} tone="rose" isLoading={worklist.isLoading} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <DxKpi label="Active cases" value={metrics.active} icon={Activity} tone="accent" isLoading={worklist.isLoading} />
+        <DxKpi label="In theatre" value={metrics.inTheatre} icon={Scissors} tone="info" isLoading={worklist.isLoading} />
+        <DxKpi label="Emergencies" value={metrics.emergencies} icon={AlertTriangle} tone="danger" isLoading={worklist.isLoading} />
       </div>
 
-      <Card>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Select label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} options={STATUS_FILTERS} />
-          <Select label="Theatre" value={theatreFilter} onChange={(e) => setTheatreFilter(e.target.value)}>
-            <option value="">All theatres</option>
-            {(theatresQuery.data?.items ?? []).map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </Select>
-          <div className="flex items-end">
-            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-secondary-200 px-4 py-3 dark:border-white/10">
-              <input
-                type="checkbox"
-                className="h-5 w-5 rounded accent-rose-600"
-                checked={emergencyOnly}
-                onChange={(e) => setEmergencyOnly(e.target.checked)}
-              />
-              <span className="text-sm font-bold text-secondary-900 dark:text-secondary-100">Emergencies only</span>
-            </label>
-          </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <DxSelect label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} options={STATUS_FILTERS} />
+        <DxSelect label="Theatre" value={theatreFilter} onChange={(e) => setTheatreFilter(e.target.value)}
+          options={[{ value: "", label: "All theatres" }, ...(theatresQuery.data?.items ?? []).map((t) => ({ value: String(t.id), label: t.name }))]} />
+        <div className="flex items-end pb-1">
+          <DxCheckbox label="Emergencies only" checked={emergencyOnly} onChange={(e) => setEmergencyOnly(e.target.checked)} />
         </div>
-      </Card>
+      </div>
 
-      <Card padding="none">
-        <CardHeader className="px-6 pt-6" title="Cases" description="Click a case to open its theatre record." />
-        {worklist.isLoading ? (
-          <div className="space-y-3 px-6 pb-6">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full" />
-            ))}
-          </div>
-        ) : worklist.isError ? (
-          <div className="px-6 pb-8">
-            <EmptyState icon={Scissors} title="Couldn't load the worklist" description="The surgical worklist failed to load." action={<Button size="sm" variant="secondary" onClick={() => worklist.refetch()}>Retry</Button>} />
-          </div>
-        ) : cases.length === 0 ? (
-          <div className="px-6 pb-8">
-            <EmptyState icon={Scissors} title="No cases" description="No surgical cases match these filters. Book a case to get started." action={<Button size="sm" onClick={() => setBookOpen(true)} leftIcon={<Plus className="h-4 w-4" />}>Book Case</Button>} />
-          </div>
-        ) : (
-          <div className="overflow-x-auto px-6 pb-6">
-            <table className="w-full min-w-[860px] text-sm">
-              <thead>
-                <tr className="text-left text-[10px] font-black uppercase tracking-[0.15em] text-secondary-400">
-                  <th className="px-3 py-2">Case</th>
-                  <th className="px-3 py-2">Patient</th>
-                  <th className="px-3 py-2">Procedure</th>
-                  <th className="px-3 py-2">Theatre</th>
-                  <th className="px-3 py-2">Scheduled</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {cases.map((c) => (
-                  <tr
-                    key={c.id}
-                    onClick={() => openCase(c)}
-                    className="cursor-pointer border-t border-secondary-100 transition-colors hover:bg-secondary-50 dark:border-white/5 dark:hover:bg-white/5"
-                  >
-                    <td className="px-3 py-3">
-                      <span className="flex items-center gap-2 font-black text-secondary-900 dark:text-secondary-100">
-                        {c.case_no}
-                        {c.is_emergency && <Badge variant="soft-danger">EMG</Badge>}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-secondary-700 dark:text-secondary-300">
-                      {patientMap.get(c.patient_id) ?? `Patient #${c.patient_id}`}
-                    </td>
-                    <td className="px-3 py-3 text-secondary-700 dark:text-secondary-300">
-                      {procedureMap.get(c.procedure_catalog_id) ?? `#${c.procedure_catalog_id}`}
-                    </td>
-                    <td className="px-3 py-3 text-secondary-500">
-                      {c.operating_theatre_id ? theatreMap.get(c.operating_theatre_id) ?? `#${c.operating_theatre_id}` : "—"}
-                    </td>
-                    <td className="px-3 py-3 text-secondary-500">{fmtDateTime(c.scheduled_start_at)}</td>
-                    <td className="px-3 py-3">
-                      <Badge variant={(STATUS_TINT[String(c.status)] as any) ?? "secondary"}>
-                        {caseStatusLabel(String(c.status))}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <Stethoscope className={cn("ml-auto h-4 w-4 text-secondary-300")} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-
-      <BookCaseModal
-        isOpen={bookOpen}
-        onClose={() => setBookOpen(false)}
-        onBooked={(c) => openCase(c)}
+      <DxGrid<SurgicalCase>
+        columns={columns}
+        data={cases}
+        rowKey={(c) => c.id}
+        isLoading={worklist.isLoading}
+        error={worklist.isError ? "The surgical worklist failed to load." : null}
+        onRetry={() => worklist.refetch()}
+        onRowClick={openCase}
+        empty={{ icon: Scissors, title: "No cases", description: "No surgical cases match these filters. Book a case to get started." }}
       />
-    </div>
+
+      <BookCaseModal isOpen={bookOpen} onClose={() => setBookOpen(false)} onBooked={(c) => openCase(c)} />
+    </DxPage>
   );
 }

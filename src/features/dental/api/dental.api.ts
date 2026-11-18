@@ -24,6 +24,27 @@ export type DentalProcedure = {
   procedure_name: string; status: DentalProcedureStatus; cost?: string | null;
   planned_date?: string | null; performed_date?: string | null;
   performed_by?: string | null; note?: string | null; created_at?: string | null;
+  catalog_id?: number | null; billed_at?: string | null; is_billed?: boolean;
+};
+
+export type DentalCatalogItem = {
+  id: number; code?: string | null; name: string; category?: string | null;
+  default_cost?: string | null; tooth_specific: boolean;
+  billable_service_id?: number | null; is_active: boolean; description?: string | null;
+};
+
+export type DentalRecallStatus = "DUE" | "SCHEDULED" | "COMPLETED" | "CANCELLED";
+
+export type DentalRecall = {
+  id: number; patient_id: number; chart_id?: number | null;
+  recall_type?: string | null; due_date: string; interval_months?: number | null;
+  status: DentalRecallStatus; note?: string | null;
+  created_by?: string | null; created_by_staff_id?: number | null;
+  completed_at?: string | null; is_overdue?: boolean; patient: PatientBrief;
+};
+
+export type DentalBillResult = {
+  billed_count: number; billed_procedure_ids: number[]; billing: Record<string, unknown>;
 };
 
 export type DentalChart = {
@@ -40,6 +61,7 @@ export type DentalStats = {
   charts_total: number; charts_open: number; procedures_planned: number;
   procedures_completed: number; completed_revenue?: string | null;
   condition_distribution: { condition: string; count: number }[];
+  recalls_due?: number; procedures_unbilled?: number;
 };
 
 const g = <T,>(u: string, params?: Record<string, unknown>) =>
@@ -47,6 +69,7 @@ const g = <T,>(u: string, params?: Record<string, unknown>) =>
 const post = <T,>(u: string, body?: unknown) => apiClient.post<T>(u, body).then((r) => r.data);
 const patch = <T,>(u: string, body?: unknown) => apiClient.patch<T>(u, body).then((r) => r.data);
 const put = <T,>(u: string, body?: unknown) => apiClient.put<T>(u, body).then((r) => r.data);
+const del = <T,>(u: string) => apiClient.delete<T>(u).then((r) => r.data);
 
 export const dentalApi = {
   listCharts: (params?: { patient_id?: number; skip?: number; limit?: number }) =>
@@ -68,6 +91,31 @@ export const dentalApi = {
   worklist: (limit = 50) =>
     g<{ success: boolean; items: DentalChart[] }>("/dental/worklist", { limit }).then((d) => d.items),
   stats: () => g<{ success: boolean; data: DentalStats }>("/dental/stats").then((d) => d.data),
+
+  // ---- Procedure catalogue (price list) ----
+  listCatalog: (params?: { search?: string; category?: string; active_only?: boolean; skip?: number; limit?: number }) =>
+    g<PaginatedResponse<DentalCatalogItem>>("/dental/catalog", params),
+  createCatalog: (body: Record<string, unknown>) =>
+    post<{ success: boolean; data: DentalCatalogItem }>("/dental/catalog", body).then((d) => d.data),
+  updateCatalog: (id: number, body: Record<string, unknown>) =>
+    patch<{ success: boolean; data: DentalCatalogItem }>(`/dental/catalog/${id}`, body).then((d) => d.data),
+  deleteCatalog: (id: number) =>
+    del<{ success: boolean; message: string }>(`/dental/catalog/${id}`),
+
+  // ---- Recalls ----
+  listRecalls: (params?: { patient_id?: number; status?: string; due_before?: string; skip?: number; limit?: number }) =>
+    g<PaginatedResponse<DentalRecall>>("/dental/recalls", params),
+  createRecall: (body: Record<string, unknown>) =>
+    post<{ success: boolean; data: DentalRecall }>("/dental/recalls", body).then((d) => d.data),
+  updateRecall: (id: number, body: Record<string, unknown>) =>
+    patch<{ success: boolean; data: DentalRecall }>(`/dental/recalls/${id}`, body).then((d) => d.data),
+
+  // ---- Treatment-plan billing ----
+  billChart: (chartId: number, procedureIds?: number[]) =>
+    post<{ success: boolean; message: string; data: DentalBillResult }>(
+      `/dental/charts/${chartId}/bill`,
+      { procedure_ids: procedureIds ?? null },
+    ),
 };
 
 export const TOOTH_CONDITION_META: Record<DentalToothCondition, { label: string; color: string }> = {

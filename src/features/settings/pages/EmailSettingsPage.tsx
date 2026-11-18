@@ -1,21 +1,24 @@
-import { PageHeader } from "@/components/layout/PageHeader";
 import {
   Mail,
   Server,
   Shield,
   Settings as SettingsIcon,
-  RefreshCw,
+  RotateCcw,
   Plus,
-  Trash2,
-  CheckCircle2,
-  Send,
   MoreHorizontal,
-  ChevronRight,
   AlertCircle,
 } from "lucide-react";
-import { useEmailConfigs, useDeleteEmailConfig, useTestEmailConfig } from "../hooks/use-email-settings";
 import { useState } from "react";
-import { Modal } from "@/components/ui/Modal";
+import {
+  DxPage,
+  DxPageHeader,
+  DxPanel,
+  DxBadge,
+  DxButton,
+  DxPopup,
+  DxMessage,
+} from "@/components/dx";
+import { useEmailConfigs, useDeleteEmailConfig, useTestEmailConfig } from "../hooks/use-email-settings";
 import { CreateEmailConfigForm } from "../components/CreateEmailConfigForm";
 
 export function EmailSettingsPage() {
@@ -27,22 +30,19 @@ export function EmailSettingsPage() {
   const configs = data?.items || [];
 
   return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader
-          title="Email Configuration"
-          description="Configure SMTP servers and email providers for automated system notifications."
-        />
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="btn-primary gap-3 py-3 px-8 shadow-xl shadow-primary-500/20"
-        >
-          <Plus className="h-5 w-5" />
-          <span className="font-bold">Add Configuration</span>
-        </button>
-      </div>
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Settings" }, { label: "Email" }]}
+        title="Email Configuration"
+        subtitle="Configure SMTP servers and email providers for automated system notifications."
+        actions={
+          <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setIsModalOpen(true)}>
+            Add configuration
+          </DxButton>
+        }
+      />
 
-      <Modal
+      <DxPopup
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title="Add Email Provider"
@@ -55,105 +55,100 @@ export function EmailSettingsPage() {
           }}
           onCancel={() => setIsModalOpen(false)}
         />
-      </Modal>
+      </DxPopup>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* Info Card */}
-        <div className="lg:col-span-1 space-y-6">
-          <div className="glass-card rounded-[2.5rem] p-8 border border-secondary-400/50 bg-white/40">
-            <div className="h-12 w-12 rounded-2xl bg-secondary-900/5 flex items-center justify-center mb-6">
-              <SettingsIcon className="h-6 w-6 text-secondary-900" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Info cards */}
+        <div className="space-y-4 lg:col-span-1">
+          <DxPanel>
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--dx-surface-sunken)] text-[var(--dx-text)]">
+              <SettingsIcon className="h-6 w-6" />
             </div>
-            <h4 className="text-lg font-bold text-secondary-900 mb-2">Notification Hub</h4>
-            <p className="text-sm text-secondary-500 leading-relaxed">
+            <h4 className="text-[15px] font-bold text-[var(--dx-text)]">Notification Hub</h4>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--dx-text-muted)]">
               Settings configured here affect all outgoing emails including patient reminders,
               billing notifications, and staff invitations.
             </p>
-          </div>
+          </DxPanel>
 
-          <div className="glass-card rounded-[2.5rem] p-8 border border-primary-100 bg-primary-50/20">
-            <div className="flex items-start gap-4">
-              <Shield className="h-6 w-6 text-primary-500 shrink-0" />
-              <div>
-                <h4 className="text-sm font-bold text-secondary-900 mb-1">Security Hint</h4>
-                <p className="text-xs text-secondary-500 leading-relaxed">
-                  Always use TLS (Port 587 or 465) for secure transmissions.
-                  Plain SMTP (Port 25) is not recommended.
-                </p>
-              </div>
-            </div>
-          </div>
+          <DxMessage tone="info" title="Security Hint">
+            Always use TLS (Port 587 or 465) for secure transmissions. Plain SMTP (Port 25) is not
+            recommended.
+          </DxMessage>
         </div>
 
-        {/* Configurations List */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Configurations list */}
+        <div className="space-y-5 lg:col-span-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-secondary-900 flex items-center gap-2">
-              <Server className="h-5 w-5 text-primary-500" />
+            <h3 className="flex items-center gap-2 text-[15px] font-bold text-[var(--dx-text)]">
+              <Server className="h-5 w-5 text-[var(--dx-accent)]" />
               SMTP Providers
             </h3>
-            <button onClick={() => refetch()} className="p-2 hover:bg-secondary-100 rounded-xl transition-all">
-              <RefreshCw className={`h-4 w-4 text-secondary-400 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
+            <DxButton icon title="Refresh" variant="text" onClick={() => refetch()} isLoading={isLoading}>
+              <RotateCcw />
+            </DxButton>
           </div>
 
           <div className="space-y-4">
             {isLoading ? (
-              Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="h-32 bg-white/40 rounded-[2rem] animate-pulse" />
-              ))
+              Array.from({ length: 2 }).map((_, i) => <div key={i} className="dx-skeleton h-28 w-full" />)
             ) : configs.length > 0 ? (
               configs.map((config) => (
                 <div
                   key={config.id}
-                  className="glass-card rounded-[2rem] p-6 border border-secondary-400/50 bg-white/40 hover:bg-white/60 transition-all group"
+                  className="rounded-lg border border-[var(--dx-border)] bg-[var(--dx-surface)] p-5 transition-colors hover:border-[var(--dx-border-strong)]"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-5">
-                      <div className="h-14 w-14 rounded-2xl bg-secondary-900 text-white flex items-center justify-center shadow-lg shadow-secondary-900/10">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]">
                         <Mail className="h-6 w-6" />
                       </div>
                       <div>
                         <div className="flex items-center gap-3">
-                          <h4 className="font-bold text-secondary-900">{config.provider_name}</h4>
-                          {config.is_active && (
-                            <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-600 text-[10px] font-bold border border-emerald-100">
-                              ACTIVE
-                            </span>
-                          )}
+                          <h4 className="text-[14px] font-bold text-[var(--dx-text)]">{config.provider_name}</h4>
+                          {config.is_active ? (
+                            <DxBadge tone="success" dot>
+                              Active
+                            </DxBadge>
+                          ) : null}
                         </div>
-                        <p className="text-xs text-secondary-500 mt-1 font-medium">
+                        <p className="mt-1 text-[12px] font-medium text-[var(--dx-text-muted)]">
                           {config.smtp_host}:{config.smtp_port} • {config.sender_email}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
+                      <DxButton
+                        size="sm"
                         onClick={() => testMutation.mutate(config.id)}
                         disabled={testMutation.isPending}
-                        className="btn-secondary py-2 px-4 rounded-xl text-[10px] font-bold"
                       >
-                        Test Connection
-                      </button>
-                      <div className="relative">
-                        <button className="p-2.5 hover:bg-secondary-100 rounded-xl transition-all">
-                          <MoreHorizontal className="h-5 w-5 text-secondary-400" />
-                        </button>
-                      </div>
+                        Test connection
+                      </DxButton>
+                      <DxButton icon size="sm" variant="text" title="More">
+                        <MoreHorizontal />
+                      </DxButton>
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="py-20 text-center bg-white/20 rounded-[2.5rem] border-2 border-dashed border-secondary-400">
-                <AlertCircle className="h-12 w-12 mx-auto text-secondary-100 mb-4" />
-                <p className="text-secondary-500 font-bold">No email providers configured yet.</p>
-              </div>
+              <DxPanel>
+                <div className="py-14 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-[var(--dx-surface-sunken)]">
+                    <AlertCircle className="h-8 w-8 text-[var(--dx-text-faint)]" />
+                  </div>
+                  <p className="text-[14px] font-semibold text-[var(--dx-text)]">
+                    No email providers configured yet.
+                  </p>
+                </div>
+              </DxPanel>
             )}
           </div>
+          {error ? <DxMessage tone="danger">Failed to load email configurations.</DxMessage> : null}
         </div>
       </div>
-    </div>
+    </DxPage>
   );
 }

@@ -17,12 +17,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { MetricCard } from "@/components/charts/MetricCard";
+import { DxPage, DxPageHeader, DxPanel, DxKpi, DxButton } from "@/components/dx";
 import { useChartTheme } from "@/components/charts/chart-theme";
 import { routes } from "@/config/routes";
 import { useAttendance, useHrLeaveRequests } from "@/features/hr/hooks/use-hr";
@@ -154,181 +149,100 @@ export function HRDashboardPage() {
   );
 
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "HR & Payroll" }, { label: "Analytics" }]}
         title="HR & Payroll Analytics"
-        description="Monitor staff attendance, manage payroll cycles, and track workforce expenditures."
+        subtitle="Monitor staff attendance, manage payroll cycles, and track workforce expenditures."
         actions={
           <>
-            <Button
-              variant="secondary"
-              leftIcon={<Calendar className="h-4 w-4" />}
-              onClick={() => navigate("/hr/attendance")}
-            >
-              Attendance Log
-            </Button>
-            <Button
-              leftIcon={<Wallet className="h-4 w-4" />}
-              onClick={() => navigate(routes.payroll)}
-            >
-              Payroll Runs
-            </Button>
+            <DxButton leftIcon={<Calendar className="h-4 w-4" />} onClick={() => navigate("/hr/attendance")}>Attendance log</DxButton>
+            <DxButton variant="primary" leftIcon={<Wallet className="h-4 w-4" />} onClick={() => navigate(routes.payroll)}>Payroll runs</DxButton>
           </>
         }
       />
 
       {/* KPI Stats */}
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Active Staff"
-          value={activeStaff}
-          icon={Users}
-          tone="slate"
-          isLoading={headcountQuery.isLoading && staffLoading}
-        />
-        <MetricCard
-          label="Checked In Today"
-          value={presentToday}
-          icon={UserCheck}
-          tone="primary"
-          deltaLabel={activeStaff > 0 ? `of ${activeStaff} staff` : undefined}
-          delta={activeStaff > 0 ? (presentToday / activeStaff) * 100 : undefined}
-          isLoading={attendanceQuery.isLoading}
-        />
-        <MetricCard
-          label="Last Payroll (Net)"
-          value={latestRun ? compactMoney.format(latestRun.total_net) : "—"}
-          icon={Wallet}
-          tone="cyan"
-          delta={payrollDelta}
-          deltaLabel={payrollDelta !== undefined ? "vs previous run" : undefined}
-          isLoading={runsQuery.isLoading}
-        />
-        <MetricCard
-          label="Pending Leaves"
-          value={pendingLeaves}
-          icon={CalendarClock}
-          tone="amber"
-          isLoading={pendingLeaveQuery.isLoading}
-        />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DxKpi label="Active Staff" value={activeStaff} icon={Users} tone="neutral" isLoading={headcountQuery.isLoading && staffLoading} />
+        <DxKpi label="Checked In Today" value={presentToday} icon={UserCheck} tone="accent" sub={activeStaff > 0 ? `of ${activeStaff} staff` : undefined} isLoading={attendanceQuery.isLoading} />
+        <DxKpi label="Last Payroll (Net)" value={latestRun ? compactMoney.format(latestRun.total_net) : "—"} icon={Wallet} tone="info"
+          sub={payrollDelta !== undefined ? `${payrollDelta >= 0 ? "+" : ""}${payrollDelta.toFixed(1)}% vs previous run` : undefined} isLoading={runsQuery.isLoading} />
+        <DxKpi label="Pending Leaves" value={pendingLeaves} icon={CalendarClock} tone="warning" isLoading={pendingLeaveQuery.isLoading} />
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         {/* Payroll trend */}
-        <Card className="lg:col-span-2" padding="lg">
-          <CardHeader
-            title="Payroll Expenditure"
-            description="Net payout per processed payroll run."
-            actions={
-              <Button variant="ghost" size="sm" onClick={() => navigate(routes.payroll)}>
-                View Runs
-              </Button>
-            }
-          />
+        <DxPanel
+          className="lg:col-span-2"
+          title="Payroll Expenditure"
+          description="Net payout per processed payroll run."
+          actions={<DxButton variant="text" size="sm" onClick={() => navigate(routes.payroll)}>View runs</DxButton>}
+        >
           {runsQuery.isLoading ? (
-            <Skeleton className="h-[300px] w-full" />
+            <div className="dx-skeleton h-[300px] w-full" />
           ) : runsQuery.isError ? (
-            <EmptyState
-              icon={Wallet}
-              title="Could not load payroll data"
-              description="The payroll trend failed to load."
-              action={
-                <Button size="sm" variant="secondary" onClick={() => runsQuery.refetch()}>
-                  Retry
-                </Button>
-              }
-            />
+            <div className="py-16 text-center">
+              <Wallet className="mx-auto mb-3 h-9 w-9 text-[var(--dx-text-faint)]" />
+              <p className="text-[14px] font-semibold text-[var(--dx-text)]">Could not load payroll data</p>
+              <p className="mt-1 text-[13px] text-[var(--dx-text-muted)]">The payroll trend failed to load.</p>
+              <DxButton className="mx-auto mt-4" size="sm" onClick={() => runsQuery.refetch()}>Retry</DxButton>
+            </div>
           ) : trendData.length === 0 ? (
-            <EmptyState
-              icon={Wallet}
-              title="No processed payroll runs"
-              description="Once payroll runs are calculated, expenditure will trend here."
-              action={
-                <Button size="sm" onClick={() => navigate(routes.payroll)}>
-                  Go to Payroll
-                </Button>
-              }
-            />
+            <div className="py-16 text-center">
+              <Wallet className="mx-auto mb-3 h-9 w-9 text-[var(--dx-text-faint)]" />
+              <p className="text-[14px] font-semibold text-[var(--dx-text)]">No processed payroll runs</p>
+              <p className="mt-1 text-[13px] text-[var(--dx-text-muted)]">Once payroll runs are calculated, expenditure will trend here.</p>
+              <DxButton className="mx-auto mt-4" variant="primary" size="sm" onClick={() => navigate(routes.payroll)}>Go to Payroll</DxButton>
+            </div>
           ) : (
             <PayrollTrendChart data={trendData} />
           )}
-        </Card>
+        </DxPanel>
 
         {/* Daily check-ins */}
-        <Card padding="lg">
-          <CardHeader
-            title="Daily Check-ins"
-            description="Latest clock-ins recorded today."
-          />
+        <DxPanel title="Daily Check-ins" description="Latest clock-ins recorded today.">
           {attendanceQuery.isLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-14 w-full" />
-              ))}
-            </div>
+            <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="dx-skeleton h-14 w-full" />)}</div>
           ) : attendanceQuery.isError ? (
-            <EmptyState
-              icon={Clock}
-              title="Could not load check-ins"
-              action={
-                <Button size="sm" variant="secondary" onClick={() => attendanceQuery.refetch()}>
-                  Retry
-                </Button>
-              }
-            />
+            <div className="py-10 text-center">
+              <Clock className="mx-auto mb-3 h-9 w-9 text-[var(--dx-text-faint)]" />
+              <p className="text-[14px] font-semibold text-[var(--dx-text)]">Could not load check-ins</p>
+              <DxButton className="mx-auto mt-4" size="sm" onClick={() => attendanceQuery.refetch()}>Retry</DxButton>
+            </div>
           ) : checkIns.length === 0 ? (
-            <EmptyState
-              icon={Clock}
-              title="No check-ins yet"
-              description="No staff have clocked in today."
-            />
+            <div className="py-10 text-center">
+              <Clock className="mx-auto mb-3 h-9 w-9 text-[var(--dx-text-faint)]" />
+              <p className="text-[14px] font-semibold text-[var(--dx-text)]">No check-ins yet</p>
+              <p className="mt-1 text-[13px] text-[var(--dx-text-muted)]">No staff have clocked in today.</p>
+            </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {checkIns.map((r) => {
                 const name = nameMap.get(r.staff_profile_id) ?? `Staff #${r.staff_profile_id}`;
+                const dotColor = r.is_absent ? "var(--dx-danger)" : r.is_late ? "var(--dx-warning)" : "var(--dx-success)";
                 return (
-                  <div
-                    key={r.id}
-                    className="flex items-center justify-between rounded-2xl bg-secondary-500/5 px-4 py-3 dark:bg-white/5"
-                  >
+                  <div key={r.id} className="flex items-center justify-between rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] px-4 py-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-500/10 text-[10px] font-black text-primary-500">
-                        {initials(name) || "?"}
-                      </div>
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--dx-accent-soft)] text-[10px] font-bold text-[var(--dx-accent)]">{initials(name) || "?"}</div>
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-bold text-secondary-900">{name}</p>
-                        <p className="data-mono text-[10px] font-medium text-secondary-400">
-                          {fmtTime(r.clock_in_at)}
-                          {r.is_late && r.minutes_late ? ` · +${r.minutes_late}m late` : ""}
-                        </p>
+                        <p className="truncate text-[12px] font-semibold text-[var(--dx-text)]">{name}</p>
+                        <p className="dx-mono text-[10px] font-medium text-[var(--dx-text-muted)]">{fmtTime(r.clock_in_at)}{r.is_late && r.minutes_late ? ` · +${r.minutes_late}m late` : ""}</p>
                       </div>
                     </div>
-                    <span
-                      className={
-                        r.is_absent
-                          ? "h-2 w-2 shrink-0 rounded-full bg-rose-500"
-                          : r.is_late
-                            ? "h-2 w-2 shrink-0 rounded-full bg-amber-500"
-                            : "h-2 w-2 shrink-0 rounded-full bg-emerald-500"
-                      }
-                      aria-label={r.is_absent ? "Absent" : r.is_late ? "Late" : "On time"}
-                    />
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: dotColor }} aria-label={r.is_absent ? "Absent" : r.is_late ? "Late" : "On time"} />
                   </div>
                 );
               })}
             </div>
           )}
           <div className="mt-6 flex items-center justify-between gap-3">
-            <p className="text-xs font-medium text-secondary-400">
-              {lateToday > 0 ? `${lateToday} late arrival${lateToday === 1 ? "" : "s"} today` : "No late arrivals today"}
-            </p>
-            <Button variant="secondary" size="sm" onClick={() => navigate("/hr/attendance")}>
-              Full Attendance
-            </Button>
+            <p className="text-[12px] font-medium text-[var(--dx-text-muted)]">{lateToday > 0 ? `${lateToday} late arrival${lateToday === 1 ? "" : "s"} today` : "No late arrivals today"}</p>
+            <DxButton size="sm" onClick={() => navigate("/hr/attendance")}>Full attendance</DxButton>
           </div>
-        </Card>
+        </DxPanel>
       </div>
-    </div>
+    </DxPage>
   );
 }
 

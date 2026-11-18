@@ -1,15 +1,11 @@
 import { useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Plus, Upload } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Modal } from "@/components/ui/Modal";
-import { Badge } from "@/components/ui/Badge";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
+import { Building2, Plus, Upload, X } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxPanel, DxButton, DxBadge, DxInput, DxSelect,
+  DxCheckbox, DxPopup, DxTabs, DxGrid, type DxGridColumn,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
 import {
@@ -77,146 +73,122 @@ export function PayersPage() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["hmo"] });
 
-  const providerColumns: DataTableColumn<HmoProvider>[] = [
-    { key: "name", header: "Payer",
-      render: (r) => (
+  const providerColumns: DxGridColumn<HmoProvider>[] = [
+    { key: "name", header: "Payer", render: (r) => (
         <div>
-          <div className="font-semibold text-secondary-900">{r.name}</div>
-          <div className="text-xs text-secondary-500">{r.provider_type ?? "—"}</div>
+          <div className="font-semibold text-[var(--dx-text)]">{r.name}</div>
+          <div className="text-[11.5px] text-[var(--dx-text-muted)]">{r.provider_type ?? "—"}</div>
         </div>) },
     { key: "plan_count", header: "Plans", align: "center" },
     { key: "active_enrollee_count", header: "Enrollees", align: "center" },
     { key: "modes", header: "Modes", render: (r) => (
         <div className="flex gap-1">
-          {r.fee_for_service_supported && <Badge variant="soft-info">FFS</Badge>}
-          {r.capitation_supported && <Badge variant="soft-success">Capitation</Badge>}
+          {r.fee_for_service_supported && <DxBadge tone="info">FFS</DxBadge>}
+          {r.capitation_supported && <DxBadge tone="success">Capitation</DxBadge>}
         </div>) },
   ];
 
-  const planColumns: DataTableColumn<HmoPlan>[] = [
-    { key: "name", header: "Plan",
-      render: (r) => (
+  const planColumns: DxGridColumn<HmoPlan>[] = [
+    { key: "name", header: "Plan", render: (r) => (
         <div>
-          <div className="font-semibold">{r.name}</div>
-          <div className="text-xs text-secondary-500">{r.code} · {r.plan_tier ?? "—"}</div>
+          <div className="font-semibold text-[var(--dx-text)]">{r.name}</div>
+          <div className="text-[11.5px] text-[var(--dx-text-muted)]">{r.code} · {r.plan_tier ?? "—"}</div>
         </div>) },
-    { key: "coverage_type", header: "Type",
-      render: (r) => <Badge variant={r.coverage_type === "CAPITATION" ? "soft-success" : "soft-info"}>{r.coverage_type.replace(/_/g, " ")}</Badge> },
-    { key: "default_coverage_percent", header: "Coverage %", align: "right",
-      render: (r) => `${parseFloat(r.default_coverage_percent)}%` },
-    { key: "default_copay_flat", header: "Flat co-pay", align: "right",
-      render: (r) => fmtNaira(r.default_copay_flat) },
+    { key: "coverage_type", header: "Type", render: (r) => <DxBadge tone={r.coverage_type === "CAPITATION" ? "success" : "info"}>{r.coverage_type.replace(/_/g, " ")}</DxBadge> },
+    { key: "default_coverage_percent", header: "Coverage %", align: "right", render: (r) => `${parseFloat(r.default_coverage_percent)}%` },
+    { key: "default_copay_flat", header: "Flat co-pay", align: "right", render: (r) => <span className="dx-mono">{fmtNaira(r.default_copay_flat)}</span> },
     { key: "benefit_count", header: "Rules", align: "center" },
-    { key: "actions", header: "", align: "right",
-      render: (r) => (
-        <div className="flex justify-end gap-2">
-          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setBenefitModal(r); }}>
-            Benefits
-          </Button>
-          <Button size="sm" variant="ghost"
-            onClick={(e) => { e.stopPropagation(); setTariffPlanId(r.id); setTab("tariffs"); }}>
-            Tariffs
-          </Button>
+    { key: "actions", header: "", align: "right", render: (r) => (
+        <div className="flex justify-end gap-1">
+          <DxButton size="sm" variant="text" onClick={(e) => { e.stopPropagation(); setBenefitModal(r); }}>Benefits</DxButton>
+          <DxButton size="sm" variant="text" onClick={(e) => { e.stopPropagation(); setTariffPlanId(r.id); setTab("tariffs"); }}>Tariffs</DxButton>
         </div>) },
   ];
 
-  const tariffColumns: DataTableColumn<HmoTariff>[] = [
-    { key: "billable_service_name", header: "Service",
-      render: (r) => r.billable_service_name ?? r.service_code ?? `Drug #${r.drug_id ?? "?"}` },
-    { key: "agreed_price", header: "Agreed price", align: "right", render: (r) => fmtNaira(r.agreed_price) },
+  const tariffColumns: DxGridColumn<HmoTariff>[] = [
+    { key: "billable_service_name", header: "Service", render: (r) => r.billable_service_name ?? r.service_code ?? `Drug #${r.drug_id ?? "?"}` },
+    { key: "agreed_price", header: "Agreed price", align: "right", render: (r) => <span className="dx-mono">{fmtNaira(r.agreed_price)}</span> },
     { key: "effective_from", header: "From", render: (r) => r.effective_from ?? "—" },
     { key: "effective_to", header: "To", render: (r) => r.effective_to ?? "—" },
-    { key: "del", header: "", align: "right",
-      render: (r) => <Button size="sm" variant="ghost" onClick={() =>
-        hmoApi.deleteTariff(r.id).then(invalidate)}>Remove</Button> },
+    { key: "del", header: "", align: "right", render: (r) => <DxButton size="sm" variant="text" onClick={() => hmoApi.deleteTariff(r.id).then(invalidate)}>Remove</DxButton> },
   ];
 
-  const scheduleColumns: DataTableColumn<CapitationLine>[] = [
+  const scheduleColumns: DxGridColumn<CapitationLine>[] = [
     { key: "period_code", header: "Period" },
     { key: "enrollee_count", header: "Enrollees", align: "center" },
-    { key: "expected_amount", header: "Expected", align: "right", render: (r) => fmtNaira(r.expected_amount) },
-    { key: "received_amount", header: "Received", align: "right", render: (r) => fmtNaira(r.received_amount) },
-    { key: "status", header: "Status", render: (r) => <Badge variant={
-        r.status === "PAID" ? "soft-success" : r.status === "DRAFT" ? "secondary" : "soft-warning"
-      }>{r.status.replace(/_/g, " ")}</Badge> },
+    { key: "expected_amount", header: "Expected", align: "right", render: (r) => <span className="dx-mono">{fmtNaira(r.expected_amount)}</span> },
+    { key: "received_amount", header: "Received", align: "right", render: (r) => <span className="dx-mono">{fmtNaira(r.received_amount)}</span> },
+    { key: "status", header: "Status", render: (r) => <DxBadge tone={r.status === "PAID" ? "success" : r.status === "DRAFT" ? "neutral" : "warning"}>{r.status.replace(/_/g, " ")}</DxBadge> },
     { key: "actions", header: "", align: "right", render: (r) => (
         <div className="flex justify-end gap-2">
-          {r.status === "DRAFT" && (
-            <Button size="sm" onClick={() => setConfirmLine(r)}>
-              Confirm
-            </Button>
-          )}
-          {r.variance && (
-            <span className="text-xs text-secondary-500">
-              Δ {r.variance.missing_from_hmo} disputed ({fmtNaira(r.variance.disputed_value)})
-            </span>
-          )}
+          {r.status === "DRAFT" && <DxButton size="sm" variant="primary" onClick={() => setConfirmLine(r)}>Confirm</DxButton>}
+          {r.variance && <span className="text-[11.5px] text-[var(--dx-text-muted)]">Δ {r.variance.missing_from_hmo} disputed ({fmtNaira(r.variance.disputed_value)})</span>}
         </div>) },
   ];
 
-  const statementColumns: DataTableColumn<StatementRow>[] = [
+  const statementColumns: DxGridColumn<StatementRow>[] = [
     { key: "date", header: "Date" },
     { key: "type", header: "Type", render: (r) => r.type.replace(/_/g, " ") },
     { key: "ref", header: "Reference" },
-    { key: "debit", header: "Debit", align: "right", render: (r) => parseFloat(r.debit) ? fmtNaira(r.debit) : "" },
-    { key: "credit", header: "Credit", align: "right", render: (r) => parseFloat(r.credit) ? fmtNaira(r.credit) : "" },
-    { key: "balance", header: "Balance", align: "right", render: (r) => fmtNaira(r.balance) },
+    { key: "debit", header: "Debit", align: "right", render: (r) => <span className="dx-mono">{parseFloat(r.debit) ? fmtNaira(r.debit) : ""}</span> },
+    { key: "credit", header: "Credit", align: "right", render: (r) => <span className="dx-mono">{parseFloat(r.credit) ? fmtNaira(r.credit) : ""}</span> },
+    { key: "balance", header: "Balance", align: "right", render: (r) => <span className="dx-mono font-semibold">{fmtNaira(r.balance)}</span> },
   ];
 
   return (
-    <div>
-      <PageHeader title="HMO Payers" description="Plans, tariffs, capitation and payer statements."
-        actions={selected && (
-          <Button variant="primary" onClick={() => setPlanModal(true)}>
-            <Plus className="mr-1 h-4 w-4" /> New plan
-          </Button>
-        )} />
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Insurance" }, { label: "Payers" }]}
+        title="HMO Payers"
+        subtitle="Plans, tariffs, capitation and payer statements."
+        actions={selected ? <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setPlanModal(true)}>New plan</DxButton> : undefined}
+      />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <Card className="p-4 xl:col-span-1">
-          <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-secondary-900">
-            <Building2 className="h-5 w-5" /> Payers
-          </h2>
-          <DataTable columns={providerColumns} data={providers.data}
-            rowKey={(r) => r.id} isLoading={providers.isLoading}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <DxPanel title="Payers" icon={<Building2 className="h-4 w-4" />} flush className="xl:col-span-1">
+          <DxGrid<HmoProvider>
+            borderless columns={providerColumns} data={providers.data} rowKey={(r) => r.id} isLoading={providers.isLoading}
             error={providers.isError ? "Could not load payers." : null}
             onRetry={() => providers.refetch()}
+            selectedKey={selected?.id ?? null}
             onRowClick={(r) => { setSelectedId(r.id); setTab("plans"); }}
-            empty={{ title: "No payers yet", description: "Register insurance providers from the Insurance module." }} />
-        </Card>
+            empty={{ title: "No payers yet", description: "Register insurance providers from the Insurance module." }}
+          />
+        </DxPanel>
 
-        <Card className="p-4 xl:col-span-2">
+        <DxPanel className="xl:col-span-2">
           {!selected ? (
-            <p className="p-8 text-center text-secondary-500">Select a payer to manage its plans, tariffs, capitation and statement.</p>
+            <p className="p-8 text-center text-[13px] text-[var(--dx-text-muted)]">Select a payer to manage its plans, tariffs, capitation and statement.</p>
           ) : (
             <>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-lg font-semibold text-secondary-900">{selected.name}</h2>
-                <div className="flex flex-wrap gap-1 rounded-xl bg-secondary-100 p-1">
-                  {(["plans", "tariffs", "capitation", "statement"] as Tab[]).map((t) => (
-                    <button key={t} onClick={() => setTab(t)}
-                      className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition ${
-                        tab === t ? "bg-white text-secondary-900 shadow-sm" : "text-secondary-500 hover:text-secondary-800"}`}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
+                <h2 className="text-[16px] font-bold text-[var(--dx-text)]">{selected.name}</h2>
+                <DxTabs<Tab>
+                  value={tab}
+                  onChange={setTab}
+                  items={[
+                    { key: "plans", label: "Plans" },
+                    { key: "tariffs", label: "Tariffs" },
+                    { key: "capitation", label: "Capitation" },
+                    { key: "statement", label: "Statement" },
+                  ]}
+                />
               </div>
 
               {tab === "plans" && (
-                <DataTable columns={planColumns} data={plans.data}
-                  rowKey={(r) => r.id} isLoading={plans.isLoading}
+                <DxGrid<HmoPlan>
+                  borderless columns={planColumns} data={plans.data} rowKey={(r) => r.id} isLoading={plans.isLoading}
                   error={plans.isError ? "Could not load plans." : null}
                   onRetry={() => plans.refetch()}
-                  empty={{ title: "No plans", description: "Create the payer's benefit plans." }} />
+                  empty={{ title: "No plans", description: "Create the payer's benefit plans." }}
+                />
               )}
 
               {tab === "tariffs" && (
                 <div>
-                  <div className="mb-3 flex items-center gap-3">
-                    <Select value={tariffPlanId ?? ""} onChange={(e) => setTariffPlanId(Number(e.target.value) || null)}
-                      options={[{ value: "", label: "Select plan…" },
-                        ...(plans.data ?? []).map((pl) => ({ value: String(pl.id), label: pl.name }))]} />
+                  <div className="mb-3 flex items-center gap-2">
+                    <DxSelect value={tariffPlanId ?? ""} aria-label="Plan" onChange={(e) => setTariffPlanId(Number(e.target.value) || null)}
+                      options={[{ value: "", label: "Select plan…" }, ...(plans.data ?? []).map((pl) => ({ value: String(pl.id), label: pl.name }))]} />
                     {tariffPlanId && (
                       <>
                         <input ref={fileRef} type="file" accept=".csv" className="hidden"
@@ -233,47 +205,42 @@ export function PayersPage() {
                             }
                             e.target.value = "";
                           }} />
-                        <Button variant="secondary" onClick={() => fileRef.current?.click()}>
-                          <Upload className="mr-1 h-4 w-4" /> Import CSV
-                        </Button>
+                        <DxButton variant="default" leftIcon={<Upload className="h-4 w-4" />} onClick={() => fileRef.current?.click()}>Import CSV</DxButton>
                       </>
                     )}
                   </div>
                   {tariffPlanId ? (
-                    <DataTable columns={tariffColumns} data={tariffs.data}
-                      rowKey={(r) => r.id} isLoading={tariffs.isLoading}
-                      empty={{ title: "No tariff lines", description: "Import the HMO's price list (CSV: service_code, agreed_price)." }} />
-                  ) : <p className="text-sm text-secondary-500">Choose a plan to view its negotiated prices.</p>}
+                    <DxGrid<HmoTariff>
+                      borderless columns={tariffColumns} data={tariffs.data} rowKey={(r) => r.id} isLoading={tariffs.isLoading}
+                      empty={{ title: "No tariff lines", description: "Import the HMO's price list (CSV: service_code, agreed_price)." }}
+                    />
+                  ) : <p className="text-[13px] text-[var(--dx-text-muted)]">Choose a plan to view its negotiated prices.</p>}
                 </div>
               )}
 
               {tab === "capitation" && (
-                <CapitationTab providerId={selected.id}
-                  contracts={contracts.data ?? []} schedule={schedule.data ?? []}
-                  scheduleColumns={scheduleColumns} onChanged={invalidate} />
+                <CapitationTab providerId={selected.id} contracts={contracts.data ?? []} schedule={schedule.data ?? []} scheduleColumns={scheduleColumns} onChanged={invalidate} />
               )}
 
               {tab === "statement" && (
                 <div>
-                  <div className="mb-3 flex items-center justify-between text-sm">
-                    <span className="text-secondary-500">Opening: {fmtNaira(statement.data?.opening_balance)}</span>
-                    <span className="font-semibold text-secondary-900">
-                      Balance: {fmtNaira(statement.data?.closing_balance)}
-                    </span>
+                  <div className="mb-3 flex items-center justify-between text-[13px]">
+                    <span className="text-[var(--dx-text-muted)]">Opening: {fmtNaira(statement.data?.opening_balance)}</span>
+                    <span className="font-semibold text-[var(--dx-text)]">Balance: {fmtNaira(statement.data?.closing_balance)}</span>
                   </div>
-                  <DataTable columns={statementColumns} data={statement.data?.rows}
-                    rowKey={(_, i) => i} isLoading={statement.isLoading}
-                    empty={{ title: "No activity", description: "Approved claims and capitation will appear here." }} />
+                  <DxGrid<StatementRow>
+                    borderless columns={statementColumns} data={statement.data?.rows} rowKey={(_, i) => i} isLoading={statement.isLoading}
+                    empty={{ title: "No activity", description: "Approved claims and capitation will appear here." }}
+                  />
                 </div>
               )}
             </>
           )}
-        </Card>
+        </DxPanel>
       </div>
 
       {selected && (
-        <NewPlanModal isOpen={planModal} onClose={() => setPlanModal(false)}
-          providerId={selected.id} onSaved={() => { setPlanModal(false); invalidate(); }} />
+        <NewPlanModal isOpen={planModal} onClose={() => setPlanModal(false)} providerId={selected.id} onSaved={() => { setPlanModal(false); invalidate(); }} />
       )}
       {benefitModal && (
         <BenefitsModal plan={benefitModal} onClose={() => { setBenefitModal(null); invalidate(); }} />
@@ -299,7 +266,7 @@ export function PayersPage() {
           }
         }}
       />
-    </div>
+    </DxPage>
   );
 }
 
@@ -307,7 +274,7 @@ function CapitationTab({ providerId, contracts, schedule, scheduleColumns, onCha
   providerId: number;
   contracts: CapitationContract[];
   schedule: CapitationLine[];
-  scheduleColumns: DataTableColumn<CapitationLine>[];
+  scheduleColumns: DxGridColumn<CapitationLine>[];
   onChanged: () => void;
 }) {
   const toast = useToast();
@@ -318,27 +285,21 @@ function CapitationTab({ providerId, contracts, schedule, scheduleColumns, onCha
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-secondary-200 p-4">
-        <h3 className="mb-2 font-semibold text-secondary-900">Contracts</h3>
+      <div className="rounded-lg border border-[var(--dx-border)] p-4">
+        <h3 className="mb-2 font-semibold text-[var(--dx-text)]">Contracts</h3>
         {contracts.length === 0 ? (
           <div className="flex flex-wrap items-end gap-3">
-            <Input label="Rate / enrollee / month" type="number" value={rate}
-              onChange={(e) => setRate(e.target.value)} placeholder="750" />
-            <Button onClick={() => hmoApi.createContract({
-                insurance_provider_id: providerId,
-                rate_per_enrollee: Number(rate),
-                effective_from: new Date().toISOString().slice(0, 10),
-              }).then(() => { toast.success("Contract created."); onChanged(); })}
-              disabled={!rate}>
-              Create contract
-            </Button>
+            <DxInput label="Rate / enrollee / month" type="number" mono value={rate} onChange={(e) => setRate(e.target.value)} placeholder="750" />
+            <DxButton variant="primary" onClick={() => hmoApi.createContract({
+                insurance_provider_id: providerId, rate_per_enrollee: Number(rate), effective_from: new Date().toISOString().slice(0, 10),
+              }).then(() => { toast.success("Contract created."); onChanged(); })} disabled={!rate}>Create contract</DxButton>
           </div>
         ) : (
-          <ul className="space-y-1 text-sm">
+          <ul className="space-y-1 text-[13px]">
             {contracts.map((c) => (
-              <li key={c.id} className="flex justify-between rounded-lg bg-secondary-50 px-3 py-2">
-                <span>{c.plan_name ?? "All capitation plans"} · {fmtNaira(c.rate_per_enrollee)}/enrollee</span>
-                <Badge variant={c.status === "ACTIVE" ? "soft-success" : "secondary"}>{c.status}</Badge>
+              <li key={c.id} className="flex justify-between rounded-md bg-[var(--dx-surface-sunken)] px-3 py-2">
+                <span className="text-[var(--dx-text)]">{c.plan_name ?? "All capitation plans"} · {fmtNaira(c.rate_per_enrollee)}/enrollee</span>
+                <DxBadge tone={c.status === "ACTIVE" ? "success" : "neutral"}>{c.status}</DxBadge>
               </li>
             ))}
           </ul>
@@ -347,22 +308,19 @@ function CapitationTab({ providerId, contracts, schedule, scheduleColumns, onCha
 
       {contracts.length > 0 && (
         <div className="flex flex-wrap items-end gap-3">
-          <Select label="Contract" value={effectiveContract ?? ""}
-            onChange={(e) => setContractId(Number(e.target.value))}
-            options={contracts.map((c) => ({ value: String(c.id),
-              label: `${c.plan_name ?? "All plans"} @ ${fmtNaira(c.rate_per_enrollee)}` }))} />
-          <Input label="Period" type="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
-          <Button onClick={() => effectiveContract && hmoApi.runCapitation({
-              contract_id: effectiveContract, period_code: period })
+          <DxSelect label="Contract" value={effectiveContract ?? ""} onChange={(e) => setContractId(Number(e.target.value))}
+            options={contracts.map((c) => ({ value: String(c.id), label: `${c.plan_name ?? "All plans"} @ ${fmtNaira(c.rate_per_enrollee)}` }))} />
+          <DxInput label="Period" type="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
+          <DxButton variant="primary" onClick={() => effectiveContract && hmoApi.runCapitation({ contract_id: effectiveContract, period_code: period })
             .then((l) => { toast.success(`Schedule generated: ${l.enrollee_count} enrollees, ${fmtNaira(l.expected_amount)}.`); onChanged(); })
-            .catch((e) => toast.error(e?.response?.data?.detail ?? "Failed to run capitation."))}>
-            Run capitation
-          </Button>
+            .catch((e) => toast.error(e?.response?.data?.detail ?? "Failed to run capitation."))}>Run capitation</DxButton>
         </div>
       )}
 
-      <DataTable columns={scheduleColumns} data={schedule} rowKey={(r) => r.id}
-        empty={{ title: "No capitation schedules", description: "Run a month to snapshot the enrollee register." }} />
+      <DxGrid<CapitationLine>
+        borderless columns={scheduleColumns} data={schedule} rowKey={(r) => r.id}
+        empty={{ title: "No capitation schedules", description: "Run a month to snapshot the enrollee register." }}
+      />
     </div>
   );
 }
@@ -375,33 +333,28 @@ function NewPlanModal({ isOpen, onClose, providerId, onSaved }: {
     default_coverage_percent: "90", default_copay_flat: "0", plan_tier: "" });
   const save = useMutation({
     mutationFn: () => hmoApi.createPlan({ ...form, insurance_provider_id: providerId,
-      default_coverage_percent: Number(form.default_coverage_percent),
-      default_copay_flat: Number(form.default_copay_flat) }),
+      default_coverage_percent: Number(form.default_coverage_percent), default_copay_flat: Number(form.default_copay_flat) }),
     onSuccess: () => { toast.success("Plan created."); onSaved(); },
     onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Could not create the plan."),
   });
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="New HMO plan"
-      footer={<div className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button onClick={() => save.mutate()} disabled={!form.name || save.isPending}>Create plan</Button>
-      </div>}>
+    <DxPopup isOpen={isOpen} onClose={onClose} title="New HMO plan" size="md"
+      footer={<>
+        <DxButton variant="text" onClick={onClose}>Cancel</DxButton>
+        <DxButton variant="primary" onClick={() => save.mutate()} disabled={!form.name || save.isPending}>Create plan</DxButton>
+      </>}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input label="Plan name" value={form.name} onChange={set("name")} />
-        <Input label="Code" value={form.code} onChange={set("code")} />
-        <Select label="Coverage type" value={form.coverage_type} onChange={set("coverage_type")}
-          options={[{ value: "FEE_FOR_SERVICE", label: "Fee for service" },
-                    { value: "CAPITATION", label: "Capitation" },
-                    { value: "HYBRID", label: "Hybrid" }]} />
-        <Input label="Tier" value={form.plan_tier} onChange={set("plan_tier")} placeholder="gold" />
-        <Input label="Default coverage %" type="number" value={form.default_coverage_percent}
-          onChange={set("default_coverage_percent")} />
-        <Input label="Flat co-pay (₦)" type="number" value={form.default_copay_flat}
-          onChange={set("default_copay_flat")} />
+        <DxInput label="Plan name" value={form.name} onChange={set("name")} />
+        <DxInput label="Code" value={form.code} onChange={set("code")} />
+        <DxSelect label="Coverage type" value={form.coverage_type} onChange={set("coverage_type")}
+          options={[{ value: "FEE_FOR_SERVICE", label: "Fee for service" }, { value: "CAPITATION", label: "Capitation" }, { value: "HYBRID", label: "Hybrid" }]} />
+        <DxInput label="Tier" value={form.plan_tier} onChange={set("plan_tier")} placeholder="gold" />
+        <DxInput label="Default coverage %" type="number" mono value={form.default_coverage_percent} onChange={set("default_coverage_percent")} />
+        <DxInput label="Flat co-pay (₦)" type="number" mono value={form.default_copay_flat} onChange={set("default_copay_flat")} />
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -423,60 +376,42 @@ function BenefitsModal({ plan, onClose }: { plan: HmoPlan; onClose: () => void }
       .catch((e) => toast.error(e?.response?.data?.detail ?? "Could not add the rule."));
 
   return (
-    <Modal isOpen onClose={onClose} title={`Benefit rules — ${plan.name}`} size="xl">
+    <DxPopup isOpen onClose={onClose} title={`Benefit rules — ${plan.name}`} size="lg">
       <div className="mb-4 space-y-2">
         {benefits.map((b) => (
-          <div key={b.id} className="flex items-center justify-between rounded-lg bg-secondary-50 px-3 py-2 text-sm">
-            <span className="font-medium">{b.billable_service_name ?? b.category ?? "—"}</span>
-            <span className="flex items-center gap-2 text-secondary-500">
-              {b.is_excluded ? <Badge variant="soft-danger">Excluded</Badge> : (
+          <div key={b.id} className="flex items-center justify-between rounded-md bg-[var(--dx-surface-sunken)] px-3 py-2 text-[13px]">
+            <span className="font-medium text-[var(--dx-text)]">{b.billable_service_name ?? b.category ?? "—"}</span>
+            <span className="flex items-center gap-2 text-[var(--dx-text-muted)]">
+              {b.is_excluded ? <DxBadge tone="danger">Excluded</DxBadge> : (
                 <>
                   {b.coverage_percent != null && `${parseFloat(b.coverage_percent)}%`}
                   {b.copay_flat != null && parseFloat(b.copay_flat) > 0 && ` · co-pay ${fmtNaira(b.copay_flat)}`}
                   {b.limit_amount != null && ` · cap ${fmtNaira(b.limit_amount)}/${b.limit_period}`}
                 </>
               )}
-              {b.requires_preauth && <Badge variant="soft-warning">Pre-auth</Badge>}
-              <Button size="sm" variant="ghost" onClick={() =>
-                hmoApi.deleteBenefit(b.id).then(() => detail.refetch())}>×</Button>
+              {b.requires_preauth && <DxBadge tone="warning">Pre-auth</DxBadge>}
+              <DxButton icon size="sm" variant="text" title="Remove" onClick={() => hmoApi.deleteBenefit(b.id).then(() => detail.refetch())}><X className="h-3.5 w-3.5" /></DxButton>
             </span>
           </div>
         ))}
-        {benefits.length === 0 && <p className="text-sm text-secondary-500">No rules yet — plan defaults apply to everything.</p>}
+        {benefits.length === 0 && <p className="text-[13px] text-[var(--dx-text-muted)]">No rules yet — plan defaults apply to everything.</p>}
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Select label="Category" value={form.category}
-          onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-          options={["CONSULTATION", "PHARMACY", "LAB", "RADIOLOGY", "PROCEDURE", "ADMISSION",
-                    "MATERNITY", "DENTAL", "OPTICAL", "OTHER"].map((c) => ({ value: c, label: c }))} />
-        <Input label="Coverage %" type="number" value={form.coverage_percent}
-          onChange={(e) => setForm((f) => ({ ...f, coverage_percent: e.target.value }))} />
-        <Input label="Flat co-pay" type="number" value={form.copay_flat}
-          onChange={(e) => setForm((f) => ({ ...f, copay_flat: e.target.value }))} />
-        <Input label="Limit amount" type="number" value={form.limit_amount}
-          onChange={(e) => setForm((f) => ({ ...f, limit_amount: e.target.value }))} />
-        <Select label="Limit period" value={form.limit_period}
-          onChange={(e) => setForm((f) => ({ ...f, limit_period: e.target.value }))}
-          options={[{ value: "", label: "No limit period" },
-                    { value: "PER_VISIT", label: "Per visit" },
-                    { value: "PER_ANNUM", label: "Per annum" },
-                    { value: "LIFETIME", label: "Lifetime" }]} />
-        <div className="flex items-end gap-4 pb-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.requires_preauth}
-              onChange={(e) => setForm((f) => ({ ...f, requires_preauth: e.target.checked }))} />
-            Pre-auth
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.is_excluded}
-              onChange={(e) => setForm((f) => ({ ...f, is_excluded: e.target.checked }))} />
-            Excluded
-          </label>
+        <DxSelect label="Category" value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+          options={["CONSULTATION", "PHARMACY", "LAB", "RADIOLOGY", "PROCEDURE", "ADMISSION", "MATERNITY", "DENTAL", "OPTICAL", "OTHER"].map((c) => ({ value: c, label: c }))} />
+        <DxInput label="Coverage %" type="number" mono value={form.coverage_percent} onChange={(e) => setForm((f) => ({ ...f, coverage_percent: e.target.value }))} />
+        <DxInput label="Flat co-pay" type="number" mono value={form.copay_flat} onChange={(e) => setForm((f) => ({ ...f, copay_flat: e.target.value }))} />
+        <DxInput label="Limit amount" type="number" mono value={form.limit_amount} onChange={(e) => setForm((f) => ({ ...f, limit_amount: e.target.value }))} />
+        <DxSelect label="Limit period" value={form.limit_period} onChange={(e) => setForm((f) => ({ ...f, limit_period: e.target.value }))}
+          options={[{ value: "", label: "No limit period" }, { value: "PER_VISIT", label: "Per visit" }, { value: "PER_ANNUM", label: "Per annum" }, { value: "LIFETIME", label: "Lifetime" }]} />
+        <div className="flex items-end gap-4 pb-1">
+          <DxCheckbox label="Pre-auth" checked={form.requires_preauth} onChange={(e) => setForm((f) => ({ ...f, requires_preauth: e.target.checked }))} />
+          <DxCheckbox label="Excluded" checked={form.is_excluded} onChange={(e) => setForm((f) => ({ ...f, is_excluded: e.target.checked }))} />
         </div>
       </div>
       <div className="mt-4 flex justify-end">
-        <Button onClick={add}><Plus className="mr-1 h-4 w-4" /> Add rule</Button>
+        <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={add}>Add rule</DxButton>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

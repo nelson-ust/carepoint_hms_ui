@@ -12,8 +12,7 @@ import {
   UserRound,
   XCircle,
 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
+import { DxPopup, DxButton } from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import { membershipApi, formatCardMoney, type CardVerifyResult } from "../api/membership.api";
@@ -143,13 +142,20 @@ export function VerifyCardModal({ isOpen, onClose }: { isOpen: boolean; onClose:
     ? "valid"
     : "warning";
 
+  const toneStyle =
+    tone === "valid"
+      ? { background: "var(--dx-success-soft)", color: "var(--dx-success)", borderColor: "var(--dx-success)" }
+      : tone === "warning"
+      ? { background: "var(--dx-warning-soft)", color: "var(--dx-warning)", borderColor: "var(--dx-warning)" }
+      : { background: "var(--dx-danger-soft)", color: "var(--dx-danger)", borderColor: "var(--dx-danger)" };
+
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Verify membership card" size="md">
+    <DxPopup isOpen={isOpen} onClose={handleClose} title="Verify membership card" size="md">
       <div className="space-y-5">
         {!result ? (
           <>
-            {/* Camera viewport */}
-            <div className="relative overflow-hidden rounded-2xl border border-secondary-200 bg-secondary-950 dark:border-white/10">
+            {/* Camera viewport — intentional dark scanner surface */}
+            <div className="relative overflow-hidden rounded-md border border-[var(--dx-border)]" style={{ background: "#020617" }}>
               <video
                 ref={videoRef}
                 muted
@@ -157,30 +163,22 @@ export function VerifyCardModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                 className={`h-64 w-full object-cover ${scanning ? "" : "hidden"}`}
               />
               {!scanning ? (
-                <div className="flex h-64 flex-col items-center justify-center gap-3 text-center text-secondary-300">
-                  <ScanLine className="h-10 w-10 text-primary-400" />
-                  <p className="text-sm font-semibold text-white">Scan a card's QR code</p>
-                  <p className="max-w-xs text-xs text-secondary-400">
+                <div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
+                  <ScanLine className="h-10 w-10" style={{ color: "var(--dx-accent)" }} />
+                  <p className="text-[14px] font-semibold text-white">Scan a card's QR code</p>
+                  <p className="max-w-xs text-[12px] text-white/50">
                     Point your camera at the QR code on the membership card to verify it.
                   </p>
-                  <Button
-                    size="sm"
-                    onClick={startCamera}
-                    leftIcon={<Camera className="h-4 w-4" />}
-                    disabled={verifyMut.isPending}
-                  >
+                  <DxButton size="sm" variant="primary" onClick={startCamera} leftIcon={<Camera className="h-4 w-4" />} disabled={verifyMut.isPending}>
                     Start camera
-                  </Button>
+                  </DxButton>
                 </div>
               ) : (
                 <>
                   <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div className="h-40 w-40 rounded-2xl border-2 border-primary-400/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+                    <div className="h-40 w-40 rounded-xl border-2" style={{ borderColor: "var(--dx-accent)", boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)" }} />
                   </div>
-                  <button
-                    onClick={stopStream}
-                    className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-xl bg-white/90 px-4 py-1.5 text-xs font-bold text-secondary-800 shadow"
-                  >
+                  <button onClick={stopStream} className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md bg-white/90 px-4 py-1.5 text-[12px] font-semibold text-slate-800 shadow">
                     Stop
                   </button>
                 </>
@@ -188,14 +186,14 @@ export function VerifyCardModal({ isOpen, onClose }: { isOpen: boolean; onClose:
             </div>
 
             {cameraError ? (
-              <p className="flex items-center gap-2 text-xs font-medium text-amber-600">
+              <p className="flex items-center gap-2 text-[12px] font-medium text-[var(--dx-warning)]">
                 <AlertTriangle className="h-4 w-4 shrink-0" /> {cameraError}
               </p>
             ) : null}
 
             {/* Manual entry */}
-            <div className="rounded-2xl border border-secondary-200 p-4 dark:border-white/10">
-              <label className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-secondary-500">
+            <div className="rounded-md border border-[var(--dx-border)] p-4">
+              <label className="dx-field-label mb-2 flex items-center gap-1.5">
                 <Keyboard className="h-3.5 w-3.5" /> Or enter the code manually
               </label>
               <div className="flex gap-2">
@@ -204,21 +202,16 @@ export function VerifyCardModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                   onChange={(e) => setManual(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && submitManual()}
                   placeholder="Card number or scanned QR content"
-                  className="flex-1 rounded-xl border border-secondary-300 bg-white/70 px-3 py-2.5 text-sm outline-none focus:border-primary-500 dark:bg-white/5"
+                  className="dx-editor flex-1"
                 />
-                <Button
-                  onClick={submitManual}
-                  isLoading={verifyMut.isPending}
-                  disabled={!manual.trim()}
-                  leftIcon={<ShieldCheck className="h-4 w-4" />}
-                >
+                <DxButton variant="primary" onClick={submitManual} isLoading={verifyMut.isPending} disabled={!manual.trim()} leftIcon={<ShieldCheck className="h-4 w-4" />}>
                   Verify
-                </Button>
+                </DxButton>
               </div>
             </div>
 
             {verifyMut.isPending ? (
-              <p className="flex items-center justify-center gap-2 text-xs text-secondary-400">
+              <p className="flex items-center justify-center gap-2 text-[12px] text-[var(--dx-text-muted)]">
                 <Loader2 className="h-4 w-4 animate-spin" /> Verifying…
               </p>
             ) : null}
@@ -226,15 +219,7 @@ export function VerifyCardModal({ isOpen, onClose }: { isOpen: boolean; onClose:
         ) : (
           /* ---- Result ---- */
           <div className="space-y-5">
-            <div
-              className={`flex items-center gap-4 rounded-2xl border p-5 ${
-                tone === "valid"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : tone === "warning"
-                  ? "border-amber-200 bg-amber-50 text-amber-700"
-                  : "border-rose-200 bg-rose-50 text-rose-700"
-              }`}
-            >
+            <div className="flex items-center gap-4 rounded-md border p-5" style={toneStyle}>
               {tone === "valid" ? (
                 <CheckCircle2 className="h-10 w-10 shrink-0" />
               ) : tone === "warning" ? (
@@ -243,83 +228,61 @@ export function VerifyCardModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                 <XCircle className="h-10 w-10 shrink-0" />
               )}
               <div>
-                <p className="text-base font-black">
-                  {tone === "valid"
-                    ? "Valid card"
-                    : tone === "warning"
-                    ? "Card found — not usable"
-                    : "Not verified"}
+                <p className="text-[16px] font-bold">
+                  {tone === "valid" ? "Valid card" : tone === "warning" ? "Card found — not usable" : "Not verified"}
                 </p>
-                <p className="text-sm font-medium">{result.message}</p>
+                <p className="text-[13px] font-medium">{result.message}</p>
               </div>
             </div>
 
             {result.valid ? (
-              <div className="space-y-3 rounded-2xl border border-secondary-200 p-5 dark:border-white/10">
+              <div className="space-y-3 rounded-md border border-[var(--dx-border)] p-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary-900 text-white">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]">
                     <UserRound className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-secondary-900">
-                      {result.patient_name || `Patient #${result.patient_id}`}
-                    </p>
-                    {result.patient_mrn ? (
-                      <p className="data-mono text-[11px] text-secondary-400">{result.patient_mrn}</p>
-                    ) : null}
+                    <p className="text-[14px] font-semibold text-[var(--dx-text)]">{result.patient_name || `Patient #${result.patient_id}`}</p>
+                    {result.patient_mrn ? <p className="dx-mono text-[11px] text-[var(--dx-text-muted)]">{result.patient_mrn}</p> : null}
                   </div>
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 pt-1 text-sm">
                   <div>
-                    <dt className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                      Card number
-                    </dt>
-                    <dd className="data-mono flex items-center gap-1 font-semibold text-secondary-800">
-                      <CreditCard className="h-3.5 w-3.5 text-secondary-400" />
+                    <dt className="text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">Card number</dt>
+                    <dd className="dx-mono flex items-center gap-1 font-semibold text-[var(--dx-text)]">
+                      <CreditCard className="h-3.5 w-3.5 text-[var(--dx-text-muted)]" />
                       {result.card_number}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                      Status
-                    </dt>
-                    <dd className="font-semibold text-secondary-800">{result.status || "—"}</dd>
+                    <dt className="text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">Status</dt>
+                    <dd className="font-semibold text-[var(--dx-text)]">{result.status || "—"}</dd>
                   </div>
                   <div>
-                    <dt className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                      Wallet balance
-                    </dt>
-                    <dd className="font-semibold text-primary-600">{formatCardMoney(result.balance)}</dd>
+                    <dt className="text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">Wallet balance</dt>
+                    <dd className="font-semibold text-[var(--dx-accent)]">{formatCardMoney(result.balance)}</dd>
                   </div>
                   <div>
-                    <dt className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                      Valid thru
-                    </dt>
-                    <dd className="font-semibold text-secondary-800">{safeDate(result.expiry_date)}</dd>
+                    <dt className="text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">Valid thru</dt>
+                    <dd className="font-semibold text-[var(--dx-text)]">{safeDate(result.expiry_date)}</dd>
                   </div>
                   {result.hospital_name ? (
                     <div className="col-span-2">
-                      <dt className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                        Issued by
-                      </dt>
-                      <dd className="font-semibold text-secondary-800">{result.hospital_name}</dd>
+                      <dt className="text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">Issued by</dt>
+                      <dd className="font-semibold text-[var(--dx-text)]">{result.hospital_name}</dd>
                     </div>
                   ) : null}
                 </dl>
               </div>
             ) : null}
 
-            <div className="flex justify-end gap-3">
-              <Button variant="secondary" onClick={handleClose}>
-                Close
-              </Button>
-              <Button onClick={reset} leftIcon={<ScanLine className="h-4 w-4" />}>
-                Verify another
-              </Button>
+            <div className="flex justify-end gap-2">
+              <DxButton onClick={handleClose}>Close</DxButton>
+              <DxButton variant="primary" onClick={reset} leftIcon={<ScanLine className="h-4 w-4" />}>Verify another</DxButton>
             </div>
           </div>
         )}
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

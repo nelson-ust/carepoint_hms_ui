@@ -1,17 +1,12 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, Plus, RefreshCw } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
-import { Modal } from "@/components/ui/Modal";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
-import { Pagination } from "@/components/data-table/Pagination";
+import { ClipboardList, Plus, RotateCcw } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxGrid, DxPager, DxBadge, DxButton, DxPopup,
+  DxInput, DxSelect, DxTextarea, DxStatusBar, DxStatusItem,
+  type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { PatientPicker } from "@/components/forms/pickers";
 import type { EntityOption } from "@/components/forms/EntityPicker";
@@ -31,11 +26,11 @@ const STATUS_OPTIONS = [
   { value: "CANCELLED", label: "Cancelled" },
 ];
 
-function statusVariant(s: string): "soft-success" | "soft-warning" | "soft-info" | "secondary" {
-  if (s === "ACTIVE") return "soft-success";
-  if (s === "ON_HOLD") return "soft-warning";
-  if (s === "DRAFT") return "soft-info";
-  return "secondary";
+function statusTone(s: string): DxBadgeTone {
+  if (s === "ACTIVE") return "success";
+  if (s === "ON_HOLD") return "warning";
+  if (s === "DRAFT") return "info";
+  return "neutral";
 }
 
 export function CarePlansPage() {
@@ -55,31 +50,29 @@ export function CarePlansPage() {
   const items = query.data?.items ?? [];
   const total = query.data?.total ?? 0;
 
-  const columns: DataTableColumn<CarePlan>[] = useMemo(
+  const columns: DxGridColumn<CarePlan>[] = useMemo(
     () => [
       {
         key: "title",
         header: "Care plan",
         render: (r) => (
-          <div>
-            <div className="font-semibold text-secondary-900 dark:text-white">{r.title}</div>
-            <div className="text-xs text-secondary-500">{r.condition || "—"}</div>
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-semibold text-[var(--dx-text)]">{r.title}</div>
+            <div className="text-[11px] text-[var(--dx-text-muted)]">{r.condition || "—"}</div>
           </div>
         ),
       },
-      { key: "patient", header: "Patient", render: (r) => r.patient_name || `#${r.patient_id}` },
-      { key: "status", header: "Status", render: (r) => <Badge variant={statusVariant(String(r.status))}>{labelize(r.status)}</Badge> },
-      { key: "goals", header: "Goals", render: (r) => r.goal_count ?? 0 },
-      { key: "tasks", header: "Open tasks", render: (r) => r.open_task_count ?? 0 },
-      { key: "lead", header: "Lead", render: (r) => r.lead_staff_name || "—" },
+      { key: "patient", header: "Patient", render: (r) => <span className="text-[13px] text-[var(--dx-text)]">{r.patient_name || `#${r.patient_id}`}</span> },
+      { key: "status", header: "Status", align: "center", render: (r) => <DxBadge tone={statusTone(String(r.status))}>{labelize(r.status)}</DxBadge> },
+      { key: "goals", header: "Goals", align: "center", render: (r) => <span className="dx-mono text-[13px] text-[var(--dx-text)]">{r.goal_count ?? 0}</span> },
+      { key: "tasks", header: "Open tasks", align: "center", render: (r) => <span className="dx-mono text-[13px] text-[var(--dx-text)]">{r.open_task_count ?? 0}</span> },
+      { key: "lead", header: "Lead", render: (r) => <span className="text-[13px] text-[var(--dx-text)]">{r.lead_staff_name || <span className="text-[var(--dx-text-faint)]">—</span>}</span> },
       {
         key: "actions",
         header: "",
         align: "right",
         render: (r) => (
-          <Button size="sm" variant="secondary" onClick={() => navigate(routes.carePlanDetail.replace(":planId", String(r.id)))}>
-            Open
-          </Button>
+          <DxButton size="sm" onClick={() => navigate(routes.carePlanDetail.replace(":planId", String(r.id)))}>Open</DxButton>
         ),
       },
     ],
@@ -87,43 +80,48 @@ export function CarePlansPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Home health" }, { label: "Care plans" }]}
         title="Care Plans"
-        description="Individualized care plans with goals, interventions, tasks and reviews."
+        subtitle="Individualized care plans with goals, interventions, tasks and reviews."
         actions={
           <>
-            <Button variant="ghost" size="sm" onClick={() => query.refetch()}><RefreshCw className="h-4 w-4" /> Refresh</Button>
-            <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> New care plan</Button>
+            <DxButton icon title="Refresh" onClick={() => query.refetch()} isLoading={query.isFetching}><RotateCcw /></DxButton>
+            <DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>New care plan</DxButton>
           </>
         }
       />
-      <Card className="flex flex-wrap items-end gap-4">
-        <div className="w-56">
-          <Select label="Status" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} options={STATUS_OPTIONS} />
-        </div>
-        <div className="text-sm text-secondary-500">{total} plan(s)</div>
-      </Card>
-      <Card padding="none">
-        <DataTable<CarePlan>
-          columns={columns}
-          data={items}
-          rowKey={(r) => r.id}
-          isLoading={query.isLoading}
-          error={query.isError ? apiErrorMessage(query.error, "Couldn't load care plans.") : null}
-          onRetry={() => query.refetch()}
-          empty={{ icon: ClipboardList, title: "No care plans", description: "Create one to get started." }}
-          footer={<Pagination page={page} totalItems={total} totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))} pageSize={PAGE_SIZE} onPageChange={setPage} />}
-        />
-      </Card>
 
-      {showCreate && (
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="w-56">
+          <DxSelect label="Status" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} options={STATUS_OPTIONS} />
+        </div>
+      </div>
+
+      <DxStatusBar>
+        <DxStatusItem icon={<ClipboardList className="h-3.5 w-3.5" />}>{total} plan{total === 1 ? "" : "s"}{status ? ` · ${labelize(status)}` : ""}</DxStatusItem>
+      </DxStatusBar>
+
+      <DxGrid<CarePlan>
+        columns={columns}
+        data={items}
+        rowKey={(r) => r.id}
+        isLoading={query.isLoading}
+        error={query.isError ? apiErrorMessage(query.error, "Couldn't load care plans.") : null}
+        onRetry={() => query.refetch()}
+        onRowClick={(r) => navigate(routes.carePlanDetail.replace(":planId", String(r.id)))}
+        empty={{ icon: ClipboardList, title: "No care plans", description: "Create one to get started." }}
+        footer={<DxPager page={page} totalItems={total} totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))} pageSize={PAGE_SIZE} onPageChange={setPage} />}
+      />
+
+      {showCreate ? (
         <CreateCarePlanModal
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ["care-plans", "list"] }); toast.success("Care plan created"); }}
         />
-      )}
-    </div>
+      ) : null}
+    </DxPage>
   );
 }
 
@@ -160,29 +158,30 @@ function CreateCarePlanModal({ onClose, onCreated }: { onClose: () => void; onCr
   };
 
   return (
-    <Modal
+    <DxPopup
       isOpen
       onClose={onClose}
       title="Create a care plan"
       size="lg"
+      locked={mutation.isPending}
       footer={
-        <div className="flex justify-end gap-3">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit} disabled={mutation.isPending}>{mutation.isPending ? "Creating…" : "Create"}</Button>
-        </div>
+        <>
+          <DxButton onClick={onClose} disabled={mutation.isPending}>Cancel</DxButton>
+          <DxButton variant="primary" onClick={submit} isLoading={mutation.isPending}>Create</DxButton>
+        </>
       }
     >
       <div className="space-y-4">
         <PatientPicker value={patient} onChange={setPatient} />
-        <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Diabetes management" />
+        <DxInput label="Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Diabetes management" />
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Condition" value={condition} onChange={(e) => setCondition(e.target.value)} />
-          <Select label="Priority" value={priority} onChange={(e) => setPriority(e.target.value)} options={PRIORITY_OPTIONS} />
+          <DxInput label="Condition" value={condition} onChange={(e) => setCondition(e.target.value)} />
+          <DxSelect label="Priority" value={priority} onChange={(e) => setPriority(e.target.value)} options={PRIORITY_OPTIONS} />
         </div>
         <StaffPicker label="Lead clinician" value={leadStaffId} onChange={(id) => setLeadStaffId(id)} />
-        <Input label="Review frequency (days)" type="number" value={reviewDays} onChange={(e) => setReviewDays(e.target.value)} />
-        <Textarea label="Description" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <DxInput label="Review frequency (days)" type="number" value={reviewDays} onChange={(e) => setReviewDays(e.target.value)} />
+        <DxTextarea label="Description" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

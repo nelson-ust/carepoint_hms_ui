@@ -1,4 +1,8 @@
-import { PageHeader } from "@/components/layout/PageHeader";
+import {
+  DxPage, DxPageHeader, DxKpi, DxGrid, DxBadge, DxButton, DxPopup,
+  DxInput, DxSelect, DxMessage,
+  type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -47,15 +51,6 @@ import { searchPatients, getPatientById } from "@/features/patients/api/patients
 import type { Patient } from "@/features/patients/api/patients.api";
 import { getStaff, getCurrentStaff, staffDisplayName } from "@/features/staff/api/staff.api";
 import type { Staff } from "@/features/staff/api/staff.api";
-
-const statusStyles: Record<string, string> = {
-  ADMITTED: "bg-primary-50 text-primary-600 border-primary-100",
-  ON_LEAVE: "bg-amber-50 text-amber-600 border-amber-100",
-  TRANSFERRED: "bg-secondary-100 text-secondary-600 border-secondary-200",
-  AWAITING_DISCHARGE: "bg-amber-50 text-amber-600 border-amber-100",
-  DISCHARGED: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  CANCELLED: "bg-rose-50 text-rose-600 border-rose-100",
-};
 
 const STATUS_FILTERS = [
   { value: "", label: "All Statuses" },
@@ -677,759 +672,363 @@ export function AdmissionsPage() {
   };
 
   // ----- Render -----
-  return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <PageHeader
-          title="Admissions & Wards"
-          description="Track every inpatient — admission, ward transfers, status changes, and bed-day billing."
-        />
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={load}
-            className="btn-secondary p-4 rounded-2xl bg-white/80 border-secondary-400 hover:rotate-180 transition-transform duration-500"
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={openFromVisit}
-            className="btn-secondary gap-2 px-5 py-3 rounded-2xl bg-white/80 border-secondary-400"
-          >
-            <ArrowRightLeft className="h-4 w-4" />
-            <span className="text-sm font-bold">From Visit</span>
-          </button>
-          <button
-            onClick={openAdmit}
-            className="btn-primary gap-3 py-3 px-7 shadow-xl shadow-primary-500/20"
-          >
-            <LogIn className="h-5 w-5" />
-            <span className="font-bold">Admit Patient</span>
-          </button>
-        </div>
-      </div>
+  const statusTone = (key: string): DxBadgeTone => {
+    switch (key) {
+      case "DISCHARGED":
+        return "success";
+      case "CANCELLED":
+        return "danger";
+      case "ON_LEAVE":
+      case "AWAITING_DISCHARGE":
+        return "warning";
+      case "TRANSFERRED":
+        return "neutral";
+      default:
+        return "info";
+    }
+  };
 
-      {feedback && (
-        <div
-          className={`px-6 py-4 rounded-2xl border flex items-center gap-3 shadow-lg animate-fade-in ${feedback.tone === "success"
-              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-              : "bg-rose-50 text-rose-700 border-rose-100"
-            }`}
-        >
-          {feedback.tone === "success" ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-          <span className="text-sm font-bold">{feedback.message}</span>
+  const admissionColumns: DxGridColumn<Admission>[] = [
+    {
+      key: "admission",
+      header: "Admission",
+      render: (a) => (
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--dx-accent)] text-white">
+            <BedIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="dx-mono text-[12px] font-semibold text-[var(--dx-text)]">{a.admission_no}</p>
+            <p className="text-[11px] text-[var(--dx-text-muted)]">
+              #{a.id}
+              {a.visit_id ? (
+                <>
+                  {" · "}
+                  <Link to={`/visits/${a.visit_id}`} className="inline-flex items-center gap-0.5 hover:text-[var(--dx-accent)]">
+                    Visit #{a.visit_id}
+                    <ExternalLink className="h-2.5 w-2.5" />
+                  </Link>
+                </>
+              ) : null}
+            </p>
+          </div>
         </div>
-      )}
+      ),
+    },
+    {
+      key: "patient",
+      header: "Patient",
+      render: (a) =>
+        a.patient ? (
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--dx-accent-soft)] text-[11px] font-bold text-[var(--dx-accent)]">
+              {(a.patient.first_name?.[0] ?? "?")}
+              {(a.patient.last_name?.[0] ?? "?")}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-[13px] font-semibold text-[var(--dx-text)]">{a.patient.first_name} {a.patient.last_name}</p>
+              <p className="dx-mono text-[11px] text-[var(--dx-text-muted)]">{a.patient.hospital_number}</p>
+            </div>
+          </div>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-[13px] text-[var(--dx-text)]"><User className="h-3.5 w-3.5" /> Patient #{a.patient_id}</span>
+        ),
+    },
+    {
+      key: "ward_bed",
+      header: "Ward / Bed",
+      render: (a) => (
+        <div className="space-y-1">
+          <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--dx-text)]"><Hospital className="h-3 w-3 text-[var(--dx-text-muted)]" /> {wardName(a.ward_id)}</span>
+          <p className="dx-mono text-[11px] text-[var(--dx-text-muted)]"><BedIcon className="mr-1 inline h-2.5 w-2.5" />{bedNumber(a.bed_id)}</p>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      align: "center",
+      render: (a) => {
+        const key = (a.admission_status || "ADMITTED").toUpperCase();
+        return <DxBadge tone={statusTone(key)}>{key.replace("_", " ")}</DxBadge>;
+      },
+    },
+    {
+      key: "admitted",
+      header: "Admitted",
+      render: (a) => (
+        <div>
+          <div className="flex items-center gap-1.5 text-[12px] text-[var(--dx-text-muted)]"><Clock className="h-3 w-3" />{formatDateTime(a.admitted_at || a.created_at)}</div>
+          {a.expected_discharge_at && !a.actual_discharge_at ? (
+            <p className="mt-1 flex items-center gap-1 text-[11px] text-[var(--dx-warning)]"><CalendarClock className="h-2.5 w-2.5" />Exp. {formatDateTime(a.expected_discharge_at)}</p>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      render: (a) => {
+        const key = (a.admission_status || "ADMITTED").toUpperCase();
+        const isClosed = ["DISCHARGED", "CANCELLED"].includes(key);
+        return (
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {!isClosed ? (
+              <>
+                <DxButton size="sm" leftIcon={<ArrowRightLeft className="h-3.5 w-3.5" />} onClick={() => openTransfer(a)}>Transfer</DxButton>
+                <DxButton size="sm" variant="primary" leftIcon={<Sliders className="h-3.5 w-3.5" />} onClick={() => openStatus(a)}>Status</DxButton>
+                <DxButton size="sm" leftIcon={<Coins className="h-3.5 w-3.5" />} onClick={() => openBedDays(a)}>Bed-days</DxButton>
+              </>
+            ) : (
+              <DxButton size="sm" variant="text" leftIcon={<Coins className="h-3.5 w-3.5" />} onClick={() => openBedDays(a)}>Bed-days</DxButton>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
+  return (
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Admissions" }]}
+        title="Admissions & Wards"
+        subtitle="Track every inpatient — admission, ward transfers, status changes, and bed-day billing."
+        actions={
+          <>
+            <DxButton icon title="Refresh" onClick={load} isLoading={isLoading}><RefreshCw /></DxButton>
+            <DxButton leftIcon={<ArrowRightLeft className="h-4 w-4" />} onClick={openFromVisit}>From visit</DxButton>
+            <DxButton variant="primary" leftIcon={<LogIn className="h-4 w-4" />} onClick={openAdmit}>Admit patient</DxButton>
+          </>
+        }
+      />
+
+      {feedback ? <DxMessage tone={feedback.tone === "success" ? "success" : "danger"}>{feedback.message}</DxMessage> : null}
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <StatCard icon={ListChecks} label="Total" value={stats.total} tone="primary" />
-        <StatCard icon={BedIcon} label="Admitted" value={stats.admitted} tone="primary" />
-        <StatCard icon={Clock} label="Awaiting Discharge" value={stats.awaitingDischarge} tone="amber" />
-        <StatCard icon={CheckCircle2} label="Discharged" value={stats.discharged} tone="emerald" />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <DxKpi label="Total" value={stats.total} icon={ListChecks} tone="accent" />
+        <DxKpi label="Admitted" value={stats.admitted} icon={BedIcon} tone="info" />
+        <DxKpi label="Awaiting discharge" value={stats.awaitingDischarge} icon={Clock} tone="warning" />
+        <DxKpi label="Discharged" value={stats.discharged} icon={CheckCircle2} tone="success" />
       </div>
 
       {/* Filters */}
-      <div className="glass-card rounded-[2rem] p-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center bg-white/40 backdrop-blur-md">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-secondary-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by admission #, patient name, hospital number, reason..."
-            className="w-full bg-white/50 border-none rounded-2xl pl-14 pr-6 py-4 text-sm focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
-          />
+      <div className="flex flex-col gap-3 md:flex-row md:items-end">
+        <div className="flex-1">
+          <DxInput leftIcon={<Search className="h-3.5 w-3.5" />} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by admission #, patient name, hospital number, reason…" />
         </div>
-        <div className="relative">
-          <Filter className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
-          >
-            {STATUS_FILTERS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+        <div className="w-full md:w-52">
+          <DxSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} options={STATUS_FILTERS} aria-label="Filter by status" />
         </div>
-        {wards.length > 0 && (
-          <div className="relative">
-            <Hospital className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-400 pointer-events-none" />
-            <select
-              value={wardFilter}
-              onChange={(e) => setWardFilter(e.target.value)}
-              className="appearance-none bg-white/80 border border-secondary-400 rounded-2xl pl-11 pr-8 py-4 text-xs font-bold uppercase tracking-widest text-secondary-700 focus:ring-2 focus:ring-primary-500/40"
-            >
-              <option value="">All Wards</option>
-              {wards.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name ?? `Ward #${w.id}`}
-                </option>
-              ))}
-            </select>
+        {wards.length > 0 ? (
+          <div className="w-full md:w-52">
+            <DxSelect value={wardFilter} onChange={(e) => setWardFilter(e.target.value)} aria-label="Filter by ward"
+              options={[{ value: "", label: "All wards" }, ...wards.map((w) => ({ value: String(w.id), label: w.name ?? `Ward #${w.id}` }))]} />
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Table */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden border border-secondary-400/50 shadow-premium bg-white/40">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-secondary-900/5">
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Admission</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Patient</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Ward / Bed</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Status</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500">Admitted</th>
-                <th className="px-8 py-6 text-[11px] font-bold uppercase tracking-[0.2em] text-secondary-500 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-secondary-100/50">
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="animate-pulse">
-                    <td colSpan={6} className="px-8 py-6">
-                      <div className="h-14 bg-secondary-100/30 rounded-2xl" />
-                    </td>
-                  </tr>
-                ))
-              ) : error ? (
-                <tr>
-                  <td colSpan={6} className="px-8 py-20 text-center">
-                    <AlertCircle className="h-12 w-12 mx-auto text-rose-500/50 mb-4" />
-                    <p className="text-secondary-600 font-bold">{error}</p>
-                    <button onClick={load} className="btn-primary mt-4 py-3 px-8">
-                      Try Again
-                    </button>
-                  </td>
-                </tr>
-              ) : filteredAdmissions.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-8 py-32 text-center">
-                    <div className="h-20 w-20 bg-secondary-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
-                      <BedIcon className="h-10 w-10 text-secondary-200" />
-                    </div>
-                    <h4 className="text-xl font-bold text-secondary-900">No Admissions</h4>
-                    <p className="text-sm text-secondary-500 mt-2">
-                      {admissions.length === 0
-                        ? "Admit the first patient to start the inpatient ledger."
-                        : "No admissions match your filters."}
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                filteredAdmissions.map((a) => {
-                  const statusKey = (a.admission_status || "ADMITTED").toUpperCase();
-                  const statusClass = statusStyles[statusKey] ?? statusStyles.ADMITTED;
-                  const isClosed = ["DISCHARGED", "CANCELLED"].includes(statusKey);
-                  return (
-                    <tr key={a.id} className="hover:bg-primary-50/30 transition-all">
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-3">
-                          <div className="h-11 w-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md">
-                            <BedIcon className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-mono font-bold text-secondary-900 uppercase tracking-tight">
-                              {a.admission_no}
-                            </p>
-                            <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-widest mt-0.5">
-                              #{a.id}
-                              {a.visit_id && (
-                                <>
-                                  {" · "}
-                                  <Link
-                                    to={`/visits/${a.visit_id}`}
-                                    className="hover:text-primary-500 inline-flex items-center gap-0.5"
-                                  >
-                                    Visit #{a.visit_id}
-                                    <ExternalLink className="h-2.5 w-2.5" />
-                                  </Link>
-                                </>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        {a.patient ? (
-                          <div className="flex items-center gap-2">
-                            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-[10px] font-black shadow-md">
-                              {(a.patient.first_name?.[0] ?? "?")}
-                              {(a.patient.last_name?.[0] ?? "?")}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-secondary-900 truncate">
-                                {a.patient.first_name} {a.patient.last_name}
-                              </p>
-                              <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase tracking-tighter mt-0.5">
-                                {a.patient.hospital_number}
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-secondary-700">
-                            <User className="h-3 w-3" />
-                            Patient #{a.patient_id}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="space-y-1">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary-100 text-secondary-600 text-[10px] font-bold uppercase tracking-widest">
-                            <Hospital className="h-3 w-3" />
-                            {wardName(a.ward_id)}
-                          </span>
-                          <p className="text-[10px] font-mono font-bold text-secondary-500">
-                            <BedIcon className="h-2.5 w-2.5 inline mr-1" />
-                            {bedNumber(a.bed_id)}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <span
-                          className={`inline-flex px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${statusClass}`}
-                        >
-                          {statusKey.replace("_", " ")}
-                        </span>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-secondary-600">
-                          <Clock className="h-3 w-3 text-secondary-400" />
-                          {formatDateTime(a.admitted_at || a.created_at)}
-                        </div>
-                        {a.expected_discharge_at && !a.actual_discharge_at && (
-                          <p className="text-[10px] font-bold text-amber-600 mt-1 flex items-center gap-1">
-                            <CalendarClock className="h-2.5 w-2.5" />
-                            Exp. {formatDateTime(a.expected_discharge_at)}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                          {!isClosed && (
-                            <>
-                              <button
-                                onClick={() => openTransfer(a)}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold uppercase tracking-widest shadow-md"
-                                title="Transfer Bed"
-                              >
-                                <ArrowRightLeft className="h-3 w-3" />
-                                Transfer
-                              </button>
-                              <button
-                                onClick={() => openStatus(a)}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-[10px] font-bold uppercase tracking-widest shadow-md"
-                                title="Update Status"
-                              >
-                                <Sliders className="h-3 w-3" />
-                                Status
-                              </button>
-                              <button
-                                onClick={() => openBedDays(a)}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest shadow-md"
-                                title="Capture Bed-Day Charges"
-                              >
-                                <Coins className="h-3 w-3" />
-                                Bed-Days
-                              </button>
-                            </>
-                          )}
-                          {isClosed && (
-                            <button
-                              onClick={() => openBedDays(a)}
-                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary-100 hover:bg-secondary-200 text-secondary-700 text-[10px] font-bold uppercase tracking-widest"
-                              title="Bed-Days"
-                            >
-                              <Coins className="h-3 w-3" />
-                              Bed-Days
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DxGrid<Admission>
+        columns={admissionColumns}
+        data={filteredAdmissions}
+        rowKey={(a) => a.id}
+        isLoading={isLoading}
+        error={error}
+        onRetry={load}
+        empty={{
+          icon: BedIcon,
+          title: "No admissions",
+          description: admissions.length === 0 ? "Admit the first patient to start the inpatient ledger." : "No admissions match your filters.",
+        }}
+      />
 
       {/* MODALS */}
-      {actionKind === "admit" && (
-        <ModalShell
-          title="Admit Patient"
-          subtitle="Open A New Inpatient Stay"
-          onClose={closeAction}
-          icon={LogIn}
-        >
-          {actionError && (
-            <ErrorBanner message={actionError} />
-          )}
-          <div className="space-y-5">
+      {actionKind === "admit" ? (
+        <ModalShell title="Admit patient" subtitle="Open a new inpatient stay" onClose={closeAction} icon={LogIn}>
+          {actionError ? <ErrorBanner message={actionError} /> : null}
+          <div className="space-y-4">
             {/* Patient picker */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                Patient *
-              </label>
+            <div className="dx-field">
+              <label className="dx-field-label">Patient *</label>
               {admitForm.patient_id ? (
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-primary-50 border border-primary-100">
-                  <div className="flex items-center gap-3">
-                    <User className="h-4 w-4 text-primary-600" />
-                    <p className="text-sm font-bold text-secondary-900">
-                      {admitForm.patient_label}
-                    </p>
+                <div className="flex items-center justify-between rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-[var(--dx-accent)]" />
+                    <p className="text-[13px] font-semibold text-[var(--dx-text)]">{admitForm.patient_label}</p>
                   </div>
-                  <button
-                    onClick={() =>
-                      setAdmitForm({ ...admitForm, patient_id: null, patient_label: "" })
-                    }
-                    className="p-1.5 rounded-lg hover:bg-white text-secondary-500"
-                  >
+                  <button onClick={() => setAdmitForm({ ...admitForm, patient_id: null, patient_label: "" })} className="rounded p-1 text-[var(--dx-text-muted)] hover:bg-[var(--dx-surface-alt)]">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={patientQuery}
-                    onChange={(e) => setPatientQuery(e.target.value)}
-                    placeholder="Search by name or hospital number..."
-                    className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-                  />
-                  {searchingPatients && (
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-                      Searching...
-                    </p>
-                  )}
-                  {patientResults.length > 0 && (
-                    <div className="max-h-48 overflow-y-auto rounded-xl border border-secondary-400 bg-white divide-y divide-secondary-100">
+                  <input type="text" value={patientQuery} onChange={(e) => setPatientQuery(e.target.value)} placeholder="Search by name or hospital number…" className="dx-editor w-full" />
+                  {searchingPatients ? <p className="text-[11px] text-[var(--dx-text-muted)]">Searching…</p> : null}
+                  {patientResults.length > 0 ? (
+                    <div className="max-h-48 divide-y divide-[var(--dx-border)] overflow-y-auto rounded-md border border-[var(--dx-border)]">
                       {patientResults.map((p) => (
-                        <button
-                          key={p.id}
-                          onClick={() => {
-                            setAdmitForm({
-                              ...admitForm,
-                              patient_id: p.id,
-                              patient_label: `${p.first_name} ${p.last_name} · ${p.hospital_number}`,
-                            });
-                            setPatientQuery("");
-                            setPatientResults([]);
-                          }}
-                          className="w-full text-left p-3 hover:bg-primary-50/40 transition-colors"
-                        >
-                          <p className="text-sm font-bold text-secondary-900">
-                            {p.first_name} {p.last_name}
-                          </p>
-                          <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase">
-                            {p.hospital_number}
-                          </p>
+                        <button key={p.id} onClick={() => { setAdmitForm({ ...admitForm, patient_id: p.id, patient_label: `${p.first_name} ${p.last_name} · ${p.hospital_number}` }); setPatientQuery(""); setPatientResults([]); }}
+                          className="w-full p-2.5 text-left hover:bg-[var(--dx-surface-alt)]">
+                          <p className="text-[13px] font-semibold text-[var(--dx-text)]">{p.first_name} {p.last_name}</p>
+                          <p className="dx-mono text-[11px] text-[var(--dx-text-muted)]">{p.hospital_number}</p>
                         </button>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               )}
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <VisitPicker
-                label="Linked Visit (Optional)"
-                value={admitForm.visit_id}
-                visits={patientVisits}
-                labelFor={(v) =>
-                  `${v.visit_code || `VISIT-${v.id}`} · ${String(v.status || "").replace(/_/g, " ")}`
-                }
-                placeholder={admitForm.patient_id ? "— No linked visit —" : "Select a patient first"}
-                disabled={!admitForm.patient_id}
-                emptyHint={
-                  admitForm.patient_id && patientVisits.length === 0
-                    ? "This patient has no open visits."
-                    : undefined
-                }
-                onChange={(v) => setAdmitForm({ ...admitForm, visit_id: v })}
-              />
-              <StaffPicker
-                label="Admitting Staff"
-                value={admitForm.admitting_staff_id}
-                onChange={(v) => setAdmitForm({ ...admitForm, admitting_staff_id: v })}
-                staffList={staffList}
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <VisitPicker label="Linked visit (optional)" value={admitForm.visit_id} visits={patientVisits}
+                labelFor={(v) => `${v.visit_code || `VISIT-${v.id}`} · ${String(v.status || "").replace(/_/g, " ")}`}
+                placeholder={admitForm.patient_id ? "— No linked visit —" : "Select a patient first"} disabled={!admitForm.patient_id}
+                emptyHint={admitForm.patient_id && patientVisits.length === 0 ? "This patient has no open visits." : undefined}
+                onChange={(v) => setAdmitForm({ ...admitForm, visit_id: v })} />
+              <StaffPicker label="Admitting staff" value={admitForm.admitting_staff_id} onChange={(v) => setAdmitForm({ ...admitForm, admitting_staff_id: v })} staffList={staffList} />
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <WardPicker
-                label="Ward *"
-                value={admitForm.ward_id}
-                wards={wards}
-                onChange={(v) => setAdmitForm({ ...admitForm, ward_id: v, bed_id: "" })}
-              />
-              <BedPicker
-                label="Bed *"
-                value={admitForm.bed_id}
-                wardId={admitForm.ward_id}
-                beds={beds}
-                onChange={(v) => setAdmitForm({ ...admitForm, bed_id: v })}
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <WardPicker label="Ward *" value={admitForm.ward_id} wards={wards} onChange={(v) => setAdmitForm({ ...admitForm, ward_id: v, bed_id: "" })} />
+              <BedPicker label="Bed *" value={admitForm.bed_id} wardId={admitForm.ward_id} beds={beds} onChange={(v) => setAdmitForm({ ...admitForm, bed_id: v })} />
             </div>
 
-            <FieldLabel label="Admission Reason">
-              <textarea
-                value={admitForm.admission_reason}
-                onChange={(e) =>
-                  setAdmitForm({ ...admitForm, admission_reason: e.target.value })
-                }
-                placeholder="Clinical reason for admission..."
-                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-              />
+            <FieldLabel label="Admission reason">
+              <textarea value={admitForm.admission_reason} onChange={(e) => setAdmitForm({ ...admitForm, admission_reason: e.target.value })} placeholder="Clinical reason for admission…" className="dx-editor w-full" rows={2} />
             </FieldLabel>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <FieldLabel label="Admitted At">
-                <input
-                  type="datetime-local"
-                  value={admitForm.admitted_at}
-                  onChange={(e) =>
-                    setAdmitForm({ ...admitForm, admitted_at: e.target.value })
-                  }
-                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono text-xs"
-                />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FieldLabel label="Admitted at">
+                <input type="datetime-local" value={admitForm.admitted_at} onChange={(e) => setAdmitForm({ ...admitForm, admitted_at: e.target.value })} className="dx-editor w-full dx-mono" />
               </FieldLabel>
-              <FieldLabel label="Expected Discharge">
-                <input
-                  type="datetime-local"
-                  value={admitForm.expected_discharge_at}
-                  onChange={(e) =>
-                    setAdmitForm({ ...admitForm, expected_discharge_at: e.target.value })
-                  }
-                  className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono text-xs"
-                />
+              <FieldLabel label="Expected discharge">
+                <input type="datetime-local" value={admitForm.expected_discharge_at} onChange={(e) => setAdmitForm({ ...admitForm, expected_discharge_at: e.target.value })} className="dx-editor w-full dx-mono" />
               </FieldLabel>
             </div>
 
-            <ToggleSwitch
-              label="Emergency Admission"
-              hint="Bypass the doctor-recommendation requirement (life-threatening / ER)."
-              value={admitForm.is_emergency}
-              onChange={(v) => setAdmitForm({ ...admitForm, is_emergency: v })}
-            />
-
-            <ToggleSwitch
-              label="Capture First Bed-Day Charge"
-              hint="Auto-bill the first bed-day immediately"
-              value={admitForm.capture_first_bed_day_charge}
-              onChange={(v) =>
-                setAdmitForm({ ...admitForm, capture_first_bed_day_charge: v })
-              }
-            />
+            <ToggleSwitch label="Emergency admission" hint="Bypass the doctor-recommendation requirement (life-threatening / ER)." value={admitForm.is_emergency} onChange={(v) => setAdmitForm({ ...admitForm, is_emergency: v })} />
+            <ToggleSwitch label="Capture first bed-day charge" hint="Auto-bill the first bed-day immediately" value={admitForm.capture_first_bed_day_charge} onChange={(v) => setAdmitForm({ ...admitForm, capture_first_bed_day_charge: v })} />
           </div>
 
-          {admitActive && (
-            <div className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-700">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-              <p className="text-xs font-bold">
-                This patient already has an active admission ({admitActive.admission_no}). Discharge or cancel it before admitting again.
-              </p>
-            </div>
-          )}
-          <ModalActions
-            onClose={closeAction}
-            onSubmit={handleAdmit}
-            pending={actionPending}
-            submitLabel="Admit Patient"
-            submitIcon={LogIn}
-            disabled={!!admitActive}
-          />
+          {admitActive ? (
+            <DxMessage tone="warning" className="mt-4">This patient already has an active admission ({admitActive.admission_no}). Discharge or cancel it before admitting again.</DxMessage>
+          ) : null}
+          <ModalActions onClose={closeAction} onSubmit={handleAdmit} pending={actionPending} submitLabel="Admit patient" submitIcon={LogIn} disabled={!!admitActive} />
         </ModalShell>
-      )}
+      ) : null}
 
-      {actionKind === "from-visit" && (
-        <ModalShell
-          title="Convert Visit to Admission"
-          subtitle="Promote An Outpatient Visit Into Inpatient Care"
-          onClose={closeAction}
-          icon={ArrowRightLeft}
-        >
-          {actionError && <ErrorBanner message={actionError} />}
-          <div className="space-y-5">
-            <VisitPicker
-              label="Visit *"
-              value={fromVisitForm.visit_id}
-              visits={openVisits}
-              labelFor={visitOptionLabel}
-              placeholder="Select an open visit..."
-              emptyHint={
-                openVisits.length === 0 ? "No open visits are available to convert." : undefined
-              }
-              onChange={(v) => setFromVisitForm({ ...fromVisitForm, visit_id: v })}
-            />
-            <div className="grid sm:grid-cols-2 gap-4">
-              <WardPicker
-                label="Ward *"
-                value={fromVisitForm.ward_id}
-                wards={wards}
-                onChange={(v) =>
-                  setFromVisitForm({ ...fromVisitForm, ward_id: v, bed_id: "" })
-                }
-              />
-              <BedPicker
-                label="Bed *"
-                value={fromVisitForm.bed_id}
-                wardId={fromVisitForm.ward_id}
-                beds={beds}
-                onChange={(v) => setFromVisitForm({ ...fromVisitForm, bed_id: v })}
-              />
+      {actionKind === "from-visit" ? (
+        <ModalShell title="Convert visit to admission" subtitle="Promote an outpatient visit into inpatient care" onClose={closeAction} icon={ArrowRightLeft}>
+          {actionError ? <ErrorBanner message={actionError} /> : null}
+          <div className="space-y-4">
+            <VisitPicker label="Visit *" value={fromVisitForm.visit_id} visits={openVisits} labelFor={visitOptionLabel} placeholder="Select an open visit…"
+              emptyHint={openVisits.length === 0 ? "No open visits are available to convert." : undefined}
+              onChange={(v) => setFromVisitForm({ ...fromVisitForm, visit_id: v })} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <WardPicker label="Ward *" value={fromVisitForm.ward_id} wards={wards} onChange={(v) => setFromVisitForm({ ...fromVisitForm, ward_id: v, bed_id: "" })} />
+              <BedPicker label="Bed *" value={fromVisitForm.bed_id} wardId={fromVisitForm.ward_id} beds={beds} onChange={(v) => setFromVisitForm({ ...fromVisitForm, bed_id: v })} />
             </div>
-            <StaffPicker
-              label="Admitting Staff"
-              value={fromVisitForm.admitting_staff_id}
-              onChange={(v) =>
-                setFromVisitForm({ ...fromVisitForm, admitting_staff_id: v })
-              }
-              staffList={staffList}
-            />
-            <FieldLabel label="Admission Reason">
-              <textarea
-                value={fromVisitForm.admission_reason}
-                onChange={(e) =>
-                  setFromVisitForm({ ...fromVisitForm, admission_reason: e.target.value })
-                }
-                placeholder="Reason for converting this visit..."
-                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-              />
+            <StaffPicker label="Admitting staff" value={fromVisitForm.admitting_staff_id} onChange={(v) => setFromVisitForm({ ...fromVisitForm, admitting_staff_id: v })} staffList={staffList} />
+            <FieldLabel label="Admission reason">
+              <textarea value={fromVisitForm.admission_reason} onChange={(e) => setFromVisitForm({ ...fromVisitForm, admission_reason: e.target.value })} placeholder="Reason for converting this visit…" className="dx-editor w-full" rows={2} />
             </FieldLabel>
-            <FieldLabel label="Expected Discharge">
-              <input
-                type="datetime-local"
-                value={fromVisitForm.expected_discharge_at}
-                onChange={(e) =>
-                  setFromVisitForm({
-                    ...fromVisitForm,
-                    expected_discharge_at: e.target.value,
-                  })
-                }
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono text-xs"
-              />
+            <FieldLabel label="Expected discharge">
+              <input type="datetime-local" value={fromVisitForm.expected_discharge_at} onChange={(e) => setFromVisitForm({ ...fromVisitForm, expected_discharge_at: e.target.value })} className="dx-editor w-full dx-mono" />
             </FieldLabel>
-            <SdpPicker
-              label="Route To Service Point (Optional)"
-              value={fromVisitForm.route_to_service_delivery_point_id}
-              sdps={sdps}
-              onChange={(v) =>
-                setFromVisitForm({
-                  ...fromVisitForm,
-                  route_to_service_delivery_point_id: v,
-                })
-              }
-            />
-            <ToggleSwitch
-              label="Emergency Admission"
-              hint="Bypass the doctor-recommendation requirement (life-threatening / ER)."
-              value={fromVisitForm.is_emergency}
-              onChange={(v) => setFromVisitForm({ ...fromVisitForm, is_emergency: v })}
-            />
-
-            <ToggleSwitch
-              label="Capture First Bed-Day Charge"
-              hint="Auto-bill the first bed-day immediately"
-              value={fromVisitForm.capture_first_bed_day_charge}
-              onChange={(v) =>
-                setFromVisitForm({ ...fromVisitForm, capture_first_bed_day_charge: v })
-              }
-            />
+            <SdpPicker label="Route to service point (optional)" value={fromVisitForm.route_to_service_delivery_point_id} sdps={sdps} onChange={(v) => setFromVisitForm({ ...fromVisitForm, route_to_service_delivery_point_id: v })} />
+            <ToggleSwitch label="Emergency admission" hint="Bypass the doctor-recommendation requirement (life-threatening / ER)." value={fromVisitForm.is_emergency} onChange={(v) => setFromVisitForm({ ...fromVisitForm, is_emergency: v })} />
+            <ToggleSwitch label="Capture first bed-day charge" hint="Auto-bill the first bed-day immediately" value={fromVisitForm.capture_first_bed_day_charge} onChange={(v) => setFromVisitForm({ ...fromVisitForm, capture_first_bed_day_charge: v })} />
           </div>
-          {convertActive && (
-            <div className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-700">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-              <p className="text-xs font-bold">
-                This patient already has an active admission ({convertActive.admission_no}). Discharge or cancel it before converting this visit.
-              </p>
-            </div>
-          )}
-          <ModalActions
-            onClose={closeAction}
-            onSubmit={handleFromVisit}
-            pending={actionPending}
-            submitLabel="Convert to Admission"
-            submitIcon={ArrowRightLeft}
-            disabled={!!convertActive}
-          />
+          {convertActive ? (
+            <DxMessage tone="warning" className="mt-4">This patient already has an active admission ({convertActive.admission_no}). Discharge or cancel it before converting this visit.</DxMessage>
+          ) : null}
+          <ModalActions onClose={closeAction} onSubmit={handleFromVisit} pending={actionPending} submitLabel="Convert to admission" submitIcon={ArrowRightLeft} disabled={!!convertActive} />
         </ModalShell>
-      )}
+      ) : null}
 
-      {actionKind === "transfer" && actionTarget && (
-        <ModalShell
-          title="Transfer Bed"
-          subtitle="Move The Patient To A New Bed Or Ward"
-          onClose={closeAction}
-          icon={ArrowRightLeft}
-          tone="amber"
-        >
-          {actionError && <ErrorBanner message={actionError} />}
+      {actionKind === "transfer" && actionTarget ? (
+        <ModalShell title="Transfer bed" subtitle="Move the patient to a new bed or ward" onClose={closeAction} icon={ArrowRightLeft} tone="amber">
+          {actionError ? <ErrorBanner message={actionError} /> : null}
           <ContextStrip admission={actionTarget} wardName={wardName} bedNumber={bedNumber} />
-          <div className="space-y-5">
-            <div className="grid sm:grid-cols-2 gap-4">
-              <WardPicker
-                label="New Ward (Optional)"
-                value={transferForm.new_ward_id}
-                wards={wards}
-                onChange={(v) =>
-                  setTransferForm({ ...transferForm, new_ward_id: v, new_bed_id: "" })
-                }
-              />
-              <BedPicker
-                label="New Bed *"
-                value={transferForm.new_bed_id}
-                wardId={transferForm.new_ward_id}
-                beds={beds}
-                excludeBedId={actionTarget.bed_id}
-                onChange={(v) => setTransferForm({ ...transferForm, new_bed_id: v })}
-              />
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <WardPicker label="New ward (optional)" value={transferForm.new_ward_id} wards={wards} onChange={(v) => setTransferForm({ ...transferForm, new_ward_id: v, new_bed_id: "" })} />
+              <BedPicker label="New bed *" value={transferForm.new_bed_id} wardId={transferForm.new_ward_id} beds={beds} excludeBedId={actionTarget.bed_id} onChange={(v) => setTransferForm({ ...transferForm, new_bed_id: v })} />
             </div>
             <FieldLabel label="Reason">
-              <textarea
-                value={transferForm.reason}
-                onChange={(e) =>
-                  setTransferForm({ ...transferForm, reason: e.target.value })
-                }
-                placeholder="Why is this patient being moved?"
-                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-              />
+              <textarea value={transferForm.reason} onChange={(e) => setTransferForm({ ...transferForm, reason: e.target.value })} placeholder="Why is this patient being moved?" className="dx-editor w-full" rows={2} />
             </FieldLabel>
           </div>
-          <ModalActions
-            onClose={closeAction}
-            onSubmit={handleTransfer}
-            pending={actionPending}
-            submitLabel="Transfer"
-            submitIcon={ArrowRightLeft}
-            tone="amber"
-          />
+          <ModalActions onClose={closeAction} onSubmit={handleTransfer} pending={actionPending} submitLabel="Transfer" submitIcon={ArrowRightLeft} tone="amber" />
         </ModalShell>
-      )}
+      ) : null}
 
-      {actionKind === "status" && actionTarget && (
-        <ModalShell
-          title="Update Admission Status"
-          subtitle="Move The Stay Through Its Lifecycle"
-          onClose={closeAction}
-          icon={Sliders}
-        >
-          {actionError && <ErrorBanner message={actionError} />}
+      {actionKind === "status" && actionTarget ? (
+        <ModalShell title="Update admission status" subtitle="Move the stay through its lifecycle" onClose={closeAction} icon={Sliders}>
+          {actionError ? <ErrorBanner message={actionError} /> : null}
           <ContextStrip admission={actionTarget} wardName={wardName} bedNumber={bedNumber} />
-          <div className="space-y-5">
-            <FieldLabel label="New Status *">
+          <div className="space-y-4">
+            <FieldLabel label="New status *">
               <div className="grid grid-cols-2 gap-2">
-                {ADMISSION_STATUSES.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setStatusForm({ ...statusForm, new_status: s })}
-                    className={`p-3 rounded-xl border-2 text-[10px] font-bold uppercase tracking-widest transition-all ${statusForm.new_status === s
-                        ? "bg-primary-500 text-white border-primary-500 shadow-md"
-                        : "bg-white border-secondary-400 text-secondary-600 hover:border-primary-300"
-                      }`}
-                  >
-                    {s.replace("_", " ")}
-                  </button>
-                ))}
+                {ADMISSION_STATUSES.map((s) => {
+                  const active = statusForm.new_status === s;
+                  return (
+                    <button key={s} type="button" onClick={() => setStatusForm({ ...statusForm, new_status: s })}
+                      className="rounded-md border px-3 py-2 text-[11px] font-semibold uppercase tracking-wide transition-colors"
+                      style={{
+                        borderColor: active ? "var(--dx-accent)" : "var(--dx-border)",
+                        background: active ? "var(--dx-accent)" : "var(--dx-surface)",
+                        color: active ? "#fff" : "var(--dx-text-muted)",
+                      }}>
+                      {s.replace("_", " ")}
+                    </button>
+                  );
+                })}
               </div>
             </FieldLabel>
             <FieldLabel label="Reason">
-              <textarea
-                value={statusForm.reason}
-                onChange={(e) => setStatusForm({ ...statusForm, reason: e.target.value })}
-                placeholder="Note for the audit log..."
-                className="input-field h-20 bg-secondary-50 border-secondary-400 w-full resize-none py-3"
-              />
+              <textarea value={statusForm.reason} onChange={(e) => setStatusForm({ ...statusForm, reason: e.target.value })} placeholder="Note for the audit log…" className="dx-editor w-full" rows={2} />
             </FieldLabel>
           </div>
-          <ModalActions
-            onClose={closeAction}
-            onSubmit={handleStatus}
-            pending={actionPending}
-            submitLabel="Update Status"
-            submitIcon={Edit3}
-          />
+          <ModalActions onClose={closeAction} onSubmit={handleStatus} pending={actionPending} submitLabel="Update status" submitIcon={Edit3} />
         </ModalShell>
-      )}
+      ) : null}
 
-      {actionKind === "bed-days" && actionTarget && (
-        <ModalShell
-          title="Capture Bed-Day Charges"
-          subtitle="Auto-Bill Bed-Days Up To A Date"
-          onClose={closeAction}
-          icon={Coins}
-          tone="emerald"
-        >
-          {actionError && <ErrorBanner message={actionError} />}
+      {actionKind === "bed-days" && actionTarget ? (
+        <ModalShell title="Capture bed-day charges" subtitle="Auto-bill bed-days up to a date" onClose={closeAction} icon={Coins} tone="emerald">
+          {actionError ? <ErrorBanner message={actionError} /> : null}
           <ContextStrip admission={actionTarget} wardName={wardName} bedNumber={bedNumber} />
-          <div className="space-y-5">
-            <FieldLabel label="Capture Through Date *">
-              <input
-                type="date"
-                value={bedDaysForm.through_date}
-                onChange={(e) =>
-                  setBedDaysForm({ ...bedDaysForm, through_date: e.target.value })
-                }
-                className="input-field h-12 bg-secondary-50 border-secondary-400 w-full font-mono"
-              />
+          <div className="space-y-4">
+            <FieldLabel label="Capture through date *">
+              <input type="date" value={bedDaysForm.through_date} onChange={(e) => setBedDaysForm({ ...bedDaysForm, through_date: e.target.value })} className="dx-editor w-full dx-mono" />
             </FieldLabel>
-            {bedDaysReceipt && (
-              <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-5">
-                <div className="flex items-center gap-3 text-emerald-700 mb-3">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <p className="text-sm font-bold">Captured</p>
-                </div>
+            {bedDaysReceipt ? (
+              <div className="rounded-md border border-[var(--dx-success-soft)] bg-[var(--dx-success-soft)] p-4">
+                <div className="mb-3 flex items-center gap-2 text-[var(--dx-success)]"><CheckCircle2 className="h-5 w-5" /><p className="text-[13px] font-semibold">Captured</p></div>
                 <dl className="grid grid-cols-3 gap-3 text-center">
                   <div>
-                    <dt className="text-[10px] font-bold uppercase tracking-widest text-emerald-600/80">
-                      Days
-                    </dt>
-                    <dd className="text-2xl font-black text-emerald-700">
-                      {bedDaysReceipt.charges_captured}
-                    </dd>
+                    <dt className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Days</dt>
+                    <dd className="text-[20px] font-bold text-[var(--dx-text)]">{bedDaysReceipt.charges_captured}</dd>
                   </div>
                   <div>
-                    <dt className="text-[10px] font-bold uppercase tracking-widest text-emerald-600/80">
-                      Total
-                    </dt>
-                    <dd className="text-2xl font-black text-emerald-700 font-mono">
-                      {new Intl.NumberFormat("en-NG", {
-                        style: "currency",
-                        currency: "NGN",
-                        maximumFractionDigits: 2,
-                      }).format(bedDaysReceipt.total_amount_captured)}
-                    </dd>
+                    <dt className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Total</dt>
+                    <dd className="dx-mono text-[18px] font-bold text-[var(--dx-text)]">{new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 2 }).format(bedDaysReceipt.total_amount_captured)}</dd>
                   </div>
                   <div>
-                    <dt className="text-[10px] font-bold uppercase tracking-widest text-emerald-600/80">
-                      Through
-                    </dt>
-                    <dd className="text-xs font-mono font-bold text-emerald-700">
-                      {new Date(bedDaysReceipt.captured_through).toLocaleDateString()}
-                    </dd>
+                    <dt className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Through</dt>
+                    <dd className="dx-mono text-[12px] font-semibold text-[var(--dx-text)]">{new Date(bedDaysReceipt.captured_through).toLocaleDateString()}</dd>
                   </div>
                 </dl>
               </div>
-            )}
+            ) : null}
           </div>
-          <ModalActions
-            onClose={closeAction}
-            onSubmit={handleBedDays}
-            pending={actionPending}
-            submitLabel="Capture Charges"
-            submitIcon={Coins}
-            tone="emerald"
-          />
+          <ModalActions onClose={closeAction} onSubmit={handleBedDays} pending={actionPending} submitLabel="Capture charges" submitIcon={Coins} tone="emerald" />
         </ModalShell>
-      )}
-    </div>
+      ) : null}
+    </DxPage>
   );
 }
 
@@ -1447,285 +1046,127 @@ function ContextStrip({
   bedNumber: (id: number) => string;
 }) {
   return (
-    <div className="mb-6 p-4 rounded-2xl bg-secondary-50 border border-secondary-400">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+    <div className="mb-5 rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          <BedIcon className="h-4 w-4 text-secondary-500" />
+          <BedIcon className="h-4 w-4 text-[var(--dx-text-muted)]" />
           <div>
-            <p className="text-[10px] font-mono font-bold text-secondary-400 uppercase">
-              {admission.admission_no}
-            </p>
-            {admission.patient && (
-              <p className="text-sm font-bold text-secondary-900 mt-0.5">
-                {admission.patient.first_name} {admission.patient.last_name}
-              </p>
-            )}
+            <p className="dx-mono text-[11px] text-[var(--dx-text-muted)]">{admission.admission_no}</p>
+            {admission.patient ? <p className="mt-0.5 text-[13px] font-semibold text-[var(--dx-text)]">{admission.patient.first_name} {admission.patient.last_name}</p> : null}
           </div>
         </div>
         <div className="text-right">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
-            Currently
-          </p>
-          <p className="text-xs font-mono font-bold text-secondary-700 mt-0.5">
-            {wardName(admission.ward_id)} · {bedNumber(admission.bed_id)}
-          </p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--dx-text-muted)]">Currently</p>
+          <p className="dx-mono mt-0.5 text-[12px] font-semibold text-[var(--dx-text)]">{wardName(admission.ward_id)} · {bedNumber(admission.bed_id)}</p>
         </div>
       </div>
     </div>
   );
 }
 
-function FieldLabel({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-2">
-      <label className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-        {label}
-      </label>
+    <div className="dx-field">
+      <label className="dx-field-label">{label}</label>
       {children}
     </div>
   );
 }
 
-function WardPicker({
-  label,
-  value,
-  wards,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  wards: Ward[];
-  onChange: (v: string) => void;
-}) {
+function WardPicker({ label, value, wards, onChange }: { label: string; value: string; wards: Ward[]; onChange: (v: string) => void }) {
   return (
     <FieldLabel label={label}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={wards.length === 0}
-        className="input-field h-12 bg-secondary-50 border-secondary-400 w-full disabled:opacity-60"
-      >
-        <option value="">{wards.length ? "Pick a ward..." : "No wards configured"}</option>
+      <select value={value} onChange={(e) => onChange(e.target.value)} disabled={wards.length === 0} className="dx-editor w-full disabled:opacity-60">
+        <option value="">{wards.length ? "Pick a ward…" : "No wards configured"}</option>
         {wards.map((w) => (
-          <option key={w.id} value={w.id}>
-            {w.name ?? `Ward #${w.id}`}
-            {w.ward_type ? ` · ${w.ward_type}` : ""}
-          </option>
+          <option key={w.id} value={w.id}>{w.name ?? `Ward #${w.id}`}{w.ward_type ? ` · ${w.ward_type}` : ""}</option>
         ))}
       </select>
-      {wards.length === 0 && (
-        <p className="text-[10px] font-semibold text-amber-600">
-          Create wards under Wards &amp; Beds first.
-        </p>
-      )}
+      {wards.length === 0 ? <p className="mt-1 text-[11px] font-medium text-[var(--dx-warning)]">Create wards under Wards &amp; Beds first.</p> : null}
     </FieldLabel>
   );
 }
 
-function BedPicker({
-  label,
-  value,
-  wardId,
-  beds,
-  excludeBedId,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  wardId: string;
-  beds: Bed[];
-  excludeBedId?: number;
-  onChange: (v: string) => void;
-}) {
+function BedPicker({ label, value, wardId, beds, excludeBedId, onChange }: { label: string; value: string; wardId: string; beds: Bed[]; excludeBedId?: number; onChange: (v: string) => void }) {
   const filtered = beds.filter((b) => {
     if (excludeBedId != null && b.id === excludeBedId) return false;
     if (wardId && b.ward_id !== Number(wardId)) return false;
     if (b.bed_status && b.bed_status !== "AVAILABLE" && b.id !== Number(value)) return false;
     return true;
   });
-
-  const placeholder = !wardId
-    ? "Pick a ward first..."
-    : filtered.length
-      ? "Pick a bed..."
-      : "No available beds in this ward";
-
+  const placeholder = !wardId ? "Pick a ward first…" : filtered.length ? "Pick a bed…" : "No available beds in this ward";
   return (
     <FieldLabel label={label}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={!wardId || filtered.length === 0}
-        className="input-field h-12 bg-secondary-50 border-secondary-400 w-full disabled:opacity-60"
-      >
+      <select value={value} onChange={(e) => onChange(e.target.value)} disabled={!wardId || filtered.length === 0} className="dx-editor w-full disabled:opacity-60">
         <option value="">{placeholder}</option>
-        {wardId &&
-          filtered.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.bed_no ?? `Bed #${b.id}`}
-              {b.bed_type ? ` · ${b.bed_type}` : ""}
-              {b.bed_status ? ` · ${b.bed_status}` : ""}
-            </option>
-          ))}
+        {wardId && filtered.map((b) => (
+          <option key={b.id} value={b.id}>{b.bed_no ?? `Bed #${b.id}`}{b.bed_type ? ` · ${b.bed_type}` : ""}{b.bed_status ? ` · ${b.bed_status}` : ""}</option>
+        ))}
       </select>
     </FieldLabel>
   );
 }
 
-function StaffPicker({
-  label,
-  value,
-  staffList,
-  onChange,
-}: {
-  label: string;
-  value: number | null;
-  staffList: Staff[];
-  onChange: (v: number | null) => void;
-}) {
+function StaffPicker({ label, value, staffList, onChange }: { label: string; value: number | null; staffList: Staff[]; onChange: (v: number | null) => void }) {
   return (
     <FieldLabel label={label}>
-      <select
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-        className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-      >
+      <select value={value ?? ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)} className="dx-editor w-full">
         <option value="">— None —</option>
         {staffList.map((s) => (
-          <option key={s.id} value={s.id}>
-            {staffDisplayName(s)}
-            {s.designation ? ` · ${s.designation}` : ""}
-          </option>
+          <option key={s.id} value={s.id}>{staffDisplayName(s)}{s.designation ? ` · ${s.designation}` : ""}</option>
         ))}
       </select>
     </FieldLabel>
   );
 }
 
-function VisitPicker({
-  label,
-  value,
-  visits,
-  labelFor,
-  placeholder,
-  emptyHint,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  visits: Visit[];
-  labelFor: (v: Visit) => string;
-  placeholder: string;
-  emptyHint?: string;
-  disabled?: boolean;
-  onChange: (v: string) => void;
-}) {
+function VisitPicker({ label, value, visits, labelFor, placeholder, emptyHint, disabled, onChange }: { label: string; value: string; visits: Visit[]; labelFor: (v: Visit) => string; placeholder: string; emptyHint?: string; disabled?: boolean; onChange: (v: string) => void }) {
   return (
     <FieldLabel label={label}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className="input-field h-12 bg-secondary-50 border-secondary-400 w-full disabled:opacity-60"
-      >
+      <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className="dx-editor w-full disabled:opacity-60">
         <option value="">{placeholder}</option>
-        {visits.map((v) => (
-          <option key={v.id} value={v.id}>
-            {labelFor(v)}
-          </option>
-        ))}
+        {visits.map((v) => (<option key={v.id} value={v.id}>{labelFor(v)}</option>))}
       </select>
-      {emptyHint && (
-        <p className="text-[10px] font-semibold text-amber-600">{emptyHint}</p>
-      )}
+      {emptyHint ? <p className="mt-1 text-[11px] font-medium text-[var(--dx-warning)]">{emptyHint}</p> : null}
     </FieldLabel>
   );
 }
 
-function SdpPicker({
-  label,
-  value,
-  sdps,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  sdps: ServiceDeliveryPoint[];
-  onChange: (v: string) => void;
-}) {
+function SdpPicker({ label, value, sdps, onChange }: { label: string; value: string; sdps: ServiceDeliveryPoint[]; onChange: (v: string) => void }) {
   return (
     <FieldLabel label={label}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="input-field h-12 bg-secondary-50 border-secondary-400 w-full"
-      >
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="dx-editor w-full">
         <option value="">— None —</option>
-        {sdps.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-            {s.code ? ` (${s.code})` : ""}
-          </option>
-        ))}
+        {sdps.map((s) => (<option key={s.id} value={s.id}>{s.name}{s.code ? ` (${s.code})` : ""}</option>))}
       </select>
     </FieldLabel>
   );
 }
 
-function ToggleSwitch({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-}) {
+function ToggleSwitch({ label, hint, value, onChange }: { label: string; hint: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
-      className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${value
-          ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-          : "bg-secondary-50 border-secondary-400 text-secondary-500"
-        }`}
-    >
-      <div className="text-left flex items-center gap-3">
-        <Coins className={`h-4 w-4 ${value ? "text-emerald-600" : "text-secondary-400"}`} />
+    <button type="button" onClick={() => onChange(!value)}
+      className="flex w-full items-center justify-between rounded-md border px-4 py-3 text-left transition-colors"
+      style={{
+        borderColor: value ? "var(--dx-accent)" : "var(--dx-border)",
+        background: value ? "var(--dx-accent-soft)" : "var(--dx-surface)",
+      }}>
+      <div className="flex items-center gap-3">
+        <Coins className="h-4 w-4" style={{ color: value ? "var(--dx-accent)" : "var(--dx-text-muted)" }} />
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest">{label}</p>
-          <p className="text-[10px] font-bold opacity-70 mt-0.5">{hint}</p>
+          <p className="text-[12px] font-semibold text-[var(--dx-text)]">{label}</p>
+          <p className="mt-0.5 text-[11px] text-[var(--dx-text-muted)]">{hint}</p>
         </div>
       </div>
-      <div
-        className={`h-6 w-12 rounded-full p-0.5 transition-all ${value ? "bg-emerald-500" : "bg-secondary-200"
-          }`}
-      >
-        <div
-          className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${value ? "translate-x-6" : ""
-            }`}
-        />
-      </div>
+      <span className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors" style={{ background: value ? "var(--dx-accent)" : "var(--dx-border-strong)" }}>
+        <span className="h-5 w-5 rounded-full bg-white shadow transition-transform" style={{ transform: value ? "translateX(20px)" : "translateX(0)" }} />
+      </span>
     </button>
   );
 }
 
 function ErrorBanner({ message }: { message: string }) {
-  return (
-    <div className="mb-5 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-      <AlertCircle className="h-5 w-5" />
-      <span className="text-sm font-bold">{message}</span>
-    </div>
-  );
+  return <DxMessage tone="danger" className="mb-4">{message}</DxMessage>;
 }
 
 function ModalActions({
@@ -1745,31 +1186,11 @@ function ModalActions({
   tone?: "primary" | "amber" | "emerald" | "rose";
   disabled?: boolean;
 }) {
-  const cls =
-    tone === "amber"
-      ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20"
-      : tone === "emerald"
-        ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
-        : tone === "rose"
-          ? "bg-rose-500 hover:bg-rose-600 shadow-rose-500/20"
-          : "bg-primary-500 hover:bg-primary-600 shadow-primary-500/20";
+  const variant = tone === "rose" ? "danger" : "primary";
   return (
-    <div className="pt-6 flex gap-4">
-      <button
-        onClick={onClose}
-        disabled={pending}
-        className="flex-1 btn-secondary py-4 rounded-2xl font-bold disabled:opacity-50"
-      >
-        Cancel
-      </button>
-      <button
-        onClick={onSubmit}
-        disabled={pending || disabled}
-        className={`flex-[2] py-4 rounded-2xl text-white font-black tracking-tight shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 ${cls}`}
-      >
-        <Icon className="h-4 w-4" />
-        {pending ? "Working..." : submitLabel}
-      </button>
+    <div className="mt-6 flex justify-end gap-2 border-t border-[var(--dx-border)] pt-4">
+      <DxButton onClick={onClose} disabled={pending}>Cancel</DxButton>
+      <DxButton variant={variant} isLoading={pending} disabled={disabled} leftIcon={<Icon className="h-4 w-4" />} onClick={onSubmit}>{submitLabel}</DxButton>
     </div>
   );
 }
@@ -1780,7 +1201,6 @@ function ModalShell({
   onClose,
   children,
   icon: Icon,
-  tone = "primary",
 }: {
   title: string;
   subtitle: string;
@@ -1789,66 +1209,23 @@ function ModalShell({
   icon: typeof LogIn;
   tone?: "primary" | "amber" | "emerald" | "rose";
 }) {
-  const cls =
-    tone === "amber"
-      ? "bg-amber-500 shadow-amber-500/20"
-      : tone === "emerald"
-        ? "bg-emerald-500 shadow-emerald-500/20"
-        : tone === "rose"
-          ? "bg-rose-500 shadow-rose-500/20"
-          : "bg-primary-600 shadow-primary-500/20";
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] p-10 max-w-2xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"
-        >
-          <X className="h-5 w-5 text-secondary-400" />
-        </button>
-        <div className="flex items-center gap-5 mb-8">
-          <div className={`h-14 w-14 rounded-2xl text-white flex items-center justify-center shadow-xl ${cls}`}>
-            <Icon className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-black font-display tracking-tight">{title}</h3>
-            <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-              {subtitle}
-            </p>
-          </div>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-type StatTone = "primary" | "emerald" | "amber" | "rose";
-const statToneStyles: Record<StatTone, string> = {
-  primary: "bg-primary-50 text-primary-600 border-primary-100",
-  emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  amber: "bg-amber-50 text-amber-600 border-amber-100",
-  rose: "bg-rose-50 text-rose-600 border-rose-100",
-};
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: typeof BedIcon;
-  label: string;
-  value: number;
-  tone: StatTone;
-}) {
-  return (
-    <div className={`glass-card rounded-[2rem] p-6 border ${statToneStyles[tone]} bg-white/60 backdrop-blur-md`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">{label}</span>
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="text-3xl font-black tracking-tight">{value}</div>
-    </div>
+    <DxPopup
+      isOpen
+      onClose={onClose}
+      size="lg"
+      title={
+        <span className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]"><Icon className="h-5 w-5" /></span>
+          <span className="flex flex-col">
+            <span className="text-[15px] font-bold text-[var(--dx-text)]">{title}</span>
+            <span className="text-[11px] font-normal text-[var(--dx-text-muted)]">{subtitle}</span>
+          </span>
+        </span>
+      }
+    >
+      {children}
+    </DxPopup>
   );
 }
 

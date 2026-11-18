@@ -1,33 +1,30 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Building2, Plus, Trash2 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { Building2, Plus, Trash2 } from "lucide-react";
+import {
+  DxPage, DxPageHeader, DxPanel, DxBadge, DxButton, DxPopup, DxInput, DxSelect, DxTextarea, DxCheckbox,
+  type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import { routes } from "@/config/routes";
 import { useTheatres, surgeryKeys } from "../hooks/use-surgery";
 import { createTheatre, changeTheatreStatus, deleteTheatre, THEATRE_STATUS_OPTIONS } from "../api/surgery.api";
 
-const STATUS_TINT: Record<string, string> = {
-  AVAILABLE: "soft-success",
-  OCCUPIED: "soft-warning",
-  CLEANING: "soft-info",
-  OUT_OF_SERVICE: "soft-danger",
-  UNDER_MAINTENANCE: "soft-danger",
-};
+function statusTone(status: string): DxBadgeTone {
+  switch (status) {
+    case "AVAILABLE":
+      return "success";
+    case "OCCUPIED":
+      return "warning";
+    case "CLEANING":
+      return "info";
+    default:
+      return "danger";
+  }
+}
 
 export function TheatresPage() {
-  const navigate = useNavigate();
   const toast = useToast();
   const qc = useQueryClient();
   const theatres = useTheatres();
@@ -66,58 +63,56 @@ export function TheatresPage() {
   const items = theatres.data?.items ?? [];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
-      <button onClick={() => navigate(routes.surgery)} className="flex items-center gap-2 text-sm font-bold text-secondary-500 hover:text-primary-600">
-        <ArrowLeft className="h-4 w-4" /> Back to worklist
-      </button>
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Surgery", to: routes.surgery }, { label: "Theatres" }]}
         title="Operating Theatres"
-        description="Manage theatres and their real-time availability."
-        actions={<Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setOpen(true)}>New theatre</Button>}
+        subtitle="Manage theatres and their real-time availability."
+        actions={<DxButton variant="primary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setOpen(true)}>New theatre</DxButton>}
       />
-      <Card padding="none">
-        <CardHeader className="px-6 pt-6" title="Theatres" />
+      <DxPanel title="Theatres" icon={<Building2 className="h-4 w-4" />}>
         {theatres.isLoading ? (
-          <div className="space-y-3 px-6 pb-6">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="dx-skeleton h-36 w-full" />)}</div>
         ) : items.length === 0 ? (
-          <div className="px-6 pb-8"><EmptyState icon={Building2} title="No theatres" description="Add your first operating theatre." /></div>
+          <div className="py-12 text-center">
+            <Building2 className="mx-auto mb-3 h-9 w-9 text-[var(--dx-text-faint)]" />
+            <p className="text-[13px] font-medium text-[var(--dx-text-muted)]">No theatres. Add your first operating theatre.</p>
+          </div>
         ) : (
-          <div className="grid gap-4 px-6 pb-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {items.map((t) => (
-              <div key={t.id} className="rounded-2xl border border-secondary-200 p-5 dark:border-white/10">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-base font-black text-secondary-900 dark:text-secondary-100">{t.name}</p>
-                    <p className="font-mono text-[11px] font-bold uppercase text-secondary-400">{t.code}</p>
+              <div key={t.id} className="rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface)] p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-bold text-[var(--dx-text)]">{t.name}</p>
+                    <p className="dx-mono text-[11px] font-semibold uppercase text-[var(--dx-text-muted)]">{t.code}</p>
                   </div>
-                  <Badge variant={(STATUS_TINT[String(t.status)] as any) ?? "secondary"}>{String(t.status).replace(/_/g, " ")}</Badge>
+                  <DxBadge tone={statusTone(String(t.status))}>{String(t.status).replace(/_/g, " ")}</DxBadge>
                 </div>
-                {t.location_description && <p className="mt-2 text-xs text-secondary-500">{t.location_description}</p>}
-                {t.is_emergency_capable && <Badge variant="soft-danger" className="mt-2">Emergency capable</Badge>}
+                {t.location_description ? <p className="mt-2 text-[12px] text-[var(--dx-text-muted)]">{t.location_description}</p> : null}
+                {t.is_emergency_capable ? <DxBadge tone="danger" className="mt-2">Emergency capable</DxBadge> : null}
                 <div className="mt-4 flex items-center gap-2">
-                  <Select value={String(t.status)} onChange={(e) => setStatus(t.id, e.target.value)} options={THEATRE_STATUS_OPTIONS} className="h-10 text-xs" />
-                  <button onClick={() => remove(t.id)} className="rounded-xl p-2.5 text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                  <div className="flex-1"><DxSelect value={String(t.status)} onChange={(e) => setStatus(t.id, e.target.value)} options={THEATRE_STATUS_OPTIONS} editorSize="sm" /></div>
+                  <DxButton icon variant="outline-danger" title="Delete" onClick={() => remove(t.id)}><Trash2 /></DxButton>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </Card>
-      <Modal isOpen={open} onClose={() => setOpen(false)} title="New Operating Theatre" size="md"
-        footer={<div className="flex justify-end gap-3"><Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={create} isLoading={busy}>Create</Button></div>}>
+      </DxPanel>
+
+      <DxPopup isOpen={open} onClose={() => setOpen(false)} title="New operating theatre" size="md" locked={busy}
+        footer={<><DxButton onClick={() => setOpen(false)} disabled={busy}>Cancel</DxButton><DxButton variant="primary" onClick={create} isLoading={busy}>Create</DxButton></>}>
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="OT-1" />
-            <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Main Theatre 1" />
+            <DxInput label="Code" mono value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="OT-1" />
+            <DxInput label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Main Theatre 1" />
           </div>
-          <Input label="Location" value={form.location_description} onChange={(e) => setForm({ ...form, location_description: e.target.value })} placeholder="2nd floor, surgical wing" />
-          <label className="flex cursor-pointer items-center gap-3">
-            <input type="checkbox" className="h-5 w-5 rounded accent-rose-600" checked={form.is_emergency_capable} onChange={(e) => setForm({ ...form, is_emergency_capable: e.target.checked })} />
-            <span className="text-sm font-bold text-secondary-900 dark:text-secondary-100">Emergency capable</span>
-          </label>
-          <Textarea label="Notes (optional)" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          <DxInput label="Location" value={form.location_description} onChange={(e) => setForm({ ...form, location_description: e.target.value })} placeholder="2nd floor, surgical wing" />
+          <DxCheckbox label="Emergency capable" checked={form.is_emergency_capable} onChange={(e) => setForm({ ...form, is_emergency_capable: e.target.checked })} />
+          <DxTextarea label="Notes (optional)" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         </div>
-      </Modal>
-    </div>
+      </DxPopup>
+    </DxPage>
   );
 }

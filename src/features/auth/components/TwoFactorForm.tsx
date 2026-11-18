@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ShieldCheck, ChevronRight, AlertCircle, RefreshCw } from "lucide-react";
-import logo from "@/assets/logo.jpeg";
+import logo from "@/assets/logo.svg";
 
 export function TwoFactorForm() {
   const [code, setCode] = useState(["", "", "", "", "", ""]);

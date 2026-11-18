@@ -3,17 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Banknote, Briefcase, CheckCircle2, Landmark, Pencil, Search, ShieldCheck, Users, Wallet,
 } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { SuiteEyebrow } from "@/components/layout/SuiteEyebrow";
-import { Card } from "@/components/ui/Card";
-import { Badge, type BadgeProps } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Modal } from "@/components/ui/Modal";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { MetricCard } from "@/components/charts/MetricCard";
+import {
+  DxPage, DxPageHeader, DxPanel, DxKpi, DxGrid, DxBadge, DxButton, DxInput, DxSelect, DxPopup,
+  type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { listPensionProviders } from "@/features/payroll/api/payroll.api";
 import { listDepartments } from "@/features/staff/api/staff-admin.api";
@@ -25,16 +18,16 @@ import {
 
 const money = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const STATUS_VARIANT: Record<string, BadgeProps["variant"]> = {
-  ACTIVE: "soft-success",
-  ON_LEAVE: "soft-info",
-  PROBATION: "soft-info",
-  SUSPENDED: "soft-warning",
-  RESIGNED: "secondary",
-  TERMINATED: "soft-danger",
-  RETIRED: "secondary",
-  TRANSFERRED: "secondary",
-};
+function statusTone(status?: string | null): DxBadgeTone {
+  switch ((status ?? "").toUpperCase()) {
+    case "ACTIVE": return "success";
+    case "ON_LEAVE":
+    case "PROBATION": return "info";
+    case "SUSPENDED": return "warning";
+    case "TERMINATED": return "danger";
+    default: return "neutral";
+  }
+}
 
 function labelize(v?: string | null): string {
   if (!v) return "—";
@@ -129,7 +122,7 @@ function toForm(r: StaffRecord): FormState {
 
 function SectionTitle({ icon: Icon, children }: { icon: any; children: React.ReactNode }) {
   return (
-    <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-secondary-400">
+    <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
       <Icon className="h-3.5 w-3.5" /> {children}
     </p>
   );
@@ -237,153 +230,107 @@ function EditStaffModal({ record, onClose }: { record: StaffRecord | null; onClo
   };
 
   return (
-    <Modal
+    <DxPopup
       isOpen={!!record}
       onClose={onClose}
       title={`Edit — ${record.staff_name || record.staff_no}`}
       size="lg"
+      locked={save.isPending}
       footer={
-        <div className="flex w-full items-center justify-end gap-2">
-          <Button variant="secondary" onClick={onClose} disabled={save.isPending}>Cancel</Button>
-          <Button onClick={submit} isLoading={save.isPending}>Save changes</Button>
-        </div>
+        <>
+          <DxButton onClick={onClose} disabled={save.isPending}>Cancel</DxButton>
+          <DxButton variant="primary" onClick={submit} isLoading={save.isPending}>Save changes</DxButton>
+        </>
       }
     >
       <div className="space-y-6">
         {/* ── Job & employment ── */}
         <div className="space-y-3">
           <SectionTitle icon={Briefcase}>Job &amp; employment</SectionTitle>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <Input label="Job title" value={form.job_title} onChange={set("job_title")} />
-            <Input label="Designation" value={form.designation} onChange={set("designation")} />
-            <Input label="Specialty" value={form.specialty} onChange={set("specialty")} />
-            <Select label="Department" value={form.department_id} onChange={set("department_id")}
-              placeholder="Select department…"
+          <div className="grid gap-3 sm:grid-cols-2">
+            <DxInput label="Job title" value={form.job_title} onChange={set("job_title")} />
+            <DxInput label="Designation" value={form.designation} onChange={set("designation")} />
+            <DxInput label="Specialty" value={form.specialty} onChange={set("specialty")} />
+            <DxSelect label="Department" value={form.department_id} onChange={set("department_id")} placeholder="Select department…"
               options={departments.map((d: any) => ({ value: String(d.id), label: d.name }))} />
-            <Select label="Employment type" value={form.employment_type} onChange={set("employment_type")}
-              placeholder="Select type…"
+            <DxSelect label="Employment type" value={form.employment_type} onChange={set("employment_type")} placeholder="Select type…"
               options={EMPLOYMENT_TYPES.map((t) => ({ value: t, label: labelize(t) }))} />
-            <Select label="Employment status" value={form.employment_status} onChange={set("employment_status")}
-              placeholder="Select status…"
+            <DxSelect label="Employment status" value={form.employment_status} onChange={set("employment_status")} placeholder="Select status…"
               options={EMPLOYMENT_STATUSES.map((s) => ({ value: s, label: labelize(s) }))}
               hint="Exits (resigned/terminated/retired) also deactivate the user's login." />
-            <Input label="Hire date" type="date" value={form.hire_date} onChange={set("hire_date")} />
-            <Select label="Supervisor / line manager" value={form.supervisor_staff_id}
-              onChange={set("supervisor_staff_id")}
-              placeholder="Select supervisor…"
-              options={(allStaff ?? [])
-                .filter((sm) => sm.staff_profile_id !== record.staff_profile_id)
-                .map((sm) => ({
-                  value: String(sm.staff_profile_id),
-                  label: sm.staff_name || sm.staff_no,
-                }))} />
-            <Input label="Confirmation date" type="date" value={form.confirmation_date}
-              onChange={set("confirmation_date")} hint="When probation was confirmed." />
-            <Input label="Probation end date" type="date" value={form.probation_end_date}
-              onChange={set("probation_end_date")} />
-            <Input label="Contract start" type="date" value={form.contract_start_date}
-              onChange={set("contract_start_date")} />
-            <Input label="Contract end" type="date" value={form.contract_end_date}
-              onChange={set("contract_end_date")} />
-            <Input label="Exit date" type="date" value={form.exit_date} onChange={set("exit_date")} />
-            <Input label="Exit reason" value={form.exit_reason} onChange={set("exit_reason")} />
+            <DxInput label="Hire date" type="date" value={form.hire_date} onChange={set("hire_date")} />
+            <DxSelect label="Supervisor / line manager" value={form.supervisor_staff_id} onChange={set("supervisor_staff_id")} placeholder="Select supervisor…"
+              options={(allStaff ?? []).filter((sm) => sm.staff_profile_id !== record.staff_profile_id).map((sm) => ({ value: String(sm.staff_profile_id), label: sm.staff_name || sm.staff_no }))} />
+            <DxInput label="Confirmation date" type="date" value={form.confirmation_date} onChange={set("confirmation_date")} hint="When probation was confirmed." />
+            <DxInput label="Probation end date" type="date" value={form.probation_end_date} onChange={set("probation_end_date")} />
+            <DxInput label="Contract start" type="date" value={form.contract_start_date} onChange={set("contract_start_date")} />
+            <DxInput label="Contract end" type="date" value={form.contract_end_date} onChange={set("contract_end_date")} />
+            <DxInput label="Exit date" type="date" value={form.exit_date} onChange={set("exit_date")} />
+            <DxInput label="Exit reason" value={form.exit_reason} onChange={set("exit_reason")} />
           </div>
         </div>
 
         {/* ── Personal, contact & next of kin ── */}
         <div className="space-y-3">
           <SectionTitle icon={Users}>Personal &amp; next of kin</SectionTitle>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <Input label="Date of birth" type="date" value={form.date_of_birth}
-              onChange={set("date_of_birth")} />
-            <Select label="Gender" value={form.gender} onChange={set("gender")}
-              placeholder="Select…"
+          <div className="grid gap-3 sm:grid-cols-2">
+            <DxInput label="Date of birth" type="date" value={form.date_of_birth} onChange={set("date_of_birth")} />
+            <DxSelect label="Gender" value={form.gender} onChange={set("gender")} placeholder="Select…"
               options={["MALE", "FEMALE", "OTHER"].map((g) => ({ value: g, label: labelize(g) }))} />
-            <Select label="Marital status" value={form.marital_status} onChange={set("marital_status")}
-              placeholder="Select…"
+            <DxSelect label="Marital status" value={form.marital_status} onChange={set("marital_status")} placeholder="Select…"
               options={["SINGLE", "MARRIED", "DIVORCED", "WIDOWED", "SEPARATED"].map((m) => ({ value: m, label: labelize(m) }))} />
-            <Input label="Nationality" value={form.nationality} onChange={set("nationality")} />
-            <Input label="Personal email" type="email" value={form.personal_email}
-              onChange={set("personal_email")} />
-            <Input label="Personal phone" value={form.personal_phone} onChange={set("personal_phone")} />
-            <Input label="Address line 1" value={form.address_line_1} onChange={set("address_line_1")} />
-            <Input label="Address line 2" value={form.address_line_2} onChange={set("address_line_2")} />
-            <Input label="City" value={form.city} onChange={set("city")} />
-            <Input label="State / region" value={form.state_region} onChange={set("state_region")} />
-            <Input label="Country" value={form.country} onChange={set("country")} />
+            <DxInput label="Nationality" value={form.nationality} onChange={set("nationality")} />
+            <DxInput label="Personal email" type="email" value={form.personal_email} onChange={set("personal_email")} />
+            <DxInput label="Personal phone" value={form.personal_phone} onChange={set("personal_phone")} />
+            <DxInput label="Address line 1" value={form.address_line_1} onChange={set("address_line_1")} />
+            <DxInput label="Address line 2" value={form.address_line_2} onChange={set("address_line_2")} />
+            <DxInput label="City" value={form.city} onChange={set("city")} />
+            <DxInput label="State / region" value={form.state_region} onChange={set("state_region")} />
+            <DxInput label="Country" value={form.country} onChange={set("country")} />
           </div>
-          <div className="grid sm:grid-cols-2 gap-3 rounded-2xl bg-secondary-50/70 p-4 dark:bg-white/5">
-            <Input label="Next of kin — name" value={form.next_of_kin_name}
-              onChange={set("next_of_kin_name")} />
-            <Input label="Next of kin — relationship" value={form.next_of_kin_relationship}
-              onChange={set("next_of_kin_relationship")} />
-            <Input label="Next of kin — phone" value={form.next_of_kin_phone}
-              onChange={set("next_of_kin_phone")} />
-            <Input label="Emergency contact — name" value={form.emergency_contact_name}
-              onChange={set("emergency_contact_name")} />
-            <Input label="Emergency contact — phone" value={form.emergency_contact_phone}
-              onChange={set("emergency_contact_phone")} />
+          <div className="grid gap-3 rounded-md bg-[var(--dx-surface-sunken)] p-4 sm:grid-cols-2">
+            <DxInput label="Next of kin — name" value={form.next_of_kin_name} onChange={set("next_of_kin_name")} />
+            <DxInput label="Next of kin — relationship" value={form.next_of_kin_relationship} onChange={set("next_of_kin_relationship")} />
+            <DxInput label="Next of kin — phone" value={form.next_of_kin_phone} onChange={set("next_of_kin_phone")} />
+            <DxInput label="Emergency contact — name" value={form.emergency_contact_name} onChange={set("emergency_contact_name")} />
+            <DxInput label="Emergency contact — phone" value={form.emergency_contact_phone} onChange={set("emergency_contact_phone")} />
           </div>
         </div>
 
         {/* ── Compensation (read-only — managed in Payroll → Salary Mapping) ── */}
-        <div className="space-y-3 rounded-2xl bg-secondary-50/70 p-4 dark:bg-white/5">
+        <div className="space-y-3 rounded-md bg-[var(--dx-surface-sunken)] p-4">
           <SectionTitle icon={Wallet}>Compensation</SectionTitle>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
-            <span className="text-secondary-500">
-              Base{" "}
-              <span className="font-bold text-secondary-800 dark:text-secondary-100">
-                {record.base_salary_amount
-                  ? `${record.salary_currency} ${money.format(Number(record.base_salary_amount))}`
-                  : "Not mapped"}
-              </span>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[13px]">
+            <span className="text-[var(--dx-text-muted)]">
+              Base <span className="font-bold text-[var(--dx-text)]">{record.base_salary_amount ? `${record.salary_currency} ${money.format(Number(record.base_salary_amount))}` : "Not mapped"}</span>
             </span>
-            {(record.allowances?.length ?? 0) > 0 && (
-              <span className="text-secondary-500">
-                {record.allowances!.length} allowance{record.allowances!.length === 1 ? "" : "s"}
-              </span>
-            )}
-            {(record.deductions?.length ?? 0) > 0 && (
-              <span className="text-secondary-500">
-                {record.deductions!.length} deduction{record.deductions!.length === 1 ? "" : "s"}
-              </span>
-            )}
-            {record.salary_effective_from && (
-              <span className="text-secondary-500">since {record.salary_effective_from}</span>
-            )}
+            {(record.allowances?.length ?? 0) > 0 ? <span className="text-[var(--dx-text-muted)]">{record.allowances!.length} allowance{record.allowances!.length === 1 ? "" : "s"}</span> : null}
+            {(record.deductions?.length ?? 0) > 0 ? <span className="text-[var(--dx-text-muted)]">{record.deductions!.length} deduction{record.deductions!.length === 1 ? "" : "s"}</span> : null}
+            {record.salary_effective_from ? <span className="text-[var(--dx-text-muted)]">since {record.salary_effective_from}</span> : null}
           </div>
-          <p className="text-[11px] text-secondary-400">
-            Pay structure (base, grade/step, allowances, deductions, annual rent for
-            tax relief) is managed in one place — Payroll → Salary Mapping — so the
-            same figures can't diverge between two editors.
+          <p className="text-[11px] text-[var(--dx-text-muted)]">
+            Pay structure (base, grade/step, allowances, deductions, annual rent for tax relief) is managed in one place — Payroll → Salary Mapping — so the same figures can't diverge between two editors.
           </p>
-          <Button size="sm" variant="secondary"
-            onClick={() => { window.location.href = "/payroll/salary"; }}>
-            Open Salary Mapping
-          </Button>
+          <DxButton size="sm" onClick={() => { window.location.href = "/payroll/salary"; }}>Open Salary Mapping</DxButton>
         </div>
 
         {/* ── Bank & statutory ── */}
         <div className="space-y-3">
           <SectionTitle icon={Landmark}>Bank &amp; statutory</SectionTitle>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <Input label="Bank name" value={form.bank_name} onChange={set("bank_name")} />
-            <Input label="Account number" value={form.bank_account_no} onChange={set("bank_account_no")} />
-            <Input label="Account name" value={form.bank_account_name} onChange={set("bank_account_name")} />
-            <Input label="Tax ID (TIN)" value={form.tax_id} onChange={set("tax_id")} />
-            <Input label="Pension PIN" value={form.pension_pin} onChange={set("pension_pin")} />
-            <Select label="Pension provider (PFA)" value={form.pension_provider_id}
-              onChange={set("pension_provider_id")}
-              placeholder="Select PFA…"
-              options={pensionProviders
-                .filter((pv) => pv.is_active || String(pv.id) === form.pension_provider_id)
-                .map((pv) => ({ value: String(pv.id), label: pv.name }))}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <DxInput label="Bank name" value={form.bank_name} onChange={set("bank_name")} />
+            <DxInput label="Account number" value={form.bank_account_no} onChange={set("bank_account_no")} />
+            <DxInput label="Account name" value={form.bank_account_name} onChange={set("bank_account_name")} />
+            <DxInput label="Tax ID (TIN)" value={form.tax_id} onChange={set("tax_id")} />
+            <DxInput label="Pension PIN" value={form.pension_pin} onChange={set("pension_pin")} />
+            <DxSelect label="Pension provider (PFA)" value={form.pension_provider_id} onChange={set("pension_provider_id")} placeholder="Select PFA…"
+              options={pensionProviders.filter((pv) => pv.is_active || String(pv.id) === form.pension_provider_id).map((pv) => ({ value: String(pv.id), label: pv.name }))}
               hint="Drives the per-PFA pension remittance schedule." />
-            <Input label="NHF number" value={form.nhf_no} onChange={set("nhf_no")} />
+            <DxInput label="NHF number" value={form.nhf_no} onChange={set("nhf_no")} />
           </div>
         </div>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }
 
@@ -412,109 +359,90 @@ export function StaffRecordsPage() {
   const active = rows.filter((r) => r.employment_status === "ACTIVE").length;
   const mapped = rows.filter((r) => r.has_salary).length;
 
+  const columns: DxGridColumn<StaffRecord>[] = [
+    {
+      key: "staff", header: "Staff", render: (r) => (
+        <div>
+          <div className="text-[13px] font-semibold text-[var(--dx-text)]">{r.staff_name || `Staff #${r.staff_profile_id}`}</div>
+          <div className="text-[11px] text-[var(--dx-text-muted)]">{r.staff_no}{r.job_title ? ` · ${r.job_title}` : ""}</div>
+        </div>
+      ),
+    },
+    { key: "department", header: "Department", render: (r) => <span className="text-[13px] text-[var(--dx-text-muted)]">{r.department_name || "—"}</span> },
+    {
+      key: "employment", header: "Employment", render: (r) => (
+        <div className="flex flex-col items-start gap-1">
+          <DxBadge tone={statusTone(r.employment_status)}>{labelize(r.employment_status)}</DxBadge>
+          <span className="text-[11px] text-[var(--dx-text-muted)]">{labelize(r.employment_type)}</span>
+        </div>
+      ),
+    },
+    {
+      key: "base_salary", header: "Base salary", align: "right", render: (r) =>
+        r.base_salary_amount ? (
+          <div>
+            <div className="dx-mono text-[13px] font-semibold text-[var(--dx-text)]">{r.salary_currency} {money.format(Number(r.base_salary_amount))}</div>
+            <div className="text-[11px] text-[var(--dx-text-muted)]">
+              {r.salary_grade ? `${r.salary_grade}${r.salary_step ? ` / ${r.salary_step}` : ""}` : "No grade"}
+              {(r.allowances?.length || r.deductions?.length) ? (
+                <span className="ml-1 text-[var(--dx-text-faint)]">
+                  · {r.allowances?.length ? `+${r.allowances.length} allow` : ""}
+                  {r.allowances?.length && r.deductions?.length ? ", " : ""}
+                  {r.deductions?.length ? `−${r.deductions.length} deduct` : ""}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <DxBadge tone="warning">Not set</DxBadge>
+        ),
+    },
+    {
+      key: "bank", header: "Bank", render: (r) =>
+        r.bank_name ? (
+          <div>
+            <div className="text-[13px] font-semibold text-[var(--dx-text)]">{r.bank_name}</div>
+            <div className="text-[11px] text-[var(--dx-text-muted)]">{r.bank_account_no || "—"}</div>
+          </div>
+        ) : <span className="text-[var(--dx-text-muted)]">—</span>,
+    },
+    {
+      key: "action", header: "", align: "right",
+      render: (r) => <DxButton size="sm" variant="text" leftIcon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditing(r)}>Edit</DxButton>,
+    },
+  ];
+
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "HR & Payroll" }, { label: "Staff Records" }]}
         title="Staff Records"
-        eyebrow={<SuiteEyebrow label="HR & Payroll Suite" />}
-        description="The HR directory — review every staff member and update their employment, compensation and banking details."
+        subtitle="The HR directory — review every staff member and update their employment, compensation and banking details."
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <MetricCard label="Staff" value={String(rows.length)} icon={Users} tone="primary" isLoading={isLoading} />
-        <MetricCard label="Active" value={String(active)} icon={CheckCircle2} tone="cyan" isLoading={isLoading} />
-        <MetricCard label="Salary on record" value={String(mapped)} icon={Banknote} tone="amber" isLoading={isLoading} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <DxKpi label="Staff" value={String(rows.length)} icon={Users} tone="accent" isLoading={isLoading} />
+        <DxKpi label="Active" value={String(active)} icon={CheckCircle2} tone="success" isLoading={isLoading} />
+        <DxKpi label="Salary on record" value={String(mapped)} icon={Banknote} tone="warning" isLoading={isLoading} />
       </div>
 
-      <Card variant="panel" className="p-6">
+      <DxPanel>
         <div className="mb-4 max-w-sm">
-          <Input
-            placeholder="Search by name, staff no, email, title or department…"
-            leftIcon={<Search className="h-4 w-4" />}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <DxInput placeholder="Search by name, staff no, email, title or department…" leftIcon={<Search className="h-3.5 w-3.5" />} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-
         {isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
-          </div>
-        ) : filtered.length === 0 ? (
-          <EmptyState icon={ShieldCheck} title="No staff found"
-            description="Onboard staff members first — they will appear here for HR updates." />
+          <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="dx-skeleton h-14 w-full" />)}</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[10px] font-black uppercase tracking-widest text-secondary-400 border-b border-secondary-100">
-                  <th className="py-3 pr-4">Staff</th>
-                  <th className="py-3 pr-4">Department</th>
-                  <th className="py-3 pr-4">Employment</th>
-                  <th className="py-3 pr-4 text-right">Base salary</th>
-                  <th className="py-3 pr-4">Bank</th>
-                  <th className="py-3 pr-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((r) => (
-                  <tr key={r.staff_profile_id} className="border-b border-secondary-100/60 hover:bg-white/50">
-                    <td className="py-3 pr-4">
-                      <div className="font-bold text-secondary-900">{r.staff_name || `Staff #${r.staff_profile_id}`}</div>
-                      <div className="text-[11px] text-secondary-400">{r.staff_no}{r.job_title ? ` · ${r.job_title}` : ""}</div>
-                    </td>
-                    <td className="py-3 pr-4 text-secondary-500">{r.department_name || "—"}</td>
-                    <td className="py-3 pr-4">
-                      <div className="flex flex-col items-start gap-1">
-                        <Badge variant={STATUS_VARIANT[r.employment_status || ""] ?? "secondary"}>
-                          {labelize(r.employment_status)}
-                        </Badge>
-                        <span className="text-[11px] text-secondary-400">{labelize(r.employment_type)}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4 text-right">
-                      {r.base_salary_amount ? (
-                        <>
-                          <div className="font-bold text-secondary-900">
-                            {r.salary_currency} {money.format(Number(r.base_salary_amount))}
-                          </div>
-                          <div className="text-[11px] text-secondary-400">
-                            {r.salary_grade ? `${r.salary_grade}${r.salary_step ? ` / ${r.salary_step}` : ""}` : "No grade"}
-                            {(r.allowances?.length || r.deductions?.length) ? (
-                              <span className="ml-1 text-secondary-300">
-                                · {r.allowances?.length ? `+${r.allowances.length} allow` : ""}
-                                {r.allowances?.length && r.deductions?.length ? ", " : ""}
-                                {r.deductions?.length ? `−${r.deductions.length} deduct` : ""}
-                              </span>
-                            ) : null}
-                          </div>
-                        </>
-                      ) : (
-                        <Badge variant="soft-warning">Not set</Badge>
-                      )}
-                    </td>
-                    <td className="py-3 pr-4 text-secondary-500">
-                      {r.bank_name ? (
-                        <>
-                          <div className="text-secondary-700 font-semibold">{r.bank_name}</div>
-                          <div className="text-[11px] text-secondary-400">{r.bank_account_no || "—"}</div>
-                        </>
-                      ) : "—"}
-                    </td>
-                    <td className="py-3 pr-4 text-right">
-                      <Button size="sm" variant="ghost" leftIcon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditing(r)}>
-                        Edit
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DxGrid<StaffRecord>
+            columns={columns}
+            data={filtered}
+            rowKey={(r) => r.staff_profile_id}
+            empty={{ icon: ShieldCheck, title: "No staff found", description: "Onboard staff members first — they will appear here for HR updates." }}
+          />
         )}
-      </Card>
+      </DxPanel>
 
       <EditStaffModal record={editing} onClose={() => setEditing(null)} />
-    </div>
+    </DxPage>
   );
 }

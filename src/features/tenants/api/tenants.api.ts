@@ -96,6 +96,7 @@ export type TenantRegistrationPayload = {
   billing_address: string;
   tax_id?: string;
   deployment_model?: string;
+  facility_profile?: string;
   plan_code: string;
   admin_email: string;
   admin_username: string;

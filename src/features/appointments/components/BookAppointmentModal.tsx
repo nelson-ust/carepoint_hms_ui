@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarPlus, Loader2, Search, UserRound } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
+import { DxPopup, DxButton, DxInput, DxSelect, DxTextarea } from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import { searchPatients } from "@/features/patients/api/patients.api";
@@ -141,48 +137,65 @@ export function BookAppointmentModal({
   });
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Book an appointment" size="lg">
+    <DxPopup
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Book an appointment"
+      size="lg"
+      locked={book.isPending}
+      footer={
+        <>
+          <DxButton onClick={onClose} disabled={book.isPending}>
+            Cancel
+          </DxButton>
+          <DxButton
+            variant="primary"
+            onClick={() => book.mutate()}
+            isLoading={book.isPending}
+            disabled={!canSubmit}
+            leftIcon={<CalendarPlus className="h-4 w-4" />}
+          >
+            Book appointment
+          </DxButton>
+        </>
+      }
+    >
       <div className="space-y-5">
         {/* Patient picker */}
         {patient ? (
-          <div className="flex items-center justify-between rounded-2xl border border-primary-200 bg-primary-500/5 p-4">
+          <div className="flex items-center justify-between rounded-md border border-[var(--dx-accent)] bg-[var(--dx-accent-soft)] p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-600">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[var(--dx-surface)] text-[var(--dx-accent)]">
                 <UserRound className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-bold text-secondary-900">{patient.name}</p>
+                <p className="text-[13px] font-bold text-[var(--dx-text)]">{patient.name}</p>
                 {patient.hospital_number ? (
-                  <p className="data-mono text-[11px] text-secondary-400">{patient.hospital_number}</p>
+                  <p className="dx-mono text-[11px] text-[var(--dx-text-muted)]">{patient.hospital_number}</p>
                 ) : null}
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setPatient(null)}>
+            <DxButton variant="text" size="sm" onClick={() => setPatient(null)}>
               Change
-            </Button>
+            </DxButton>
           </div>
         ) : (
           <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-secondary-500">
-              Patient *
-            </label>
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search patient by name…"
-                className="w-full rounded-2xl border border-secondary-300 bg-white/60 py-3 pl-11 pr-4 text-sm outline-none focus:border-primary-500 dark:bg-white/5"
-              />
-            </div>
+            <label className="dx-field-label mb-1.5 block">Patient <span className="dx-required">*</span></label>
+            <DxInput
+              leftIcon={<Search className="h-3.5 w-3.5" />}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search patient by name…"
+            />
             {query.trim().length >= 2 ? (
-              <div className="mt-2 max-h-52 overflow-y-auto rounded-2xl border border-secondary-200 dark:border-white/10">
+              <div className="mt-2 max-h-52 overflow-y-auto rounded-md border border-[var(--dx-border)]">
                 {searchQuery.isLoading ? (
-                  <div className="flex items-center justify-center gap-2 p-4 text-xs text-secondary-400">
+                  <div className="flex items-center justify-center gap-2 p-4 text-[12px] text-[var(--dx-text-muted)]">
                     <Loader2 className="h-4 w-4 animate-spin" /> Searching…
                   </div>
                 ) : results.length === 0 ? (
-                  <p className="p-4 text-center text-xs font-medium text-secondary-400">No patients found.</p>
+                  <p className="p-4 text-center text-[12px] font-medium text-[var(--dx-text-muted)]">No patients found.</p>
                 ) : (
                   results.slice(0, 10).map((p) => {
                     const name = `${p.first_name || ""} ${p.last_name || ""}`.trim() || `Patient #${p.id}`;
@@ -193,13 +206,11 @@ export function BookAppointmentModal({
                         onClick={() =>
                           setPatient({ id: p.id, name, hospital_number: p.hospital_number })
                         }
-                        className="flex w-full items-center justify-between border-b border-secondary-100 px-4 py-2.5 text-left last:border-0 hover:bg-primary-500/5 dark:border-white/5"
+                        className="flex w-full items-center justify-between border-b border-[var(--dx-border)] px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-[var(--dx-surface-sunken)]"
                       >
-                        <span className="text-sm font-semibold text-secondary-800 dark:text-secondary-100">
-                          {name}
-                        </span>
+                        <span className="text-[13px] font-semibold text-[var(--dx-text)]">{name}</span>
                         {p.hospital_number ? (
-                          <span className="data-mono text-[11px] text-secondary-400">{p.hospital_number}</span>
+                          <span className="dx-mono text-[11px] text-[var(--dx-text-muted)]">{p.hospital_number}</span>
                         ) : null}
                       </button>
                     );
@@ -212,9 +223,9 @@ export function BookAppointmentModal({
 
         {/* Date / time / duration */}
         <div className="grid gap-4 sm:grid-cols-3">
-          <Input label="Date *" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          <Input label="Time *" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-          <Select
+          <DxInput label="Date" required type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <DxInput label="Time" required type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          <DxSelect
             label="Duration"
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
@@ -224,14 +235,14 @@ export function BookAppointmentModal({
 
         {/* Clinician / service point */}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select
+          <DxSelect
             label="Clinician (optional)"
             value={doctorUserId}
             onChange={(e) => setDoctorUserId(e.target.value)}
             options={doctorOptions}
             disabled={doctorsQuery.isLoading}
           />
-          <Select
+          <DxSelect
             label="Service point (optional)"
             value={sdpId}
             onChange={(e) => setSdpId(e.target.value)}
@@ -240,28 +251,14 @@ export function BookAppointmentModal({
           />
         </div>
 
-        <Textarea
+        <DxTextarea
           label="Reason (optional)"
           placeholder="e.g. Follow-up consultation"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           rows={2}
         />
-
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="secondary" onClick={onClose} disabled={book.isPending}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => book.mutate()}
-            isLoading={book.isPending}
-            disabled={!canSubmit}
-            leftIcon={<CalendarPlus className="h-4 w-4" />}
-          >
-            Book appointment
-          </Button>
-        </div>
       </div>
-    </Modal>
+    </DxPopup>
   );
 }

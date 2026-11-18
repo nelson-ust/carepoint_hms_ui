@@ -5,21 +5,17 @@ import {
   Copy,
   Mail,
   Plus,
-  RefreshCw,
+  RotateCcw,
+  Search,
   Send,
   Timer,
   XCircle,
 } from "lucide-react";
 import { format, formatDistanceToNow, isValid } from "date-fns";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
-import { MetricCard } from "@/components/charts/MetricCard";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
-import { SearchInput } from "@/components/forms/SearchInput";
-import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
+import {
+  DxPage, DxPageHeader, DxPanel, DxKpi, DxGrid, DxBadge, DxButton, DxInput, DxSelect, DxPopup, DxMessage,
+  type DxGridColumn, type DxBadgeTone,
+} from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import {
   useCancelInvitation,
@@ -31,11 +27,11 @@ import { buildAcceptUrl, invitationName, invitationRecipient } from "../api/invi
 import type { Invitation, InvitationStatus } from "../api/invitations.api";
 import { SendInvitationModal } from "../components/SendInvitationModal";
 
-const STATUS_BADGE: Record<InvitationStatus, "soft-warning" | "soft-success" | "secondary" | "soft-danger"> = {
-  PENDING: "soft-warning",
-  ACCEPTED: "soft-success",
-  EXPIRED: "secondary",
-  CANCELLED: "soft-danger",
+const STATUS_TONE: Record<InvitationStatus, DxBadgeTone> = {
+  PENDING: "warning",
+  ACCEPTED: "success",
+  EXPIRED: "neutral",
+  CANCELLED: "danger",
 };
 
 function safeDate(value: string | null | undefined, pattern: string, fallback = "—"): string {
@@ -90,144 +86,93 @@ export function InvitationsPage() {
     }
   };
 
-  const columns: DataTableColumn<Invitation>[] = [
+  const columns: DxGridColumn<Invitation>[] = [
     {
-      key: "recipient",
-      header: "Recipient",
+      key: "recipient", header: "Recipient",
       render: (inv) => (
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]">
             <Mail className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-secondary-900">{invitationRecipient(inv)}</p>
-            <p className="text-[11px] font-medium text-secondary-400">
+            <p className="truncate text-[13px] font-semibold text-[var(--dx-text)]">{invitationRecipient(inv)}</p>
+            <p className="text-[11px] font-medium text-[var(--dx-text-muted)]">
               {invitationName(inv) !== "—" ? invitationName(inv) : "Name pending"} · invited {safeDate(inv.date_created, "MMM d, yyyy")}
             </p>
           </div>
         </div>
       ),
     },
+    { key: "roles", header: "Roles", render: (inv) => <DxBadge tone="neutral">{inv.role_ids?.length ? `${inv.role_ids.length} role${inv.role_ids.length > 1 ? "s" : ""}` : "Defaults"}</DxBadge> },
+    { key: "status", header: "Status", render: (inv) => <DxBadge tone={STATUS_TONE[inv.status]}>{inv.status}</DxBadge> },
     {
-      key: "roles",
-      header: "Roles",
+      key: "sent", header: "Last sent",
       render: (inv) => (
-        <Badge variant="secondary">{inv.role_ids?.length ? `${inv.role_ids.length} role${inv.role_ids.length > 1 ? "s" : ""}` : "Defaults"}</Badge>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      render: (inv) => <Badge variant={STATUS_BADGE[inv.status]}>{inv.status}</Badge>,
-    },
-    {
-      key: "sent",
-      header: "Last sent",
-      render: (inv) => (
-        <span className="text-xs font-bold text-secondary-500">
-          {inv.last_sent_at && isValid(new Date(inv.last_sent_at))
-            ? formatDistanceToNow(new Date(inv.last_sent_at), { addSuffix: true })
-            : "—"}
-          {inv.resend_count > 0 ? (
-            <span className="ml-1.5 text-[10px] font-medium text-secondary-400">×{inv.resend_count + 1}</span>
-          ) : null}
+        <span className="text-[12px] font-semibold text-[var(--dx-text-muted)]">
+          {inv.last_sent_at && isValid(new Date(inv.last_sent_at)) ? formatDistanceToNow(new Date(inv.last_sent_at), { addSuffix: true }) : "—"}
+          {inv.resend_count > 0 ? <span className="ml-1.5 text-[10px] font-medium text-[var(--dx-text-faint)]">×{inv.resend_count + 1}</span> : null}
         </span>
       ),
     },
+    { key: "expires", header: "Expires", render: (inv) => <span className="dx-mono text-[12px] text-[var(--dx-text-muted)]">{safeDate(inv.expires_at, "MMM d, HH:mm")}</span> },
     {
-      key: "expires",
-      header: "Expires",
-      render: (inv) => (
-        <span className="data-mono text-xs text-secondary-500">{safeDate(inv.expires_at, "MMM d, HH:mm")}</span>
-      ),
-    },
-    {
-      key: "actions",
-      header: "",
-      align: "right",
+      key: "actions", header: "", align: "right",
       render: (inv) =>
         inv.status === "PENDING" ? (
-          <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => handleResend(inv)}
-              disabled={resendMutation.isPending}
-              className="btn-ghost px-2.5 py-2 text-xs"
-              title="Resend invitation (rotates the token)"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => handleResend(inv)}
-              disabled={resendMutation.isPending}
-              className="btn-ghost px-2.5 py-2 text-xs"
-              title="Copy a fresh accept link (rotates the token)"
-            >
-              <Copy className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setCancelTarget(inv)}
-              disabled={cancelMutation.isPending}
-              className="btn-ghost px-2.5 py-2 text-xs text-rose-500 hover:text-rose-600"
-              title="Cancel invitation"
-            >
-              <XCircle className="h-4 w-4" />
-            </button>
+          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            <DxButton icon size="sm" variant="text" onClick={() => handleResend(inv)} disabled={resendMutation.isPending} title="Resend invitation (rotates the token)"><Send /></DxButton>
+            <DxButton icon size="sm" variant="text" onClick={() => handleResend(inv)} disabled={resendMutation.isPending} title="Copy a fresh accept link (rotates the token)"><Copy /></DxButton>
+            <DxButton icon size="sm" variant="outline-danger" onClick={() => setCancelTarget(inv)} disabled={cancelMutation.isPending} title="Cancel invitation"><XCircle /></DxButton>
           </div>
         ) : null,
     },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Administration" }, { label: "Invitations" }]}
         title="Staff Invitations"
-        description="Send and manage invitations for new hospital staff members."
+        subtitle="Send and manage invitations for new hospital staff members."
         actions={
           <>
-            <Button
-              variant="ghost"
-              onClick={() => sweepMutation.mutate(undefined, {
-                onSuccess: () => toast.info("Sweep complete", "Overdue invitations were marked EXPIRED."),
-              })}
+            <DxButton
+              onClick={() => sweepMutation.mutate(undefined, { onSuccess: () => toast.info("Sweep complete", "Overdue invitations were marked EXPIRED.") })}
               isLoading={sweepMutation.isPending}
               leftIcon={<Timer className="h-4 w-4" />}
             >
               Expire overdue
-            </Button>
-            <Button onClick={() => setSendOpen(true)} leftIcon={<Plus className="h-4 w-4" />}>
-              Send Invitation
-            </Button>
+            </DxButton>
+            <DxButton variant="primary" onClick={() => setSendOpen(true)} leftIcon={<Plus className="h-4 w-4" />}>Send invitation</DxButton>
           </>
         }
       />
 
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Total Invitations" value={counts.total} icon={Mail} tone="primary" isLoading={isLoading} />
-        <MetricCard label="Pending" value={counts.pending} icon={Clock} tone="amber" isLoading={isLoading} />
-        <MetricCard label="Accepted" value={counts.accepted} icon={CheckCircle2} tone="cyan" isLoading={isLoading} />
-        <MetricCard label="Expired" value={counts.expired} icon={XCircle} tone="slate" isLoading={isLoading} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DxKpi label="Total Invitations" value={counts.total} icon={Mail} tone="accent" isLoading={isLoading} />
+        <DxKpi label="Pending" value={counts.pending} icon={Clock} tone="warning" isLoading={isLoading} />
+        <DxKpi label="Accepted" value={counts.accepted} icon={CheckCircle2} tone="success" isLoading={isLoading} />
+        <DxKpi label="Expired" value={counts.expired} icon={XCircle} tone="neutral" isLoading={isLoading} />
       </div>
 
-      <Card padding="none">
-        <div className="flex flex-wrap items-center gap-3 px-6 py-4">
-          <SearchInput onSearch={setSearch} placeholder="Search by name, email or phone…" className="w-full sm:w-80" />
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as InvitationStatus | "")}
-            className="w-44 py-2.5"
-            options={[
-              { value: "", label: "All statuses" },
-              { value: "PENDING", label: "Pending" },
-              { value: "ACCEPTED", label: "Accepted" },
-              { value: "EXPIRED", label: "Expired" },
-              { value: "CANCELLED", label: "Cancelled" },
-            ]}
-          />
-          <Button variant="ghost" size="sm" onClick={() => refetch()} leftIcon={<RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />}>
-            Refresh
-          </Button>
+      <DxPanel flush>
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+          <div className="w-full sm:w-80">
+            <DxInput leftIcon={<Search className="h-3.5 w-3.5" />} placeholder="Search by name, email or phone…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div className="w-44">
+            <DxSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as InvitationStatus | "")} editorSize="sm"
+              options={[
+                { value: "", label: "All statuses" },
+                { value: "PENDING", label: "Pending" },
+                { value: "ACCEPTED", label: "Accepted" },
+                { value: "EXPIRED", label: "Expired" },
+                { value: "CANCELLED", label: "Cancelled" },
+              ]} />
+          </div>
+          <DxButton variant="text" size="sm" onClick={() => refetch()} leftIcon={<RotateCcw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />}>Refresh</DxButton>
         </div>
-        <DataTable
+        <DxGrid
           columns={columns}
           data={filtered}
           rowKey={(inv) => inv.id}
@@ -237,44 +182,46 @@ export function InvitationsPage() {
           empty={{
             icon: Mail,
             title: invitations.length === 0 ? "No invitations yet" : "No matches",
-            description:
-              invitations.length === 0
-                ? "Invite your first team member — they'll receive a secure link to set up their account."
-                : "No invitations match your current search or filter.",
-            action:
-              invitations.length === 0 ? (
-                <Button size="sm" onClick={() => setSendOpen(true)} leftIcon={<Plus className="h-4 w-4" />}>
-                  Send Invitation
-                </Button>
-              ) : undefined,
+            description: invitations.length === 0 ? "Invite your first team member — they'll receive a secure link to set up their account." : "No invitations match your current search or filter.",
+            action: invitations.length === 0 ? <DxButton size="sm" variant="primary" onClick={() => setSendOpen(true)} leftIcon={<Plus className="h-4 w-4" />}>Send invitation</DxButton> : undefined,
           }}
         />
-      </Card>
+      </DxPanel>
 
       <SendInvitationModal isOpen={sendOpen} onClose={() => setSendOpen(false)} />
 
-      <ConfirmDialog
+      <DxPopup
         isOpen={!!cancelTarget}
         onClose={() => setCancelTarget(null)}
         title="Cancel this invitation?"
-        description={
-          cancelTarget
-            ? `${invitationRecipient(cancelTarget)} will no longer be able to use their invite link. This cannot be undone — you can always send a new invitation later.`
-            : undefined
+        size="sm"
+        locked={cancelMutation.isPending}
+        footer={
+          <>
+            <DxButton onClick={() => setCancelTarget(null)} disabled={cancelMutation.isPending}>Keep invitation</DxButton>
+            <DxButton
+              variant="danger"
+              isLoading={cancelMutation.isPending}
+              onClick={async () => {
+                if (!cancelTarget) return;
+                try {
+                  await cancelMutation.mutateAsync(cancelTarget.id);
+                  toast.success("Invitation cancelled");
+                  setCancelTarget(null);
+                } catch (err: any) {
+                  toast.error("Cancel failed", err?.response?.data?.message || "Please try again.");
+                }
+              }}
+            >
+              Cancel Invitation
+            </DxButton>
+          </>
         }
-        confirmLabel="Cancel Invitation"
-        tone="danger"
-        onConfirm={async () => {
-          if (!cancelTarget) return;
-          try {
-            await cancelMutation.mutateAsync(cancelTarget.id);
-            toast.success("Invitation cancelled");
-          } catch (err: any) {
-            toast.error("Cancel failed", err?.response?.data?.message || "Please try again.");
-            throw err;
-          }
-        }}
-      />
-    </div>
+      >
+        <DxMessage tone="danger">
+          {cancelTarget ? `${invitationRecipient(cancelTarget)} will no longer be able to use their invite link. This cannot be undone — you can always send a new invitation later.` : ""}
+        </DxMessage>
+      </DxPopup>
+    </DxPage>
   );
 }

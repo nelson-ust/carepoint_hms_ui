@@ -4,10 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { Check, Copy, Link2, Send } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import { DxPopup, DxButton, DxInput, DxSelect } from "@/components/dx";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { listRoles } from "@/features/roles/api/roles.api";
 import { useCreateInvitation } from "../hooks/use-invitations";
@@ -90,10 +87,7 @@ export function SendInvitationModal({
       setResult(res);
       toast.success("Invitation created", "The invite email is dispatched when SMTP is configured.");
     } catch (err: any) {
-      toast.error(
-        "Could not create invitation",
-        err?.response?.data?.message || "Please review the details and try again.",
-      );
+      toast.error("Could not create invitation", err?.response?.data?.message || "Please review the details and try again.");
     }
   });
 
@@ -109,66 +103,50 @@ export function SendInvitationModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={close} title="Send Staff Invitation" size="lg">
+    <DxPopup isOpen={isOpen} onClose={close} title="Send Staff Invitation" size="lg">
       {result ? (
-        <div className="space-y-6 animate-fade-in">
-          <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-5 py-4">
-            <Check className="h-5 w-5 shrink-0 text-emerald-500" />
-            <p className="text-sm font-bold text-secondary-900">
-              Invitation created for {result.invitation.email || result.invitation.phone_number}.
-            </p>
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 rounded-md border px-5 py-4" style={{ borderColor: "var(--dx-success)", background: "var(--dx-success-soft)" }}>
+            <Check className="h-5 w-5 shrink-0" style={{ color: "var(--dx-success)" }} />
+            <p className="text-[13px] font-semibold text-[var(--dx-text)]">Invitation created for {result.invitation.email || result.invitation.phone_number}.</p>
           </div>
           <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-widest text-secondary-500">
-              Shareable accept link
-            </p>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">Shareable accept link</p>
             <div className="flex items-center gap-2">
-              <div className="data-mono flex-1 overflow-x-auto whitespace-nowrap rounded-2xl border border-secondary-200 bg-secondary-50 px-4 py-3 text-xs dark:border-white/10 dark:bg-white/5">
-                {acceptLink}
-              </div>
-              <Button variant="secondary" size="sm" onClick={copyLink} leftIcon={copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}>
-                {copied ? "Copied" : "Copy"}
-              </Button>
+              <div className="dx-mono flex-1 overflow-x-auto whitespace-nowrap rounded-md border border-[var(--dx-border)] bg-[var(--dx-surface-sunken)] px-4 py-3 text-[12px]">{acceptLink}</div>
+              <DxButton size="sm" onClick={copyLink} leftIcon={copied ? <Check className="h-4 w-4" style={{ color: "var(--dx-success)" }} /> : <Copy className="h-4 w-4" />}>{copied ? "Copied" : "Copy"}</DxButton>
             </div>
-            <p className="mt-2 text-xs text-secondary-400">
-              The same link is emailed automatically when outgoing email is configured. It expires
-              on {new Date(result.invitation.expires_at).toLocaleString()}.
+            <p className="mt-2 text-[12px] text-[var(--dx-text-muted)]">
+              The same link is emailed automatically when outgoing email is configured. It expires on {new Date(result.invitation.expires_at).toLocaleString()}.
             </p>
           </div>
           <div className="flex justify-end">
-            <Button onClick={close}>Done</Button>
+            <DxButton variant="primary" onClick={close}>Done</DxButton>
           </div>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-6">
           <div className="grid gap-5 sm:grid-cols-2">
-            <Input label="First name" placeholder="Ada" {...register("first_name")} error={errors.first_name?.message} />
-            <Input label="Last name" placeholder="Obi" {...register("last_name")} error={errors.last_name?.message} />
-            <Input label="Email" type="email" placeholder="ada.obi@hospital.com" {...register("email")} error={errors.email?.message} />
-            <Input label="Phone number" placeholder="0803…" {...register("phone_number")} error={errors.phone_number?.message} hint="Email or phone is required." />
+            <DxInput label="First name" placeholder="Ada" {...register("first_name")} error={errors.first_name?.message} />
+            <DxInput label="Last name" placeholder="Obi" {...register("last_name")} error={errors.last_name?.message} />
+            <DxInput label="Email" type="email" placeholder="ada.obi@hospital.com" {...register("email")} error={errors.email?.message} />
+            <DxInput label="Phone number" placeholder="0803…" {...register("phone_number")} error={errors.phone_number?.message} hint="Email or phone is required." />
           </div>
 
           <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-widest text-secondary-500">
-              Roles on acceptance
-            </p>
-            <div className="grid max-h-48 gap-2 overflow-y-auto rounded-2xl border border-secondary-200 p-4 sm:grid-cols-2 dark:border-white/10">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">Roles on acceptance</p>
+            <div className="grid max-h-48 gap-2 overflow-y-auto rounded-md border border-[var(--dx-border)] p-4 sm:grid-cols-2">
               {rolesQuery.isLoading ? (
-                <p className="text-xs text-secondary-400">Loading roles…</p>
+                <p className="text-[12px] text-[var(--dx-text-muted)]">Loading roles…</p>
               ) : roles.length === 0 ? (
-                <p className="text-xs text-secondary-400">No roles defined yet — the invitee joins with defaults.</p>
+                <p className="text-[12px] text-[var(--dx-text-muted)]">No roles defined yet — the invitee joins with defaults.</p>
               ) : (
                 roles.map((role) => (
-                  <label key={role.id} className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-secondary-50 dark:hover:bg-white/5">
-                    <input
-                      type="checkbox"
-                      checked={roleIds.includes(role.id)}
-                      onChange={() => toggleRole(role.id)}
-                      className="h-4 w-4 rounded border-secondary-300 text-primary-500 focus:ring-primary-500/30"
-                    />
+                  <label key={role.id} className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-[var(--dx-surface-sunken)]">
+                    <input type="checkbox" checked={roleIds.includes(role.id)} onChange={() => toggleRole(role.id)} className="h-4 w-4 rounded" style={{ accentColor: "var(--dx-accent)" }} />
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold text-secondary-900">{role.name}</span>
-                      <span className="data-mono block text-[10px] text-secondary-400">{role.code}</span>
+                      <span className="block truncate text-[13px] font-semibold text-[var(--dx-text)]">{role.name}</span>
+                      <span className="dx-mono block text-[10px] text-[var(--dx-text-muted)]">{role.code}</span>
                     </span>
                   </label>
                 ))
@@ -176,7 +154,7 @@ export function SendInvitationModal({
             </div>
           </div>
 
-          <Select
+          <DxSelect
             label="Expires after"
             {...register("expiry_days")}
             options={[
@@ -188,21 +166,17 @@ export function SendInvitationModal({
           />
 
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" onClick={close} disabled={createMutation.isPending}>
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={createMutation.isPending} leftIcon={<Send className="h-4 w-4" />}>
-              Create Invitation
-            </Button>
+            <DxButton onClick={close} disabled={createMutation.isPending}>Cancel</DxButton>
+            <DxButton type="submit" variant="primary" isLoading={createMutation.isPending} leftIcon={<Send className="h-4 w-4" />}>Create invitation</DxButton>
           </div>
         </form>
       )}
-      {!result && (
-        <p className="mt-4 flex items-center gap-1.5 text-[11px] text-secondary-400">
+      {!result ? (
+        <p className="mt-4 flex items-center gap-1.5 text-[11px] text-[var(--dx-text-muted)]">
           <Link2 className="h-3.5 w-3.5" />
           A copyable accept link is shown after creation — handy while email delivery is not configured.
         </p>
-      )}
-    </Modal>
+      ) : null}
+    </DxPopup>
   );
 }

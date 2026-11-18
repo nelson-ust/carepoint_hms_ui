@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   LogOut,
   MapPin,
+  Pencil,
   Plus,
   Receipt,
   Scissors,
@@ -25,7 +26,6 @@ import {
   DxKpi,
   DxPage,
   DxPageHeader,
-  DxPanel,
   DxPopup,
   DxSearchBox,
   DxSelect,
@@ -57,6 +57,18 @@ const naira = (n: number | string) => `\u20a6 ${Number(n).toLocaleString()}`;
 type TabKey = "deceased" | "units" | "autopsies" | "billing";
 
 const SOURCE_LABEL: Record<string, string> = { IN_HOSPITAL: "In-hospital", BROUGHT_IN: "Brought-in" };
+const RELATIONSHIP_OPTIONS = [
+  { value: "Spouse", label: "Spouse" },
+  { value: "Child", label: "Child" },
+  { value: "Parent", label: "Parent" },
+  { value: "Sibling", label: "Sibling" },
+  { value: "Grandchild", label: "Grandchild" },
+  { value: "Other relative", label: "Other relative" },
+  { value: "Friend", label: "Friend" },
+  { value: "Guardian", label: "Guardian" },
+  { value: "Employer", label: "Employer" },
+  { value: "Other", label: "Other" },
+];
 const UNIT_TYPE_OPTIONS = [
   { value: "COLD_CHAMBER", label: "Cold chamber" },
   { value: "FREEZER", label: "Freezer" },
@@ -137,7 +149,8 @@ export function MortuaryPage() {
   const EMPTY_RELEASE = { released_to_name: "", released_to_relationship: "", released_to_contact: "", release_authorized_by: "", release_notes: "", transfer: false, storage_daily_rate: "", pay_amount: "", pay_method: "CASH", pay_reference: "", waive: false, waiver_reason: "" };
   const [releaseForm, setReleaseForm] = useState(EMPTY_RELEASE);
   const [unitOpen, setUnitOpen] = useState(false);
-  const [unitForm, setUnitForm] = useState({ code: "", name: "", unit_type: "COLD_CHAMBER", capacity: "1", location: "", notes: "" });
+  const [editingUnitId, setEditingUnitId] = useState<number | null>(null);
+  const [unitForm, setUnitForm] = useState({ code: "", name: "", unit_type: "COLD_CHAMBER", capacity: "1", rate: "", rate_period: "DAILY", account_code: "", location: "", notes: "" });
 
   // ---------- Data ----------
   const statsQuery = useQuery({ queryKey: ["mortuary", "stats"], queryFn: mortuaryApi.getStats });
@@ -146,6 +159,7 @@ export function MortuaryPage() {
     queryFn: () => mortuaryApi.listDeceased({ limit: 200, status: statusFilter || undefined, source: sourceFilter || undefined }),
   });
   const unitsQuery = useQuery({ queryKey: ["mortuary", "units"], queryFn: () => mortuaryApi.listUnits({ limit: 200 }) });
+  const accountsQuery = useQuery({ queryKey: ["mortuary", "accounts"], queryFn: mortuaryApi.listAccounts });
   const pendingDeathsQuery = useQuery({ queryKey: ["mortuary", "pending-deaths"], queryFn: mortuaryApi.listPendingDeaths });
   const autopsiesQuery = useQuery({ queryKey: ["mortuary", "autopsies"], queryFn: () => mortuaryApi.listAutopsies(), enabled: location.pathname.endsWith("/autopsies") });
   const chargesQuery = useQuery({ queryKey: ["mortuary", "charges"], queryFn: () => mortuaryApi.listCharges(), enabled: location.pathname.endsWith("/billing") });
@@ -158,6 +172,10 @@ export function MortuaryPage() {
 
   const stats = statsQuery.data;
   const units = useMemo(() => unitsQuery.data?.items ?? [], [unitsQuery.data]);
+  const accountOptions = useMemo(
+    () => (accountsQuery.data ?? []).map((a) => ({ value: a.code, label: `${a.code} — ${a.name}` })),
+    [accountsQuery.data],
+  );
   const unitOptions = useMemo(
     () => units.filter((u) => u.status !== "OUT_OF_SERVICE" && u.available_slots > 0).map((u) => ({ value: String(u.id), label: `${u.name} (${u.available_slots} free)` })),
     [units],
@@ -247,23 +265,45 @@ export function MortuaryPage() {
     onError: (e) => toast.error("Could not release", apiErrorMessage(e)),
   });
   const unitMut = useMutation({
-    mutationFn: () =>
-      mortuaryApi.createUnit({
-        code: unitForm.code,
+    mutationFn: () => {
+      const body = {
         name: unitForm.name,
         unit_type: unitForm.unit_type as MortuaryUnit["unit_type"],
         capacity: Number(unitForm.capacity) || 1,
+        rate: Number(unitForm.rate) || 0,
+        rate_period: unitForm.rate_period as MortuaryUnit["rate_period"],
+        account_code: unitForm.account_code.trim() || undefined,
         location: unitForm.location || undefined,
         notes: unitForm.notes || undefined,
-      }),
+      };
+      return editingUnitId != null
+        ? mortuaryApi.updateUnit(editingUnitId, body)
+        : mortuaryApi.createUnit({ code: unitForm.code, ...body });
+    },
     onSuccess: () => {
-      toast.success("Storage unit added");
+      toast.success(editingUnitId != null ? "Storage unit updated" : "Storage unit added");
       setUnitOpen(false);
-      setUnitForm({ code: "", name: "", unit_type: "COLD_CHAMBER", capacity: "1", location: "", notes: "" });
+      setEditingUnitId(null);
+      setUnitForm({ code: "", name: "", unit_type: "COLD_CHAMBER", capacity: "1", rate: "", rate_period: "DAILY", account_code: "", location: "", notes: "" });
       refresh();
     },
-    onError: (e) => toast.error("Could not add unit", apiErrorMessage(e)),
+    onError: (e) => toast.error(editingUnitId != null ? "Could not update unit" : "Could not add unit", apiErrorMessage(e)),
   });
+  const openEditUnit = (u: MortuaryUnit) => {
+    setEditingUnitId(u.id);
+    setUnitForm({
+      code: u.code,
+      name: u.name,
+      unit_type: u.unit_type,
+      capacity: String(u.capacity),
+      rate: u.rate != null ? String(u.rate) : "",
+      rate_period: u.rate_period ?? "DAILY",
+      account_code: u.account_code ?? "",
+      location: u.location ?? "",
+      notes: u.notes ?? "",
+    });
+    setUnitOpen(true);
+  };
 
   // ---------- Columns ----------
   const deceasedColumns: DxGridColumn<DeceasedRecord>[] = [
@@ -309,10 +349,14 @@ export function MortuaryPage() {
     { key: "code", header: "Code", render: (u) => <span className="dx-mono font-semibold">{u.code}</span> },
     { key: "name", header: "Name" },
     { key: "unit_type", header: "Type", align: "center", render: (u) => <DxBadge tone="neutral">{u.unit_type.replace("_", " ")}</DxBadge> },
+    { key: "rate", header: "Rate", align: "right", render: (u) => (Number(u.rate) > 0 ? <span className="font-mono">{naira(Number(u.rate))}<span className="text-[11px] text-[var(--dx-text-muted)]">/{u.rate_period === "MONTHLY" ? "mo" : "day"}</span></span> : <span className="text-[var(--dx-text-muted)]">—</span>) },
     { key: "occupied", header: "Occupancy", align: "center", render: (u) => `${u.occupied} / ${u.capacity}` },
     { key: "available_slots", header: "Free", align: "center" },
     { key: "location", header: "Location", render: (u) => u.location ?? <span className="text-[var(--dx-text-faint)]">—</span> },
     { key: "status", header: "Status", align: "center", render: (u) => <DxBadge tone={unitTone(u.status)}>{u.status.replace("_", " ")}</DxBadge> },
+    { key: "actions", header: "", align: "right", render: (u) => (
+      <DxButton size="sm" leftIcon={<Pencil />} onClick={(e) => { e.stopPropagation(); openEditUnit(u); }}>Edit</DxButton>
+    ) },
   ];
 
   const autopsyColumns: DxGridColumn<Autopsy>[] = [
@@ -361,7 +405,7 @@ export function MortuaryPage() {
         actions={
           <>
             {tab === "units" ? (
-              <DxButton variant="primary" leftIcon={<Plus />} onClick={() => setUnitOpen(true)}>
+              <DxButton variant="primary" leftIcon={<Plus />} onClick={() => { setEditingUnitId(null); setUnitForm({ code: "", name: "", unit_type: "COLD_CHAMBER", capacity: "1", rate: "", rate_period: "DAILY", account_code: "", location: "", notes: "" }); setUnitOpen(true); }}>
                 Add storage unit
               </DxButton>
             ) : (
@@ -501,7 +545,7 @@ export function MortuaryPage() {
 
           <DxInput label="Next of kin" value={registerForm.next_of_kin_name ?? ""} onChange={setReg("next_of_kin_name")} />
           <DxInput label="Next of kin phone" value={registerForm.next_of_kin_phone ?? ""} onChange={setReg("next_of_kin_phone")} />
-          <DxInput label="Relationship" value={registerForm.next_of_kin_relationship ?? ""} onChange={setReg("next_of_kin_relationship")} />
+          <DxSelect label="Relationship" value={registerForm.next_of_kin_relationship ?? ""} onChange={setReg("next_of_kin_relationship")} options={RELATIONSHIP_OPTIONS} placeholder="Select…" />
 
           <DxSelect label="Place in storage now (optional)" value={registerForm.mortuary_unit_id ? String(registerForm.mortuary_unit_id) : ""} onChange={(e) => setRegisterForm((f) => ({ ...f, mortuary_unit_id: e.target.value ? Number(e.target.value) : undefined }))}
             options={[{ value: "", label: "Not yet — register only" }, ...unitOptions]} />
@@ -573,7 +617,7 @@ export function MortuaryPage() {
             </div>
             <DxForm cols={2}>
               <DxInput label="Released to" required fieldClassName="dx-col-span-full" value={releaseForm.released_to_name} onChange={(e) => setReleaseForm((f) => ({ ...f, released_to_name: e.target.value }))} placeholder="Name of recipient / undertaker" />
-              <DxInput label="Relationship" value={releaseForm.released_to_relationship} onChange={(e) => setReleaseForm((f) => ({ ...f, released_to_relationship: e.target.value }))} />
+              <DxSelect label="Relationship" value={releaseForm.released_to_relationship} onChange={(e) => setReleaseForm((f) => ({ ...f, released_to_relationship: e.target.value }))} options={RELATIONSHIP_OPTIONS} placeholder="Select…" />
               <DxInput label="Contact" value={releaseForm.released_to_contact} onChange={(e) => setReleaseForm((f) => ({ ...f, released_to_contact: e.target.value }))} />
               <DxInput label="Authorized by" fieldClassName="dx-col-span-full" value={releaseForm.release_authorized_by} onChange={(e) => setReleaseForm((f) => ({ ...f, release_authorized_by: e.target.value }))} placeholder="Officer / doctor authorising release" />
 
@@ -601,21 +645,24 @@ export function MortuaryPage() {
       {/* ---------- Add storage unit ---------- */}
       <DxPopup
         isOpen={unitOpen}
-        onClose={() => setUnitOpen(false)}
-        title="Add storage unit"
+        onClose={() => { setUnitOpen(false); setEditingUnitId(null); }}
+        title={editingUnitId != null ? "Edit storage unit" : "Add storage unit"}
         locked={unitMut.isPending}
         footer={
           <>
-            <DxButton onClick={() => setUnitOpen(false)} disabled={unitMut.isPending}>Cancel</DxButton>
-            <DxButton variant="primary" leftIcon={<Plus />} isLoading={unitMut.isPending} disabled={!unitForm.code.trim() || !unitForm.name.trim()} onClick={() => unitMut.mutate()}>Add unit</DxButton>
+            <DxButton onClick={() => { setUnitOpen(false); setEditingUnitId(null); }} disabled={unitMut.isPending}>Cancel</DxButton>
+            <DxButton variant="primary" leftIcon={editingUnitId != null ? <Pencil /> : <Plus />} isLoading={unitMut.isPending} disabled={!unitForm.code.trim() || !unitForm.name.trim()} onClick={() => unitMut.mutate()}>{editingUnitId != null ? "Save changes" : "Add unit"}</DxButton>
           </>
         }
       >
         <DxForm cols={2}>
-          <DxInput label="Code" required value={unitForm.code} onChange={(e) => setUnitForm((f) => ({ ...f, code: e.target.value }))} placeholder="CC-01" />
+          <DxInput label="Code" required value={unitForm.code} onChange={(e) => setUnitForm((f) => ({ ...f, code: e.target.value }))} placeholder="CC-01" disabled={editingUnitId != null} hint={editingUnitId != null ? "Code can\u2019t be changed." : undefined} />
           <DxInput label="Name" required value={unitForm.name} onChange={(e) => setUnitForm((f) => ({ ...f, name: e.target.value }))} placeholder="Cold Chamber 1" />
           <DxSelect label="Type" value={unitForm.unit_type} onChange={(e) => setUnitForm((f) => ({ ...f, unit_type: e.target.value }))} options={UNIT_TYPE_OPTIONS} />
           <DxInput label="Capacity" type="number" value={unitForm.capacity} onChange={(e) => setUnitForm((f) => ({ ...f, capacity: e.target.value }))} />
+          <DxInput label="Storage rate (₦)" type="number" value={unitForm.rate} onChange={(e) => setUnitForm((f) => ({ ...f, rate: e.target.value }))} hint={editingUnitId != null ? "New rate applies to bodies stored from now on; existing charges keep their original rate." : "Charged to each body held here."} />
+          <DxSelect label="Rate period" value={unitForm.rate_period} onChange={(e) => setUnitForm((f) => ({ ...f, rate_period: e.target.value }))} options={[{ value: "DAILY", label: "Per day" }, { value: "MONTHLY", label: "Per month" }]} />
+          <DxSelect label="Account code" value={unitForm.account_code} onChange={(e) => setUnitForm((f) => ({ ...f, account_code: e.target.value }))} options={accountOptions} placeholder="Auto — Mortuary Storage Revenue" hint="Ledger this storage revenue posts to." />
           <DxInput label="Location" fieldClassName="dx-col-span-full" leftIcon={<MapPin className="h-3.5 w-3.5" />} value={unitForm.location} onChange={(e) => setUnitForm((f) => ({ ...f, location: e.target.value }))} placeholder="Mortuary wing, ground floor" />
           <DxTextarea label="Notes" fieldClassName="dx-col-span-full" rows={2} value={unitForm.notes} onChange={(e) => setUnitForm((f) => ({ ...f, notes: e.target.value }))} />
         </DxForm>

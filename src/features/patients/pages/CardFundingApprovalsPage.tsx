@@ -1,41 +1,28 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Banknote,
-  CheckCircle2,
-  Clock,
-  CreditCard,
-  Download,
-  Landmark,
-  RefreshCw,
-  Search,
-  UserRound,
-  XCircle,
+  Banknote, CheckCircle2, Clock, CreditCard, Download, Landmark, RotateCcw, Search,
+  UserRound, XCircle,
 } from "lucide-react";
 import { format, isValid } from "date-fns";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Textarea } from "@/components/ui/Textarea";
-import { MetricCard } from "@/components/charts/MetricCard";
-import { DataTable, type DataTableColumn } from "@/components/data-table/DataTable";
+import {
+  DxPage, DxPageHeader, DxPanel, DxBadge, DxButton, DxKpi, DxInput, DxTextarea, DxPopup,
+  DxTabs, DxGrid, type DxGridColumn,
+} from "@/components/dx";
 import { ConfirmDialog } from "@/components/feedback/ConfirmDialog";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { apiErrorMessage } from "@/lib/api/api-error";
 import {
-  fundingRequestsApi,
-  formatCardMoney,
-  type CardFundingRequest,
-  type FundingRequestStatus,
+  fundingRequestsApi, formatCardMoney,
+  type CardFundingRequest, type FundingRequestStatus,
 } from "../api/membership.api";
 
-const STATUS_TABS: { value: FundingRequestStatus | ""; label: string }[] = [
-  { value: "PENDING", label: "Pending" },
-  { value: "APPROVED", label: "Approved" },
-  { value: "REJECTED", label: "Rejected" },
-  { value: "", label: "All" },
+type StatusTab = FundingRequestStatus | "";
+const STATUS_TABS: { key: StatusTab; label: string }[] = [
+  { key: "PENDING", label: "Pending" },
+  { key: "APPROVED", label: "Approved" },
+  { key: "REJECTED", label: "Rejected" },
+  { key: "", label: "All" },
 ];
 
 function safeDate(v?: string | null): string {
@@ -46,19 +33,16 @@ function safeDate(v?: string | null): string {
 
 function statusBadge(status: FundingRequestStatus) {
   switch (status) {
-    case "APPROVED":
-      return <Badge variant="soft-success">Approved</Badge>;
-    case "REJECTED":
-      return <Badge variant="soft-danger">Rejected</Badge>;
-    default:
-      return <Badge variant="soft-warning">Pending</Badge>;
+    case "APPROVED": return <DxBadge tone="success" dot>Approved</DxBadge>;
+    case "REJECTED": return <DxBadge tone="danger" dot>Rejected</DxBadge>;
+    default: return <DxBadge tone="warning" dot>Pending</DxBadge>;
   }
 }
 
 export function CardFundingApprovalsPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<FundingRequestStatus | "">("PENDING");
+  const [status, setStatus] = useState<StatusTab>("PENDING");
   const [search, setSearch] = useState("");
   const [rejectTarget, setRejectTarget] = useState<CardFundingRequest | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -78,20 +62,13 @@ export function CardFundingApprovalsPage() {
 
   const approveMut = useMutation({
     mutationFn: (id: number) => fundingRequestsApi.approve(id),
-    onSuccess: () => {
-      toast.success("Payment confirmed", "The patient's card wallet has been credited.");
-      invalidate();
-    },
+    onSuccess: () => { toast.success("Payment confirmed", "The patient's card wallet has been credited."); invalidate(); },
     onError: (err) => toast.error("Couldn't confirm", apiErrorMessage(err, "Please try again.")),
   });
 
   const rejectMut = useMutation({
-    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
-      fundingRequestsApi.reject(id, reason),
-    onSuccess: () => {
-      toast.success("Request rejected", "The patient will see this payment was declined.");
-      invalidate();
-    },
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => fundingRequestsApi.reject(id, reason),
+    onSuccess: () => { toast.success("Request rejected", "The patient will see this payment was declined."); invalidate(); },
     onError: (err) => toast.error("Couldn't reject", apiErrorMessage(err, "Please try again.")),
   });
 
@@ -124,208 +101,90 @@ export function CardFundingApprovalsPage() {
     return { pending: pending.length, pendingValue, shown: requests.length };
   }, [all, requests]);
 
-  const columns: DataTableColumn<CardFundingRequest>[] = [
-    {
-      key: "patient",
-      header: "Patient",
-      render: (r) => (
+  const columns: DxGridColumn<CardFundingRequest>[] = [
+    { key: "patient", header: "Patient", render: (r) => (
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--dx-accent-soft)] text-[var(--dx-accent)]">
             <UserRound className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-secondary-900">
-              {r.patient_name || `Patient #${r.patient_id}`}
-            </p>
-            <p className="data-mono flex items-center gap-1 text-[11px] text-secondary-400">
-              <CreditCard className="h-3 w-3" />
-              {r.card_number || `Card #${r.membership_card_id}`}
+            <p className="truncate text-[13px] font-semibold text-[var(--dx-text)]">{r.patient_name || `Patient #${r.patient_id}`}</p>
+            <p className="dx-mono flex items-center gap-1 text-[11px] text-[var(--dx-text-faint)]">
+              <CreditCard className="h-3 w-3" />{r.card_number || `Card #${r.membership_card_id}`}
             </p>
           </div>
-        </div>
-      ),
-    },
-    {
-      key: "amount",
-      header: "Amount",
-      align: "right",
-      render: (r) => (
-        <span className="data-mono text-sm font-bold text-secondary-900">
-          {formatCardMoney(r.amount)}
-        </span>
-      ),
-    },
-    {
-      key: "payer",
-      header: "Payer / Ref",
-      render: (r) => (
-        <div className="text-xs">
-          <p className="font-bold text-secondary-700">{r.depositor_name || "—"}</p>
-          <p className="text-secondary-400">{r.payment_reference || ""}</p>
-        </div>
-      ),
-    },
-    {
-      key: "method",
-      header: "Method",
-      render: (r) => (
-        <Badge variant="secondary">
-          <Landmark className="mr-1 h-3 w-3" />
-          {(r.payment_method || "MANUAL").replace(/_/g, " ")}
-        </Badge>
-      ),
-    },
-    {
-      key: "submitted",
-      header: "Submitted",
-      render: (r) => <span className="text-xs text-secondary-500">{safeDate(r.date_created)}</span>,
-    },
-    {
-      key: "statusTag",
-      header: "Status",
-      render: (r) => statusBadge(r.status),
-    },
-    {
-      key: "proof",
-      header: "Proof",
-      render: (r) =>
+        </div>) },
+    { key: "amount", header: "Amount", align: "right", render: (r) => <span className="dx-mono font-semibold text-[var(--dx-text)]">{formatCardMoney(r.amount)}</span> },
+    { key: "payer", header: "Payer / Ref", render: (r) => (
+        <div className="text-[12px]">
+          <p className="font-semibold text-[var(--dx-text)]">{r.depositor_name || "—"}</p>
+          <p className="text-[var(--dx-text-muted)]">{r.payment_reference || ""}</p>
+        </div>) },
+    { key: "method", header: "Method", render: (r) => (
+        <DxBadge tone="neutral"><Landmark className="mr-1 h-3 w-3" />{(r.payment_method || "MANUAL").replace(/_/g, " ")}</DxBadge>) },
+    { key: "submitted", header: "Submitted", render: (r) => <span className="text-[12px] text-[var(--dx-text-muted)]">{safeDate(r.date_created)}</span> },
+    { key: "statusTag", header: "Status", render: (r) => statusBadge(r.status) },
+    { key: "proof", header: "Proof", render: (r) =>
         r.evidence_file_name ? (
-          <button
-            type="button"
-            className="btn-ghost inline-flex px-2.5 py-1.5 text-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              viewEvidence(r.id);
-            }}
-          >
-            <Download className="h-3.5 w-3.5" /> View
-          </button>
-        ) : (
-          <span className="text-xs text-secondary-400">None</span>
-        ),
-    },
-    {
-      key: "actions",
-      header: "",
-      align: "right",
-      render: (r) =>
+          <DxButton size="sm" variant="text" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={(e) => { e.stopPropagation(); viewEvidence(r.id); }}>View</DxButton>
+        ) : <span className="text-[12px] text-[var(--dx-text-faint)]">None</span> },
+    { key: "actions", header: "", align: "right", render: (r) =>
         r.status === "PENDING" ? (
           <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setConfirmTarget(r)}
-              leftIcon={<CheckCircle2 className="h-3.5 w-3.5" />}
-            >
-              Confirm
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => {
-                setRejectReason("");
-                setRejectTarget(r);
-              }}
-              leftIcon={<XCircle className="h-3.5 w-3.5" />}
-            >
-              Reject
-            </Button>
+            <DxButton variant="primary" size="sm" onClick={() => setConfirmTarget(r)} leftIcon={<CheckCircle2 className="h-3.5 w-3.5" />}>Confirm</DxButton>
+            <DxButton variant="danger" size="sm" onClick={() => { setRejectReason(""); setRejectTarget(r); }} leftIcon={<XCircle className="h-3.5 w-3.5" />}>Reject</DxButton>
           </div>
         ) : r.status === "REJECTED" && r.review_note ? (
-          <span className="text-xs text-rose-500">{r.review_note}</span>
-        ) : null,
-    },
+          <span className="text-[12px] text-[var(--dx-danger,#e11d48)]">{r.review_note}</span>
+        ) : null },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-      <PageHeader
+    <DxPage>
+      <DxPageHeader
+        crumbs={[{ label: "Patients" }, { label: "Card Funding" }]}
         title="Card Funding Approvals"
-        description="Review and confirm manual wallet top-ups submitted by patients from the portal."
+        subtitle="Review and confirm manual wallet top-ups submitted by patients from the portal."
         actions={
-          <Button
-            variant="ghost"
-            onClick={() => requestsQuery.refetch()}
-            leftIcon={<RefreshCw className={`h-4 w-4 ${requestsQuery.isFetching ? "animate-spin" : ""}`} />}
-          >
-            Refresh
-          </Button>
+          <DxButton icon title="Refresh" onClick={() => requestsQuery.refetch()} isLoading={requestsQuery.isFetching}>
+            <RotateCcw />
+          </DxButton>
         }
       />
 
-      <div className="grid gap-6 sm:grid-cols-3">
-        <MetricCard
-          label="Awaiting Confirmation"
-          value={totals.pending}
-          icon={Clock}
-          tone="amber"
-          isLoading={requestsQuery.isLoading}
-        />
-        <MetricCard
-          label="Pending Value"
-          value={formatCardMoney(totals.pendingValue)}
-          icon={Banknote}
-          tone="primary"
-          isLoading={requestsQuery.isLoading}
-        />
-        <MetricCard
-          label="Records Shown"
-          value={totals.shown}
-          icon={CreditCard}
-          tone="cyan"
-          isLoading={requestsQuery.isLoading}
-        />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <DxKpi label="Awaiting confirmation" value={totals.pending} icon={Clock} tone="warning" isLoading={requestsQuery.isLoading} />
+        <DxKpi label="Pending value" value={formatCardMoney(totals.pendingValue)} icon={Banknote} tone="accent" isLoading={requestsQuery.isLoading} />
+        <DxKpi label="Records shown" value={totals.shown} icon={CreditCard} tone="info" isLoading={requestsQuery.isLoading} />
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-2 rounded-2xl bg-secondary-100 p-1 dark:bg-white/5">
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.value || "all"}
-              onClick={() => setStatus(tab.value)}
-              className={`rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-widest transition-all ${
-                status === tab.value
-                  ? "bg-white text-primary-600 shadow-sm dark:bg-secondary-800"
-                  : "text-secondary-500 hover:text-secondary-800"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search patient, card, reference…"
-            className="w-full rounded-2xl border border-secondary-300 bg-white/70 py-3 pl-12 pr-4 text-sm outline-none focus:border-primary-500"
-          />
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <DxTabs<StatusTab>
+          value={status}
+          onChange={setStatus}
+          items={STATUS_TABS.map((t) => ({ key: t.key, label: t.label }))}
+        />
+        <div className="w-full max-w-sm">
+          <DxInput leftIcon={<Search className="h-4 w-4 text-[var(--dx-text-faint)]" />} placeholder="Search patient, card, reference…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
 
-      <Card padding="none">
-        <DataTable
-          columns={columns}
-          data={requests}
-          rowKey={(r) => r.id}
+      <DxPanel flush>
+        <DxGrid<CardFundingRequest>
+          borderless columns={columns} data={requests} rowKey={(r) => r.id}
           isLoading={requestsQuery.isLoading}
           error={requestsQuery.error ? apiErrorMessage(requestsQuery.error, "Unable to load funding requests.") : null}
           onRetry={() => requestsQuery.refetch()}
           empty={{
             icon: CheckCircle2,
             title: status === "PENDING" ? "All caught up" : "No requests",
-            description:
-              status === "PENDING"
-                ? "There are no card-funding payments awaiting confirmation right now."
-                : "No card-funding requests match this view.",
+            description: status === "PENDING"
+              ? "There are no card-funding payments awaiting confirmation right now."
+              : "No card-funding requests match this view.",
           }}
         />
-      </Card>
+      </DxPanel>
 
-      {/* Confirm */}
       <ConfirmDialog
         isOpen={!!confirmTarget}
         onClose={() => setConfirmTarget(null)}
@@ -334,53 +193,32 @@ export function CardFundingApprovalsPage() {
         confirmLabel="Confirm & credit"
         description={
           confirmTarget
-            ? `Confirming ${formatCardMoney(confirmTarget.amount)} for ${
-                confirmTarget.patient_name || "this patient"
-              } credits card ${confirmTarget.card_number || `#${confirmTarget.membership_card_id}`} immediately. Verify the proof of payment first.`
+            ? `Confirming ${formatCardMoney(confirmTarget.amount)} for ${confirmTarget.patient_name || "this patient"} credits card ${confirmTarget.card_number || `#${confirmTarget.membership_card_id}`} immediately. Verify the proof of payment first.`
             : undefined
         }
-        onConfirm={async () => {
-          if (!confirmTarget) return;
-          await approveMut.mutateAsync(confirmTarget.id);
-        }}
+        onConfirm={async () => { if (!confirmTarget) return; await approveMut.mutateAsync(confirmTarget.id); }}
       />
 
-      {/* Reject */}
-      <Modal
+      <DxPopup
         isOpen={!!rejectTarget}
         onClose={() => setRejectTarget(null)}
         title="Reject payment"
         size="md"
         footer={
-          <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={() => setRejectTarget(null)} disabled={rejectMut.isPending}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              isLoading={rejectMut.isPending}
-              onClick={async () => {
-                if (!rejectTarget) return;
-                await rejectMut.mutateAsync({ id: rejectTarget.id, reason: rejectReason });
-                setRejectTarget(null);
-              }}
-            >
+          <>
+            <DxButton variant="text" onClick={() => setRejectTarget(null)} disabled={rejectMut.isPending}>Cancel</DxButton>
+            <DxButton variant="danger" isLoading={rejectMut.isPending}
+              onClick={async () => { if (!rejectTarget) return; await rejectMut.mutateAsync({ id: rejectTarget.id, reason: rejectReason }); setRejectTarget(null); }}>
               Reject payment
-            </Button>
-          </div>
+            </DxButton>
+          </>
         }
       >
-        <p className="mb-4 text-sm font-medium text-secondary-600">
+        <p className="mb-4 text-[13px] text-[var(--dx-text-muted)]">
           Let the patient know why this evidence was rejected so they can re-submit.
         </p>
-        <Textarea
-          label="Reason"
-          placeholder="e.g. The uploaded receipt doesn't match the amount."
-          value={rejectReason}
-          onChange={(e) => setRejectReason(e.target.value)}
-          rows={3}
-        />
-      </Modal>
-    </div>
+        <DxTextarea label="Reason" placeholder="e.g. The uploaded receipt doesn't match the amount." value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} rows={3} />
+      </DxPopup>
+    </DxPage>
   );
 }

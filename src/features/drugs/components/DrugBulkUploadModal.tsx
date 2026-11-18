@@ -1,13 +1,11 @@
 import { useRef, useState } from "react";
 import {
-  AlertCircle,
   CheckCircle2,
   Download,
-  FileSpreadsheet,
   Loader2,
   UploadCloud,
-  X,
 } from "lucide-react";
+import { DxPopup, DxButton, DxMessage } from "@/components/dx";
 import {
   bulkUploadDrugs,
   downloadDrugTemplate,
@@ -20,7 +18,6 @@ export function DrugBulkUploadModal({
   onClose,
   onImported,
   title = "Bulk Upload Drugs",
-  subtitle = "Import Many Drugs From Excel",
   description = "Dosage Form, Category and Controlled are pre-filled dropdowns. Only Drug Name is required. Fill one row per drug, then upload it below.",
   importLabel = "Import Drugs",
   download = downloadDrugTemplate,
@@ -43,8 +40,6 @@ export function DrugBulkUploadModal({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<BulkDrugUploadResult | null>(null);
-
-  if (!isOpen) return null;
 
   const reset = () => {
     setFileName("");
@@ -91,155 +86,86 @@ export function DrugBulkUploadModal({
     }
   };
 
+  const resultTone = result ? (result.failed === 0 && result.created > 0 ? "success" : result.created > 0 ? "warning" : "danger") : "info";
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] p-10 max-w-2xl w-full shadow-2xl relative animate-slide-up max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={close}
-          className="absolute top-6 right-6 p-3 hover:bg-secondary-50 rounded-2xl transition-all"
-          aria-label="Close"
-        >
-          <X className="h-5 w-5 text-secondary-400" />
-        </button>
-
-        <div className="flex items-center gap-5 mb-8">
-          <div className="h-14 w-14 rounded-2xl bg-primary-600 text-white flex items-center justify-center shadow-xl shadow-primary-500/20">
-            <FileSpreadsheet className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-black font-display tracking-tight">{title}</h3>
-            <p className="text-secondary-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
-              {subtitle}
-            </p>
-          </div>
-        </div>
-
+    <DxPopup
+      isOpen={isOpen}
+      onClose={close}
+      title={title}
+      size="lg"
+      locked={uploading}
+      footer={
+        <>
+          <DxButton onClick={close} disabled={uploading}>{result ? "Done" : "Cancel"}</DxButton>
+          <DxButton variant="primary" onClick={handleUpload} isLoading={uploading} disabled={!fileName} leftIcon={<UploadCloud className="h-4 w-4" />}>{importLabel}</DxButton>
+        </>
+      }
+    >
+      <div className="space-y-5">
         {/* Step 1 — download template */}
-        <div className="rounded-2xl border border-secondary-200 p-5 mb-5">
+        <div className="rounded-md border border-[var(--dx-border)] p-5">
           <div className="flex items-start gap-4">
-            <div className="h-9 w-9 shrink-0 rounded-xl bg-primary-500/10 text-primary-600 flex items-center justify-center text-sm font-black">
-              1
-            </div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--dx-accent-soft)] text-[13px] font-bold text-[var(--dx-accent)]">1</div>
             <div className="flex-1">
-              <p className="text-sm font-bold text-secondary-900">Download the template</p>
-              <p className="mt-1 text-xs text-secondary-500 leading-relaxed">
-                {description}
-              </p>
-              <button
-                onClick={handleDownload}
-                disabled={downloading}
-                className="btn-secondary mt-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50"
-              >
-                {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Download Excel template
-              </button>
+              <p className="text-[13px] font-semibold text-[var(--dx-text)]">Download the template</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-[var(--dx-text-muted)]">{description}</p>
+              <DxButton className="mt-3" size="sm" onClick={handleDownload} isLoading={downloading} leftIcon={<Download className="h-4 w-4" />}>Download Excel template</DxButton>
             </div>
           </div>
         </div>
 
         {/* Step 2 — upload */}
-        <div className="rounded-2xl border border-secondary-200 p-5">
+        <div className="rounded-md border border-[var(--dx-border)] p-5">
           <div className="flex items-start gap-4">
-            <div className="h-9 w-9 shrink-0 rounded-xl bg-primary-500/10 text-primary-600 flex items-center justify-center text-sm font-black">
-              2
-            </div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--dx-accent-soft)] text-[13px] font-bold text-[var(--dx-accent)]">2</div>
             <div className="flex-1">
-              <p className="text-sm font-bold text-secondary-900">Upload the filled file</p>
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-dashed border-secondary-300 bg-secondary-50 px-5 py-6 text-left transition-colors hover:border-primary-400"
-              >
-                <UploadCloud className="h-6 w-6 text-primary-500" />
+              <p className="text-[13px] font-semibold text-[var(--dx-text)]">Upload the filled file</p>
+              <button type="button" onClick={() => fileRef.current?.click()} className="mt-3 flex w-full items-center gap-3 rounded-md border border-dashed border-[var(--dx-border-strong)] bg-[var(--dx-surface-sunken)] px-5 py-6 text-left transition-colors hover:border-[var(--dx-accent)]">
+                <UploadCloud className="h-6 w-6 text-[var(--dx-accent)]" />
                 <span className="min-w-0">
-                  <span className="block text-sm font-bold text-secondary-900">
-                    {fileName || "Click to choose your .xlsx file"}
-                  </span>
-                  <span className="block text-xs text-secondary-400">Only the provided template is supported.</span>
+                  <span className="block text-[13px] font-semibold text-[var(--dx-text)]">{fileName || "Click to choose your .xlsx file"}</span>
+                  <span className="block text-[12px] text-[var(--dx-text-muted)]">Only the provided template is supported.</span>
                 </span>
               </button>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                className="hidden"
-                onChange={(e) => {
-                  setFileName(e.target.files?.[0]?.name ?? "");
-                  setResult(null);
-                  setError(null);
-                }}
-              />
+              <input ref={fileRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden"
+                onChange={(e) => { setFileName(e.target.files?.[0]?.name ?? ""); setResult(null); setError(null); }} />
             </div>
           </div>
         </div>
 
-        {error && (
-          <div className="mt-5 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 shrink-0" />
-            <span className="text-sm font-bold">{error}</span>
-          </div>
-        )}
+        {error ? <DxMessage tone="danger">{error}</DxMessage> : null}
 
-        {result && (
-          <div className="mt-5 space-y-4">
+        {result ? (
+          <div className="space-y-4">
             <div className="grid grid-cols-3 gap-3">
-              <SummaryTile label="Total Rows" value={result.total_rows} tone="slate" />
-              <SummaryTile label="Imported" value={result.created} tone="emerald" />
-              <SummaryTile label="Failed" value={result.failed} tone={result.failed ? "rose" : "slate"} />
+              <SummaryTile label="Total Rows" value={result.total_rows} tone="neutral" />
+              <SummaryTile label="Imported" value={result.created} tone="success" />
+              <SummaryTile label="Failed" value={result.failed} tone={result.failed ? "danger" : "neutral"} />
             </div>
-            <div
-              className={`p-4 rounded-2xl flex items-center gap-3 text-sm font-bold ${
-                result.failed === 0 && result.created > 0
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                  : result.created > 0
-                    ? "bg-amber-50 text-amber-700 border border-amber-100"
-                    : "bg-rose-50 text-rose-700 border border-rose-100"
-              }`}
-            >
-              {result.failed === 0 && result.created > 0 ? (
-                <CheckCircle2 className="h-5 w-5 shrink-0" />
-              ) : (
-                <AlertCircle className="h-5 w-5 shrink-0" />
-              )}
-              <span>{result.message}</span>
-            </div>
+            <DxMessage tone={resultTone}>
+              <span className="flex items-center gap-2">{result.failed === 0 && result.created > 0 ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : null}{result.message}</span>
+            </DxMessage>
 
-            {result.errors.length > 0 && (
-              <div className="rounded-2xl border border-secondary-200 overflow-hidden">
-                <div className="bg-secondary-50 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-secondary-500 flex justify-between">
-                  <span>Row</span>
-                  <span className="flex-1 ml-6">Problem</span>
+            {result.errors.length > 0 ? (
+              <div className="overflow-hidden rounded-md border border-[var(--dx-border)]">
+                <div className="flex justify-between bg-[var(--dx-surface-sunken)] px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--dx-text-muted)]">
+                  <span>Row</span><span className="ml-6 flex-1">Problem</span>
                 </div>
-                <div className="max-h-56 overflow-y-auto divide-y divide-secondary-100">
+                <div className="max-h-56 divide-y divide-[var(--dx-border)] overflow-y-auto">
                   {result.errors.map((e, i) => (
-                    <div key={i} className="px-4 py-2.5 flex items-start gap-6 text-xs">
-                      <span className="font-mono font-bold text-secondary-700 w-8 shrink-0">
-                        {e.row ?? "—"}
-                      </span>
-                      <span className="flex-1 text-rose-600 font-medium">{e.message}</span>
+                    <div key={i} className="flex items-start gap-6 px-4 py-2.5 text-[12px]">
+                      <span className="dx-mono w-8 shrink-0 font-bold text-[var(--dx-text)]">{e.row ?? "—"}</span>
+                      <span className="flex-1 font-medium" style={{ color: "var(--dx-danger)" }}>{e.message}</span>
                     </div>
                   ))}
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
-        )}
-
-        <div className="pt-7 flex gap-4">
-          <button onClick={close} disabled={uploading} className="flex-1 btn-secondary py-4 rounded-2xl font-bold">
-            {result ? "Done" : "Cancel"}
-          </button>
-          <button
-            onClick={handleUpload}
-            disabled={uploading || !fileName}
-            className="flex-[2] btn-primary py-4 rounded-2xl font-black tracking-tight shadow-xl shadow-primary-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-            {uploading ? "Importing..." : importLabel}
-          </button>
-        </div>
+        ) : null}
       </div>
-    </div>
+    </DxPopup>
   );
 }
 
@@ -250,18 +176,17 @@ function SummaryTile({
 }: {
   label: string;
   value: number;
-  tone: "slate" | "emerald" | "rose";
+  tone: "neutral" | "success" | "danger";
 }) {
-  const cls =
-    tone === "emerald"
-      ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-      : tone === "rose"
-        ? "bg-rose-50 text-rose-600 border-rose-100"
-        : "bg-secondary-50 text-secondary-600 border-secondary-200";
+  const style = tone === "success"
+    ? { background: "var(--dx-success-soft)", color: "var(--dx-success)", borderColor: "var(--dx-success)" }
+    : tone === "danger"
+      ? { background: "var(--dx-danger-soft)", color: "var(--dx-danger)", borderColor: "var(--dx-danger)" }
+      : { background: "var(--dx-surface-sunken)", color: "var(--dx-text-muted)", borderColor: "var(--dx-border)" };
   return (
-    <div className={`rounded-2xl border p-4 text-center ${cls}`}>
-      <p className="text-2xl font-black tracking-tight">{value}</p>
-      <p className="text-[9px] font-bold uppercase tracking-widest opacity-80 mt-0.5">{label}</p>
+    <div className="rounded-md border p-4 text-center" style={style}>
+      <p className="text-[22px] font-bold tracking-tight">{value}</p>
+      <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-widest opacity-80">{label}</p>
     </div>
   );
 }

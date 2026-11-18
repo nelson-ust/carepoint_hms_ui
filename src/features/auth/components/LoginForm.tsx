@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Lock, Mail, Building2, ChevronRight, AlertCircle, ShieldCheck, Heart, Sparkles, Eye, EyeOff } from "lucide-react";
 import { routes } from "@/config/routes";
 import { login } from "@/features/auth/api/auth.api";
@@ -225,7 +225,7 @@ export function LoginForm() {
             <div className="space-y-2">
               <div className="flex items-center justify-between ml-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Passkey</label>
-                <a href="#" className="text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-emerald-300 transition-colors">Forgot Password?</a>
+                <Link to={`${routes.forgotPassword}${(urlTenant || tenantCode) ? `?tenant_code=${encodeURIComponent(urlTenant || tenantCode)}` : ""}`} className="text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-emerald-300 transition-colors">Forgot Password?</Link>
               </div>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-5 text-slate-500 group-focus-within:text-emerald-400 transition-colors">

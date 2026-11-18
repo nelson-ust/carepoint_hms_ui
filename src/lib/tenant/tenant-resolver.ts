@@ -26,13 +26,27 @@ export function resolveTenantCode(): string | null {
     }
   }
 
-  // 2. Fallback to stored tenant if no subdomain is present
+  // 2. Explicit tenant_code in the URL query string. Password-reset links
+  //    emailed to tenant users look like
+  //    "/reset-password?token=...&tenant_code=STNICHOLAS" and are opened on a
+  //    bare domain (no subdomain), so without this the tenant context is lost
+  //    and the reset is treated as a SaaS request.
+  try {
+    const qsTenant = new URLSearchParams(window.location.search).get("tenant_code");
+    if (qsTenant && qsTenant.trim()) {
+      return qsTenant.trim().toUpperCase();
+    }
+  } catch {
+    // window.location.search unavailable in this context — ignore.
+  }
+
+  // 3. Fallback to stored tenant if no subdomain is present
   const storedTenant = localStorageService.get(storageKeys.tenantCode);
   if (storedTenant) {
     return storedTenant;
   }
 
-  // 3. Last fallback to env default
+  // 4. Last fallback to env default
   return env.defaultTenantCode || null;
 }
 

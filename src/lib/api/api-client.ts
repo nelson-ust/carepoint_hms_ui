@@ -20,7 +20,13 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   const accessToken = localStorageService.get(storageKeys.accessToken);
 
-  if (accessToken && !config.headers.Authorization) {
+  // The login endpoint must never carry a leftover bearer token: switching
+  // between a SaaS login and a tenant login on the same browser would send the
+  // previous session's token to the new login, which the tenant-side can
+  // reject in a way that surfaces as a "cannot reach the server" error.
+  const isLoginRequest = /\/auth\/login$/.test(config.url || "");
+
+  if (accessToken && !isLoginRequest && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
 

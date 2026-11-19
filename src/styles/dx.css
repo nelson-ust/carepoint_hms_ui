@@ -708,6 +708,8 @@ html.dark select.dx-editor {
 /* Segmented (button group) */
 .dx-segmented {
   display: inline-flex;
+  flex-shrink: 0;
+  max-width: 100%;
   border: 1px solid var(--dx-border-strong);
   border-radius: var(--dx-radius);
   overflow: hidden;
@@ -725,6 +727,8 @@ html.dark select.dx-editor {
   font-weight: 500;
   cursor: pointer;
   display: inline-flex;
+  flex-shrink: 0;
+  white-space: nowrap;
   align-items: center;
   gap: 6px;
 }

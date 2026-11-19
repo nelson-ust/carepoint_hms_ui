@@ -300,6 +300,42 @@ export function VisitDetailPage() {
     onError: (err) => toast.error("Could not record vital signs", apiErrorMessage(err)),
   });
 
+  // ---------- Death / mortuary (hooks must run before the render guards) ----------
+  const mortuaryUnitsQuery = useQuery({
+    queryKey: ["mortuary", "units", "for-death"],
+    queryFn: () => mortuaryApi.listUnits({ limit: 200 }),
+    enabled: isDeathOpen,
+  });
+  const deathUnitOptions = useMemo(
+    () =>
+      (mortuaryUnitsQuery.data?.items ?? [])
+        .filter((u) => u.status !== "OUT_OF_SERVICE" && u.available_slots > 0)
+        .map((u) => ({ value: String(u.id), label: `${u.name} (${u.available_slots} free)` })),
+    [mortuaryUnitsQuery.data],
+  );
+  const recordDeathMutation = useMutation({
+    mutationFn: () =>
+      mortuaryApi.recordDeath({
+        patient_id: visit!.patient_id,
+        visit_id: visit!.id,
+        date_of_death: deathForm.date_of_death || new Date().toISOString(),
+        cause_of_death: deathForm.cause_of_death || undefined,
+        place_of_death: deathForm.place_of_death || undefined,
+        notes: deathForm.notes || undefined,
+        deposit_to_mortuary: deathForm.deposit,
+        mortuary_unit_id: deathForm.deposit && deathForm.mortuary_unit_id ? Number(deathForm.mortuary_unit_id) : undefined,
+      }),
+    onSuccess: (res) => {
+      toast.success("Death recorded", res.record ? "Body deposited to the mortuary." : "The visit has been closed as deceased.");
+      setDeathOpen(false);
+      setDeathForm({ date_of_death: "", cause_of_death: "", place_of_death: "Hospital", notes: "", deposit: false, mortuary_unit_id: "" });
+      qc.invalidateQueries({ queryKey: ["mortuary"] });
+      refreshVisit();
+      refetchAll();
+    },
+    onError: (err) => toast.error("Could not record death", apiErrorMessage(err)),
+  });
+
   // ---------- Handlers ----------
   const openEdit = () => {
     if (!visit) return;
@@ -472,41 +508,6 @@ export function VisitDetailPage() {
       tone: "danger",
     },
   };
-
-  const mortuaryUnitsQuery = useQuery({
-    queryKey: ["mortuary", "units", "for-death"],
-    queryFn: () => mortuaryApi.listUnits({ limit: 200 }),
-    enabled: isDeathOpen,
-  });
-  const deathUnitOptions = useMemo(
-    () =>
-      (mortuaryUnitsQuery.data?.items ?? [])
-        .filter((u) => u.status !== "OUT_OF_SERVICE" && u.available_slots > 0)
-        .map((u) => ({ value: String(u.id), label: `${u.name} (${u.available_slots} free)` })),
-    [mortuaryUnitsQuery.data],
-  );
-  const recordDeathMutation = useMutation({
-    mutationFn: () =>
-      mortuaryApi.recordDeath({
-        patient_id: visit!.patient_id,
-        visit_id: visit!.id,
-        date_of_death: deathForm.date_of_death || new Date().toISOString(),
-        cause_of_death: deathForm.cause_of_death || undefined,
-        place_of_death: deathForm.place_of_death || undefined,
-        notes: deathForm.notes || undefined,
-        deposit_to_mortuary: deathForm.deposit,
-        mortuary_unit_id: deathForm.deposit && deathForm.mortuary_unit_id ? Number(deathForm.mortuary_unit_id) : undefined,
-      }),
-    onSuccess: (res) => {
-      toast.success("Death recorded", res.record ? "Body deposited to the mortuary." : "The visit has been closed as deceased.");
-      setDeathOpen(false);
-      setDeathForm({ date_of_death: "", cause_of_death: "", place_of_death: "Hospital", notes: "", deposit: false, mortuary_unit_id: "" });
-      qc.invalidateQueries({ queryKey: ["mortuary"] });
-      refreshVisit();
-      refetchAll();
-    },
-    onError: (err) => toast.error("Could not record death", apiErrorMessage(err)),
-  });
 
   const runPending = async () => {
     if (pending === "advance") await advanceMutation.mutateAsync("complete").catch(() => undefined);
